@@ -1,0 +1,60 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.example.welcometothedisco"
+    compileSdkVersion 34
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId = "com.example.welcometothedisco"
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.debug
+        }
+    }
+
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+}
+
+dependencies {
+    implementation "com.spotify.android:auth:2.1.1"
+    implementation "com.spotify.android:spotify-player:2.1.0"
+    implementation "io.flutter:flutter_embedding_debug:1.0.0"
+    implementation 'com.github.spotify:spotify-android-auth:1.2.5'
+
+}
+
+flutter {
+    source = "../.."
+}
+configurations.all {
+    resolutionStrategy {
+        force 'io.flutter:flutter_embedding_debug:1.0.0'
+    }
+}
