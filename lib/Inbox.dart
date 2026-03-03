@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/InboxedSongs.dart';
+import 'package:welcometothedisco/models/artist.dart';
 
 class Inbox extends StatelessWidget {
   final List<Artist> artists = [
@@ -14,41 +17,45 @@ class Inbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
-          child: SingleChildScrollView(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8.0),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-                ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20.0),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20.0),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF1E3DE1).withOpacity(0.45),
+                  const Color(0xFFf85187).withOpacity(0.45),
+                ],
               ),
-              width: 500.0,
-              child: ListView.builder(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: artists.length,
-                itemBuilder: (context, index) {
-                  return InboxedSongs(artist: artists[index]);
-                },
+              border: Border.all(
+                color: Colors.white.withOpacity(0.18),
+                width: 0.8,
               ),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: artists.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 0,
+                indent: 72,
+                endIndent: 16,
+                color: Colors.white.withOpacity(0.1),
+              ),
+              itemBuilder: (context, index) {
+                return InboxedSongs(artist: artists[index]);
+              },
             ),
           ),
         ),
-      ],
+      ),
     );
   }
-}
-
-class Artist {
-  String songTitle;
-  String artistName;
-  String coverImage;
-
-  Artist(this.songTitle, this.artistName,this.coverImage);
 }

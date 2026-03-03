@@ -2,10 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url "https://jitpack.io" }  // Add this line
+        maven { url "https://jitpack.io" }
         maven { url "https://storage.googleapis.com/download.flutter.io" }
-        maven { url 'https://maven.google.com' }
-        maven { url 'https://maven.spotify.com' }
 
 
     }
