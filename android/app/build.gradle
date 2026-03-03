@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.welcometothedisco"
-    compileSdkVersion 34
+    compileSdkVersion 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,11 +25,11 @@ android {
     defaultConfig {
         applicationId = "com.example.welcometothedisco"
         minSdkVersion flutter.minSdkVersion
-        targetSdkVersion 34
+        targetSdkVersion 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders += [redirectSchemeName: "spotify-sdk", redirectHostName: "auth"]
+        manifestPlaceholders += [redirectSchemeName: "welcometothedisco", redirectHostName: "callback"]
     }
 
     buildTypes {
@@ -44,7 +44,6 @@ android {
 }
 
 dependencies {
-    implementation "com.spotify.android:auth:2.1.1"
 }
 
 flutter {

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
-class BottomNavBar extends StatefulWidget {
-  const BottomNavBar({super.key});
+class BottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
 
-  @override
-  State<BottomNavBar> createState() => _BottomNavBarState();
-}
-
-class _BottomNavBarState extends State<BottomNavBar> {
-  int _selectedIndex = 3;
+  const BottomNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onTap,
+  });
 
   final List<IconData> _icons = const [
     Icons.nightlight_round,
@@ -52,13 +52,9 @@ class _BottomNavBarState extends State<BottomNavBar> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(_icons.length, (index) {
-                  final bool isSelected = _selectedIndex == index;
+                  final bool isSelected = selectedIndex == index;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedIndex = index;
-                      });
-                    },
+                    onTap: () => onTap(index),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
