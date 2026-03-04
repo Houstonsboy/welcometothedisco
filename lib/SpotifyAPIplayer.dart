@@ -30,6 +30,9 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
   bool _connecting = false;
   String _statusMessage = '';
 
+  /// Final authentication result from last login attempt. Used to show status in UI.
+  SpotifyAuthResult? _lastAuthResult;
+
   NowPlaying? _nowPlaying;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
 
@@ -96,40 +99,49 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
     setState(() {
       _connecting = true;
       _statusMessage = '';
+      _lastAuthResult = null;
       _resetSteps();
     });
 
     _setStep(0, _StepStatus.loading, detail: 'clientId: ${SpotifyAuth.clientId.substring(0, 8)}…');
     _setStep(1, _StepStatus.loading);
 
-    String? token;
+    SpotifyAuthResult result;
     try {
-      token = await _auth.login();
+      result = await _auth.login();
     } catch (e) {
+      result = SpotifyAuthResult.error(message: e.toString());
+    }
+
+    _lastAuthResult = result;
+
+    if (result.isError) {
       _setStep(0, _StepStatus.error);
-      _setStep(1, _StepStatus.error, detail: e.toString());
-      _setStep(2, _StepStatus.error, detail: 'Auth failed');
+      _setStep(1, _StepStatus.error, detail: result.message ?? '');
+      _setStep(2, _StepStatus.error, detail: result.statusLabel);
       setState(() {
         _connecting = false;
-        _statusMessage = 'Login failed: $e';
+        _statusMessage = result.statusLabel;
       });
       return;
     }
 
-    if (token == null) {
+    if (result.isCancelled) {
       _setStep(0, _StepStatus.error, detail: 'Cancelled or no code returned');
       _setStep(1, _StepStatus.error);
       _setStep(2, _StepStatus.error);
       setState(() {
         _connecting = false;
-        _statusMessage = 'Login cancelled';
+        _statusMessage = result.statusLabel;
       });
       return;
     }
 
+    // success
+    final token = result.accessToken;
     _setStep(0, _StepStatus.success, detail: 'Browser opened');
     _setStep(1, _StepStatus.success, detail: 'User authorized');
-    _setStep(2, _StepStatus.success, detail: 'Token length: ${token.length}');
+    _setStep(2, _StepStatus.success, detail: 'Token length: ${token?.length ?? 0}');
 
     _setStep(3, _StepStatus.loading, detail: 'Checking for active Spotify device…');
     final deviceId = await _api.getActiveDeviceId();
@@ -144,9 +156,12 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
     setState(() {
       _connected = true;
       _connecting = false;
-      _statusMessage = deviceId != null
-          ? 'Connected to Spotify'
-          : 'Connected (no active device — open Spotify app first)';
+      _statusMessage = result.statusLabel;
+      if (deviceId != null) {
+        _statusMessage = '${result.statusLabel} — Connected to Spotify';
+      } else {
+        _statusMessage = '${result.statusLabel} — Open Spotify app to control playback';
+      }
     });
 
     _startPolling();
@@ -221,6 +236,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
       _nowPlaying = null;
       _searchResults = [];
       _statusMessage = '';
+      _lastAuthResult = null;
       _resetSteps();
     });
   }
@@ -305,6 +321,10 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
               onTap: _connecting ? null : _connect,
               highlight: true,
             ),
+            if (_lastAuthResult != null) ...[
+              const SizedBox(height: 20),
+              _authenticationStatusCard(_lastAuthResult!),
+            ],
             if (_connecting || _steps.any((s) => s.status != _StepStatus.idle)) ...[
               const SizedBox(height: 24),
               _authStepsList(),
@@ -380,6 +400,89 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
     );
   }
 
+  /// Shows the final authentication/authorization result (success, cancelled, or error).
+  Widget _authenticationStatusCard(SpotifyAuthResult result) {
+    Color color;
+    IconData icon;
+    if (result.isSuccess) {
+      color = const Color(0xFF1DB954);
+      icon = Icons.check_circle_rounded;
+    } else if (result.isCancelled) {
+      color = Colors.amber;
+      icon = Icons.cancel_rounded;
+    } else {
+      color = Colors.redAccent;
+      icon = Icons.error_rounded;
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.5), width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Authentication status',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      result.statusLabel,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// When connected, shows a short banner that auth was successful.
+  Widget _authStatusBanner() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: const Color(0xFF1DB954), size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Authentication: Successful',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Player view ───────────────────────────────────────────────────────────
 
   Widget _playerView() {
@@ -389,6 +492,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _authStatusBanner(),
           _nowPlayingCard(),
           const SizedBox(height: 20),
           _controlsCard(),
