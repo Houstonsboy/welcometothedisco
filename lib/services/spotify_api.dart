@@ -3,7 +3,29 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:welcometothedisco/services/spotify_auth.dart';
+import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/services/token_storage_service.dart';
+
+class SpotifyUser {
+  final String id;
+  final String displayName;
+  final String? imageUrl;
+
+  const SpotifyUser({
+    required this.id,
+    required this.displayName,
+    this.imageUrl,
+  });
+
+  factory SpotifyUser.fromJson(Map<String, dynamic> json) {
+    final images = (json['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return SpotifyUser(
+      id: json['id'] as String? ?? '',
+      displayName: json['display_name'] as String? ?? json['id'] as String? ?? 'Spotify User',
+      imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+    );
+  }
+}
 
 class NowPlaying {
   final String trackName;
@@ -96,18 +118,41 @@ class SpotifyPlaylist {
   }
 }
 
+class SpotifyAlbumDetails {
+  final String id;
+  final String title;
+  final String artistName;
+  final String? imageUrl;
+
+  const SpotifyAlbumDetails({
+    required this.id,
+    required this.title,
+    required this.artistName,
+    this.imageUrl,
+  });
+
+  factory SpotifyAlbumDetails.fromJson(Map<String, dynamic> json) {
+    final artists = (json['artists'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final images = (json['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return SpotifyAlbumDetails(
+      id: json['id'] as String? ?? '',
+      title: json['name'] as String? ?? 'Unknown Album',
+      artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+    );
+  }
+}
+
 class SpotifyApi {
   static const String _base = 'https://api.spotify.com/v1';
 
-  final SpotifyAuth _auth;
-
-  SpotifyApi(this._auth);
+  SpotifyApi();
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
-  Future<Map<String, String>> _headers() async {
-    final token = await _auth.getToken();
-    if (token == null) throw Exception('Not authenticated — call login() first');
+  Future<Map<String, String>?> _headers() async {
+    final token = await TokenStorageService.getAccessToken();
+    if (token == null) return null;
     return {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
@@ -117,6 +162,10 @@ class SpotifyApi {
   Future<http.Response> _get(String path, {Map<String, String>? query}) async {
     final uri = Uri.parse('$_base$path').replace(queryParameters: query);
     final h = await _headers();
+    if (h == null) {
+      debugPrint('[SpotifyApi] GET $path → no token (Spotify not connected)');
+      return http.Response('', 401);
+    }
     final resp = await http.get(uri, headers: h);
     debugPrint('[SpotifyApi] GET $path → ${resp.statusCode}');
     return resp;
@@ -125,6 +174,10 @@ class SpotifyApi {
   Future<http.Response> _put(String path, {Object? body, Map<String, String>? query}) async {
     final uri = Uri.parse('$_base$path').replace(queryParameters: query);
     final h = await _headers();
+    if (h == null) {
+      debugPrint('[SpotifyApi] PUT $path → no token (Spotify not connected)');
+      return http.Response('', 401);
+    }
     final resp = await http.put(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] PUT $path → ${resp.statusCode}');
     return resp;
@@ -133,12 +186,24 @@ class SpotifyApi {
   Future<http.Response> _post(String path, {Object? body, Map<String, String>? query}) async {
     final uri = Uri.parse('$_base$path').replace(queryParameters: query);
     final h = await _headers();
+    if (h == null) {
+      debugPrint('[SpotifyApi] POST $path → no token (Spotify not connected)');
+      return http.Response('', 401);
+    }
     final resp = await http.post(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] POST $path → ${resp.statusCode}');
     return resp;
   }
 
   // ── Devices ───────────────────────────────────────────────────────────────
+
+  /// Current Spotify user profile (display name, image). Returns null if not connected or request fails.
+  Future<SpotifyUser?> getCurrentUser() async {
+    final resp = await _get('/me');
+    if (resp.statusCode != 200) return null;
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return SpotifyUser.fromJson(json);
+  }
 
   /// Returns the ID of the current active device, or null if none.
   Future<String?> getActiveDeviceId() async {
@@ -291,5 +356,46 @@ class SpotifyApi {
       'uris': trackUris,
     });
     return resp.statusCode == 201 || resp.statusCode == 200;
+  }
+
+  // ── Versus album enrichment ───────────────────────────────────────────────
+
+  /// Fetches Spotify album metadata for one album ID.
+  Future<SpotifyAlbumDetails?> getAlbumDetails(String albumId) async {
+    if (albumId.isEmpty) return null;
+    final resp = await _get('/albums/$albumId');
+    if (resp.statusCode != 200) return null;
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return SpotifyAlbumDetails.fromJson(json);
+  }
+
+  /// Takes a VersusModel, fetches album1/album2 details in parallel,
+  /// and mutates the same model with title/artist/image fields.
+  Future<VersusModel> enrichWithSpotifyData(VersusModel versus) async {
+    final token = await TokenStorageService.getAccessToken();
+    if (token == null) return versus;
+
+    final results = await Future.wait([
+      getAlbumDetails(versus.album1ID),
+      getAlbumDetails(versus.album2ID),
+    ]);
+
+    final album1 = results[0];
+    final album2 = results[1];
+
+    versus.album1Title = album1?.title ?? versus.album1Name ?? versus.album1ID;
+    versus.album1ArtistName = album1?.artistName;
+    versus.album1ImageUrl = album1?.imageUrl;
+
+    versus.album2Title = album2?.title ?? versus.album2Name ?? versus.album2ID;
+    versus.album2ArtistName = album2?.artistName;
+    versus.album2ImageUrl = album2?.imageUrl;
+
+    return versus;
+  }
+
+  /// Enriches all versus docs with album metadata.
+  Future<List<VersusModel>> enrichVersusList(List<VersusModel> list) async {
+    return Future.wait(list.map(enrichWithSpotifyData));
   }
 }

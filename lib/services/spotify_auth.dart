@@ -9,6 +9,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_config.dart';
+import 'token_storage_service.dart';
+
 /// Distinct result of Spotify login. Use [statusLabel] for UI text.
 enum SpotifyAuthResultType { success, cancelled, error }
 
@@ -43,25 +46,14 @@ class SpotifyAuthResult {
 }
 
 class SpotifyAuth {
-  static const String clientId = '6fa99bd6412b4bd3ae11279feff19f53';
-  static const String redirectUri = 'welcometothedisco://callback';
   static const String _authEndpoint = 'https://accounts.spotify.com/authorize';
   static const String _tokenEndpoint = 'https://accounts.spotify.com/api/token';
 
-  static const List<String> _scopes = [
-    'user-read-playback-state',
-    'user-modify-playback-state',
-    'user-read-currently-playing',
-    'playlist-read-private',
-    'playlist-modify-public',
-    'playlist-modify-private',
-    'streaming',
-  ];
+  static String get _clientId => AppConfig.spotifyClientId;
+  static String get _redirectUri => AppConfig.spotifyRedirectUri;
+  static List<String> get _scopes => AppConfig.spotifyScopes.split(' ');
 
   static const _storage = FlutterSecureStorage();
-  static const _keyAccessToken = 'sp_access_token';
-  static const _keyRefreshToken = 'sp_refresh_token';
-  static const _keyExpiresAt = 'sp_expires_at';
   static const _keyPkceVerifier = 'sp_pkce_verifier';
 
   String? _accessToken;
@@ -104,9 +96,9 @@ class SpotifyAuth {
     await _storage.write(key: _keyPkceVerifier, value: verifier);
 
     final authUrl = Uri.parse(_authEndpoint).replace(queryParameters: {
-      'client_id': clientId,
+      'client_id': _clientId,
       'response_type': 'code',
-      'redirect_uri': redirectUri,
+      'redirect_uri': _redirectUri,
       'scope': _scopes.join(' '),
       'code_challenge_method': 'S256',
       'code_challenge': challenge,
@@ -119,7 +111,7 @@ class SpotifyAuth {
     _linkSub = appLinks.uriLinkStream.listen(
       (uri) {
         debugPrint('[SpotifyAuth] uriLinkStream received: $uri');
-        if (uri.toString().startsWith('welcometothedisco://callback') &&
+        if (uri.toString().startsWith(AppConfig.spotifyRedirectUri) &&
             _pendingCallback != null &&
             !_pendingCallback!.isCompleted) {
           _pendingCallback!.complete(uri);
@@ -134,7 +126,7 @@ class SpotifyAuth {
     );
 
     debugPrint('[SpotifyAuth] Opening auth URL in external browser...');
-    debugPrint('[SpotifyAuth] redirect_uri=$redirectUri');
+    debugPrint('[SpotifyAuth] redirect_uri=$_redirectUri');
 
     final launched = await launchUrl(
       authUrl,
@@ -229,8 +221,8 @@ class SpotifyAuth {
         body: {
           'grant_type': 'authorization_code',
           'code': code,
-          'redirect_uri': redirectUri,
-          'client_id': clientId,
+          'redirect_uri': _redirectUri,
+          'client_id': _clientId,
           'code_verifier': verifier,
         },
       );
@@ -264,7 +256,7 @@ class SpotifyAuth {
         body: {
           'grant_type': 'refresh_token',
           'refresh_token': _refreshToken!,
-          'client_id': clientId,
+          'client_id': _clientId,
         },
       );
 
@@ -287,18 +279,9 @@ class SpotifyAuth {
 
   // ── Public token getter ───────────────────────────────────────────────────
 
+  /// Returns a valid access token. Uses [TokenStorageService] (load + refresh if expired).
   Future<String?> getToken() async {
-    if (_accessToken == null) {
-      await _loadTokens();
-      if (_accessToken == null) return null;
-    }
-
-    if (_expiresAt != null &&
-        DateTime.now().isAfter(_expiresAt!.subtract(const Duration(minutes: 2)))) {
-      return _refresh();
-    }
-
-    return _accessToken;
+    return TokenStorageService.getAccessToken();
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────
@@ -307,9 +290,7 @@ class SpotifyAuth {
     _accessToken = null;
     _refreshToken = null;
     _expiresAt = null;
-    await _storage.delete(key: _keyAccessToken);
-    await _storage.delete(key: _keyRefreshToken);
-    await _storage.delete(key: _keyExpiresAt);
+    await TokenStorageService.clearTokens();
     await _clearPkceVerifier();
     debugPrint('[SpotifyAuth] Logged out, tokens cleared');
   }
@@ -326,26 +307,14 @@ class SpotifyAuth {
   }
 
   Future<void> _persistTokens() async {
-    if (_accessToken != null) {
-      await _storage.write(key: _keyAccessToken, value: _accessToken);
-    }
-    if (_refreshToken != null) {
-      await _storage.write(key: _keyRefreshToken, value: _refreshToken);
-    }
-    if (_expiresAt != null) {
-      await _storage.write(key: _keyExpiresAt, value: _expiresAt!.toIso8601String());
-    }
-  }
-
-  Future<void> _loadTokens() async {
-    _accessToken = await _storage.read(key: _keyAccessToken);
-    _refreshToken = await _storage.read(key: _keyRefreshToken);
-    final expiresStr = await _storage.read(key: _keyExpiresAt);
-    if (expiresStr != null) {
-      _expiresAt = DateTime.tryParse(expiresStr);
-    }
-    if (_accessToken != null) {
-      debugPrint('[SpotifyAuth] Loaded cached tokens, expires at $_expiresAt');
-    }
+    if (_accessToken == null) return;
+    final expiresIn = _expiresAt != null
+        ? _expiresAt!.difference(DateTime.now()).inSeconds
+        : 3600;
+    await TokenStorageService.saveTokens(
+      accessToken: _accessToken!,
+      refreshToken: _refreshToken ?? '',
+      expiresIn: expiresIn,
+    );
   }
 }

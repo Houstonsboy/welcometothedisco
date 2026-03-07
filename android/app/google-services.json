@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "941925661587",
+    "firebase_url": "https://jukebox-996de-default-rtdb.firebaseio.com",
+    "project_id": "jukebox-996de",
+    "storage_bucket": "jukebox-996de.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:941925661587:android:c28151ca996d3c8d7ac666",
+        "android_client_info": {
+          "package_name": "com.example.welcometothedisco"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "941925661587-1gndft15jmlnnuau01nmubkpa7apba45.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.welcometothedisco",
+            "certificate_hash": "6c8b424ac30c90e43c819a20912088ff58aa18e7"
+          }
+        },
+        {
+          "client_id": "941925661587-p5g6lrhsicmc94luad5lrprtsu444o5o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCl-6ccJAA5vVIt2Yq190OmUDzWpo3lEKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "941925661587-ablkf0glbroi01s3n6qcsma84ocae8mb.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "941925661587-5nr9m7ke9jjrhoci5tu5f6gmj8aj0pnr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.welcometothedisco"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,11 +3,17 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/BottomNavBar.dart';
+import 'package:welcometothedisco/config/app_config.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/token_storage_service.dart';
 
 class SpotifyAPIplayer extends StatefulWidget {
-  const SpotifyAPIplayer({super.key});
+  const SpotifyAPIplayer({super.key, this.embedded = false});
+
+  /// When true, only the body content is shown (no scaffold, app bar, or bottom nav).
+  /// Used when embedded in the app shell in main.dart.
+  final bool embedded;
 
   @override
   State<SpotifyAPIplayer> createState() => _SpotifyAPIplayerState();
@@ -24,7 +30,7 @@ class _AuthStep {
 
 class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
   final SpotifyAuth _auth = SpotifyAuth();
-  late final SpotifyApi _api = SpotifyApi(_auth);
+  late final SpotifyApi _api = SpotifyApi();
 
   bool _connected = false;
   bool _connecting = false;
@@ -79,7 +85,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
   }
 
   Future<void> _tryAutoLogin() async {
-    final token = await _auth.getToken();
+    final token = await TokenStorageService.getAccessToken();
     if (token != null && mounted) {
       setState(() => _connected = true);
       _startPolling();
@@ -103,7 +109,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
       _resetSteps();
     });
 
-    _setStep(0, _StepStatus.loading, detail: 'clientId: ${SpotifyAuth.clientId.substring(0, 8)}…');
+    _setStep(0, _StepStatus.loading, detail: 'clientId: ${AppConfig.spotifyClientId.length >= 8 ? AppConfig.spotifyClientId.substring(0, 8) : AppConfig.spotifyClientId}…');
     _setStep(1, _StepStatus.loading);
 
     SpotifyAuthResult result;
@@ -252,6 +258,10 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
 
   @override
   Widget build(BuildContext context) {
+    final content = _connected ? _playerView() : _connectView();
+    if (widget.embedded) {
+      return content;
+    }
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -284,7 +294,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                 ]
               : null,
         ),
-        body: _connected ? _playerView() : _connectView(),
+        body: content,
         bottomNavigationBar: BottomNavBar(
           selectedIndex: 1,
           onTap: _onTabTapped,

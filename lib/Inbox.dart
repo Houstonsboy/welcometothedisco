@@ -1,19 +1,43 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/InboxedSongs.dart';
-import 'package:welcometothedisco/models/artist.dart';
+import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 
-class Inbox extends StatelessWidget {
-  final List<Artist> artists = [
-    Artist("Batman", "Chris Brown", "https://i.pinimg.com/736x/02/46/76/02467676bc633185e2a4ddec4d321d1b.jpg"),
-    Artist("Priviledge", "TheWeeknd", "https://i.pinimg.com/474x/18/e6/e8/18e6e8e2d2b8c5b4dd77a4ae705bf96a.jpg"),
-    Artist("Billie Jean", "Michael Jackson", "https://i.pinimg.com/474x/29/0a/c1/290ac132403be3c6f288f4262f8f26a1.jpg"),
-    Artist("Sir Baudelaire", "Tyler the Creator", "https://i.pinimg.com/474x/82/e4/ba/82e4ba354a81b50f79ca6cbe94e41a48.jpg"),
-    Artist("GET OFF ME", "Kid Cudi", "https://i.pinimg.com/474x/88/b6/6b/88b66be8f0241c0388175ea7983c8236.jpg"),
-    Artist("Sunset for the dead", "Tommy Newport", "https://i.pinimg.com/474x/d0/bc/5e/d0bc5ee867837dcd3a8dcd98f54b1769.jpg"),
-    Artist("Dont Break My Heart", "TheWeeknd", "https://i.pinimg.com/474x/c2/72/d3/c272d36d0366a9272d107a01db858387.jpg"),
-  ];
+class Inbox extends StatefulWidget {
+  const Inbox({super.key});
+
+  @override
+  State<Inbox> createState() => _InboxState();
+}
+
+class _InboxState extends State<Inbox> {
+  late final Future<List<VersusModel>> _versusFuture;
+  final SpotifyApi _spotifyApi = SpotifyApi();
+
+  @override
+  void initState() {
+    super.initState();
+    _versusFuture = _loadVersusWithSpotify();
+  }
+
+  Future<List<VersusModel>> _loadVersusWithSpotify() async {
+    try {
+      final List<VersusModel> versus = await FirebaseService.getVersusList();
+      try {
+        return await _spotifyApi.enrichVersusList(versus);
+      } catch (e) {
+        debugPrint('[Inbox] Spotify enrichment failed, showing Firestore data: $e');
+        return versus;
+      }
+    } catch (e) {
+      debugPrint('[Inbox] Failed to load versus list: $e');
+      rethrow;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +63,59 @@ class Inbox extends StatelessWidget {
                 width: 0.8,
               ),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: artists.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 0,
-                indent: 72,
-                endIndent: 16,
-                color: Colors.white.withOpacity(0.1),
-              ),
-              itemBuilder: (context, index) {
-                return InboxedSongs(artist: artists[index]);
+            child: FutureBuilder<List<VersusModel>>(
+              future: _versusFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 26),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Text(
+                      'Could not load versus albums right now.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }
+
+                final versus = snapshot.data ?? [];
+                if (versus.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Text(
+                      'No versus entries yet.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: versus.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 0,
+                    indent: 16,
+                    endIndent: 16,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                  itemBuilder: (context, index) {
+                    return InboxedSongs(versus: versus[index]);
+                  },
+                );
               },
             ),
           ),
