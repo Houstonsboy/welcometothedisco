@@ -8,6 +8,7 @@ import 'package:welcometothedisco/StoriesTemplate.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/versus/lockeroom.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -411,7 +412,9 @@ class _CreateButton extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
-                    // TODO: navigate to create versus / lockeroom
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const Lockeroom()),
+                    );
                   },
                   borderRadius: BorderRadius.circular(20.0),
                   child: Container(

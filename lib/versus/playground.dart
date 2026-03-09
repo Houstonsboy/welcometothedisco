@@ -43,7 +43,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   bool _isPlayLoading = false;
   bool _isBombLoading = false;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
-  final Map<String, int> _trackIdToIndex = {};
+  String? _advanceOnTrackId;
 
   /// At each track index, which album was voted: 0 = album1, 1 = album2.
   /// Only one vote per index (toggle: voting for one disables the other).
@@ -154,14 +154,19 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final roundIndex = _activeTrackIndex;
     final t1 = albums[0]?.tracks.elementAtOrNull(roundIndex);
     final t2 = albums[1]?.tracks.elementAtOrNull(roundIndex);
-    if (t1 == null || t1.id.isEmpty) return;
+    if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) return;
 
     setState(() => _isPlayLoading = true);
     try {
-      await _api.play(t1.uri);
-      if (t2 != null && t2.id.isNotEmpty) {
-        await _api.queueTrack(t2.uri);
-      }
+      final played = await _api.play(t1.uri);
+      if (!played) return;
+      final queued = await _api.queueTrack(t2.uri);
+      if (!queued) return;
+
+      // Keep round highlight in sync with playback progression:
+      // advance once album2 (same index) starts playing.
+      _advanceOnTrackId = t2.id;
+      _startNowPlayingIndexTracking();
       if (mounted) {
         setState(() => _playingTrackIndex = roundIndex);
       }
@@ -179,9 +184,17 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         .listen((nowPlaying) {
       final trackId = nowPlaying?.trackId;
       if (!mounted || trackId == null || trackId.isEmpty) return;
-      final index = _trackIdToIndex[trackId];
-      if (index == null || index == _activeTrackIndex) return;
-      setState(() => _activeTrackIndex = index);
+      if (_advanceOnTrackId != null && trackId == _advanceOnTrackId) {
+        final albums = _albums;
+        final total = math.min(
+          albums?[0]?.tracks.length ?? 0,
+          albums?[1]?.tracks.length ?? 0,
+        );
+        if (_activeTrackIndex < total - 1) {
+          setState(() => _activeTrackIndex++);
+        }
+        _advanceOnTrackId = null;
+      }
     });
   }
 
@@ -203,8 +216,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     return _api.queueRoundTracks(a1Track.uri, a2Track.uri);
   }
 
-  /// One-tap bomb queue: play current index (album1 track), queue album2 same
-  /// index, then queue all remaining round pairs in order.
+  /// One-tap bomb queue: queue only future round pairs
+  /// (currentIndex + 1 ... end) without starting playback.
   Future<void> _handleNext() async {
     if (_isBombLoading) return;
     final albums = _albums;
@@ -212,36 +225,11 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final a1Total = albums[0]?.tracks.length ?? 0;
     final a2Total = albums[1]?.tracks.length ?? 0;
     final total = math.min(a1Total, a2Total);
-    if (total <= 0 || _activeTrackIndex >= total) return;
-
-    final startIndex = _activeTrackIndex;
-    final startTrack1 = albums[0]?.tracks.elementAtOrNull(startIndex);
-    final startTrack2 = albums[1]?.tracks.elementAtOrNull(startIndex);
-    if (startTrack1 == null ||
-        startTrack2 == null ||
-        startTrack1.id.isEmpty ||
-        startTrack2.id.isEmpty) {
-      return;
-    }
-
-    _trackIdToIndex.clear();
-    for (int i = startIndex; i < total; i++) {
-      final t1 = albums[0]?.tracks.elementAtOrNull(i);
-      final t2 = albums[1]?.tracks.elementAtOrNull(i);
-      if (t1 != null && t1.id.isNotEmpty) _trackIdToIndex[t1.id] = i;
-      if (t2 != null && t2.id.isNotEmpty) _trackIdToIndex[t2.id] = i;
-    }
-    _startNowPlayingIndexTracking();
+    if (total <= 0 || _activeTrackIndex >= total - 1) return;
 
     setState(() => _isBombLoading = true);
     try {
-      final played = await _api.play(startTrack1.uri);
-      if (!played) return;
-
-      final queuedSecond = await _api.queueTrack(startTrack2.uri);
-      if (!queuedSecond) return;
-
-      for (int i = startIndex + 1; i < total; i++) {
+      for (int i = _activeTrackIndex + 1; i < total; i++) {
         final queued = await _queueRoundAtIndex(i);
         if (!queued) {
           debugPrint('[Playground] bomb queue stopped at index $i');

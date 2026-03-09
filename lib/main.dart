@@ -9,6 +9,7 @@ import 'package:welcometothedisco/firebase_options.dart';
 import 'package:welcometothedisco/config/app_config.dart';
 import 'package:welcometothedisco/authentication/login.dart';
 import 'package:welcometothedisco/HomeScreen.dart';
+import 'package:welcometothedisco/Inbox.dart';
 import 'package:welcometothedisco/SpotifyAPIplayer.dart';
 import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
+      navigatorObservers: [inboxRouteObserver],
       routes: {
         '/': (_) => const _AuthGate(),
         '/spotify': (_) => const SpotifyAPIplayer(),

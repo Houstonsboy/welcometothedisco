@@ -107,6 +107,23 @@ class FirebaseService {
     });
   }
 
+  /// Saves a versus document from lockeroom input.
+  /// Document fields in "versus":
+  /// Author, album1ID, album1Name, album2ID, album2Name, timestamp
+  static Future<void> createVersusFromLockeroom({
+    required String album1ID,
+    required String album1Name,
+    required String album2ID,
+    required String album2Name,
+  }) async {
+    await createVersus(
+      album1ID: album1ID.trim(),
+      album1Name: album1Name.trim(),
+      album2ID: album2ID.trim(),
+      album2Name: album2Name.trim(),
+    );
+  }
+
   // ── Delete ────────────────────────────────────────────────────────────────
   static Future<void> deleteVersus(String documentId) async {
     final uid = _auth.currentUser?.uid;

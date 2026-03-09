@@ -409,6 +409,25 @@ class SpotifyApi {
         .toList();
   }
 
+  /// Search for albums by user query. Returns list of album details (id, title, artist, image).
+  Future<List<SpotifyAlbumDetails>> searchAlbums(String query, {int limit = 20}) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+    final resp = await _get('/search', query: {
+      'q': q,
+      'type': 'album',
+      'limit': '$limit',
+    });
+    if (resp.statusCode != 200) return [];
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final albums = json['albums'] as Map<String, dynamic>? ?? {};
+    final items = (albums['items'] as List?) ?? [];
+    return items
+        .cast<Map<String, dynamic>>()
+        .map((a) => SpotifyAlbumDetails.fromJson(a))
+        .toList();
+  }
+
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<List<SpotifyPlaylist>> getMyPlaylists({int limit = 50}) async {
