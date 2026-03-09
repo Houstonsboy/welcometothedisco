@@ -14,6 +14,8 @@ class AlbumResult {
   final String id;
   final String name;
   final String artistName;
+  final String? artistId;
+  final String? artistImageUrl;
   final String? imageUrl;
   final List<TrackResult> tracks;
 
@@ -21,6 +23,8 @@ class AlbumResult {
     required this.id,
     required this.name,
     required this.artistName,
+    this.artistId,
+    this.artistImageUrl,
     this.imageUrl,
     this.tracks = const [],
   });
@@ -127,6 +131,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
         id: a.id,
         name: a.title,
         artistName: a.artistName,
+        artistId: a.artistId,
         imageUrl: a.imageUrl,
       );
 
@@ -135,6 +140,8 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
         id: base.id,
         name: base.name,
         artistName: base.artistName,
+        artistId: base.artistId,
+        artistImageUrl: base.artistImageUrl,
         imageUrl: base.imageUrl,
         tracks: full.tracks
             .map((t) => TrackResult(
@@ -146,10 +153,27 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
             .toList(),
       );
 
+  Future<String?> _resolveArtistImage(String? artistId) async {
+    if (artistId == null || artistId.isEmpty) return null;
+    final artist = await _spotifyApi.getArtistDetails(artistId);
+    return artist?.imageUrl;
+  }
+
   // ── Selection ──────────────────────────────────────────────────────────────
   Future<void> _selectAlbum(AlbumResult album) async {
     final full = await _spotifyApi.getAlbumWithTracks(album.id);
-    final selected = full == null ? album : _withTracks(album, full);
+    final artistImageUrl = await _resolveArtistImage(album.artistId);
+    final baseWithArtist = AlbumResult(
+      id: album.id,
+      name: album.name,
+      artistName: album.artistName,
+      artistId: album.artistId,
+      artistImageUrl: artistImageUrl,
+      imageUrl: album.imageUrl,
+      tracks: album.tracks,
+    );
+    final selected =
+        full == null ? baseWithArtist : _withTracks(baseWithArtist, full);
     if (!mounted) return;
     setState(() {
       if (_album1 == null) {
@@ -271,7 +295,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-            if (bothSelected)
+            if (hasAlbum1 || hasAlbum2)
               SliverToBoxAdapter(child: _buildTrackPreviews()),
             if (bothSelected)
               SliverToBoxAdapter(child: _buildSaveButton()),
@@ -394,79 +418,71 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
     );
   }
 
-  // ── Album slots ────────────────────────────────────────────────────────────
+  // ── Album slots (compact artist circles) ───────────────────────────────────
   Widget _buildAlbumSlots(bool hasAlbum1, bool hasAlbum2) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Stack(
-        alignment: Alignment.center,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _AlbumSlot(
-                  album: _album1,
-                  label: 'ALBUM 1',
-                  accentColor: _kBlue,
-                  isEmpty: !hasAlbum1,
-                  onClear: () => _clearAlbum(1),
-                ),
-              ),
-              const SizedBox(width: 56),
-              Expanded(
-                child: _AlbumSlot(
-                  album: _album2,
-                  label: 'ALBUM 2',
-                  accentColor: _kPink,
-                  isEmpty: !hasAlbum2,
-                  onClear: () => _clearAlbum(2),
-                ),
-              ),
-            ],
+          _ArtistChip(
+            album: _album1,
+            label: 'ALBUM 1',
+            accentColor: _kBlue,
+            onClear: () => _clearAlbum(1),
           ),
-          // VS badge — pulsing, glass + gradient
-          AnimatedBuilder(
-            animation: _vsAnim,
-            builder: (_, child) =>
-                Transform.scale(scale: _vsAnim.value, child: child),
-            child: ClipOval(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [_kBlue, _kPink],
-                    ),
-                    border: Border.all(
-                        color: Colors.white.withOpacity(0.3), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _kPink.withOpacity(0.45),
-                        blurRadius: 20,
-                        spreadRadius: 2,
+          // VS pill
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: AnimatedBuilder(
+              animation: _vsAnim,
+              builder: (_, child) =>
+                  Transform.scale(scale: _vsAnim.value, child: child),
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_kBlue, _kPink],
                       ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'VS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.3), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _kPink.withOpacity(0.4),
+                          blurRadius: 14,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'VS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+          ),
+          _ArtistChip(
+            album: _album2,
+            label: 'ALBUM 2',
+            accentColor: _kPink,
+            onClear: () => _clearAlbum(2),
           ),
         ],
       ),
@@ -545,17 +561,31 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
 
   // ── Track previews ─────────────────────────────────────────────────────────
   Widget _buildTrackPreviews() {
+    final hasAlbum1 = _album1 != null;
+    final hasAlbum2 = _album2 != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: _TrackPreviewCard(album: _album1!, accentColor: _kBlue),
+            child: hasAlbum1
+                ? _TrackPreviewCard(album: _album1!, accentColor: _kBlue)
+                : _TrackPreviewPlaceholder(
+                    label: 'ALBUM 1',
+                    message: 'Pick an album to preview tracks.',
+                    accentColor: _kBlue,
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _TrackPreviewCard(album: _album2!, accentColor: _kPink),
+            child: hasAlbum2
+                ? _TrackPreviewCard(album: _album2!, accentColor: _kPink)
+                : _TrackPreviewPlaceholder(
+                    label: 'ALBUM 2',
+                    message: 'Pick a challenger to preview tracks.',
+                    accentColor: _kPink,
+                  ),
           ),
         ],
       ),
@@ -639,175 +669,116 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
   }
 }
 
-// ── Album Slot ────────────────────────────────────────────────────────────────
-class _AlbumSlot extends StatelessWidget {
+// ── Artist Chip (compact circular slot) ──────────────────────────────────────
+/// Shown in the top VS row — circular artist avatar + artist name.
+/// Much smaller than the track preview cards below so those stay the main focus.
+class _ArtistChip extends StatelessWidget {
   final AlbumResult? album;
   final String label;
   final Color accentColor;
-  final bool isEmpty;
   final VoidCallback onClear;
 
-  const _AlbumSlot({
+  const _ArtistChip({
     required this.album,
     required this.label,
     required this.accentColor,
-    required this.isEmpty,
     required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: isEmpty
-                ? Colors.white.withOpacity(0.08)
-                : accentColor.withOpacity(0.18),
-            border: Border.all(
-              color: isEmpty
-                  ? Colors.white.withOpacity(0.14)
-                  : accentColor.withOpacity(0.55),
-              width: isEmpty ? 0.8 : 1.5,
-            ),
-          ),
-          child: isEmpty
-              ? _EmptySlot(label: label, accentColor: accentColor)
-              : _FilledSlot(
-                  album: album!, accentColor: accentColor, onClear: onClear),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptySlot extends StatelessWidget {
-  final String label;
-  final Color accentColor;
-  const _EmptySlot({required this.label, required this.accentColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            height: 80,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Colors.white.withOpacity(0.06),
-              border: Border.all(
-                  color: Colors.white.withOpacity(0.1), width: 0.8),
-            ),
-            child: Icon(Icons.add_rounded,
-                color: Colors.white.withOpacity(0.25), size: 28),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilledSlot extends StatelessWidget {
-  final AlbumResult album;
-  final Color accentColor;
-  final VoidCallback onClear;
-
-  const _FilledSlot({
-    required this.album,
-    required this.accentColor,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
+    final isEmpty = album == null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: album.imageUrl != null
-                      ? Image.network(album.imageUrl!, fit: BoxFit.cover)
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: accentColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.album_rounded,
-                              color: accentColor.withOpacity(0.6),
-                              size: 32),
-                        ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Circle avatar
+            ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isEmpty
+                        ? Colors.white.withOpacity(0.1)
+                        : accentColor.withOpacity(0.2),
+                    border: Border.all(
+                      color: isEmpty
+                          ? Colors.white.withOpacity(0.18)
+                          : accentColor.withOpacity(0.7),
+                      width: isEmpty ? 1 : 2,
+                    ),
+                  ),
+                  child: isEmpty
+                      ? Icon(Icons.person_rounded,
+                          color: Colors.white.withOpacity(0.25), size: 26)
+                      : (album!.artistImageUrl != null
+                          ? Image.network(album!.artistImageUrl!,
+                              fit: BoxFit.cover)
+                          : Container(
+                              color: accentColor.withOpacity(0.25),
+                              child: Icon(Icons.person_rounded,
+                                  color: accentColor.withOpacity(0.7),
+                                  size: 26),
+                            )),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                album.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                album.artistName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: accentColor.withOpacity(0.9),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          top: 6,
-          right: 6,
-          child: GestureDetector(
-            onTap: onClear,
-            child: Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _kPink.withOpacity(0.9),
-                boxShadow: [
-                  BoxShadow(
-                      color: _kPink.withOpacity(0.4), blurRadius: 8),
-                ],
-              ),
-              child: const Icon(Icons.close_rounded,
-                  color: Colors.white, size: 13),
             ),
-          ),
+            // Clear button (only when filled)
+            if (!isEmpty)
+              Positioned(
+                top: -3,
+                right: -3,
+                child: GestureDetector(
+                  onTap: onClear,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _kPink,
+                      boxShadow: [
+                        BoxShadow(
+                            color: _kPink.withOpacity(0.4), blurRadius: 6),
+                      ],
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        color: Colors.white, size: 11),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 80,
+          child: isEmpty
+              ? Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.8,
+                  ),
+                )
+              : Text(
+                  album!.artistName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: accentColor.withOpacity(0.95),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
       ],
     );
@@ -1010,6 +981,68 @@ class _TrackPreviewCard extends StatelessWidget {
               else
                 const SizedBox(height: 12),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackPreviewPlaceholder extends StatelessWidget {
+  final String label;
+  final String message;
+  final Color accentColor;
+
+  const _TrackPreviewPlaceholder({
+    required this.label,
+    required this.message,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          height: 260,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withOpacity(0.08),
+            border: Border.all(color: accentColor.withOpacity(0.35), width: 1),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.library_music_rounded,
+                      color: accentColor.withOpacity(0.75), size: 26),
+                  const SizedBox(height: 10),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: accentColor.withOpacity(0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.55),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

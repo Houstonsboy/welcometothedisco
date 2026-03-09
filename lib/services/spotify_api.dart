@@ -125,12 +125,14 @@ class SpotifyAlbumDetails {
   final String id;
   final String title;
   final String artistName;
+  final String? artistId;
   final String? imageUrl;
 
   const SpotifyAlbumDetails({
     required this.id,
     required this.title,
     required this.artistName,
+    this.artistId,
     this.imageUrl,
   });
 
@@ -141,6 +143,28 @@ class SpotifyAlbumDetails {
       id: json['id'] as String? ?? '',
       title: json['name'] as String? ?? 'Unknown Album',
       artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      artistId: artists.isNotEmpty ? artists.first['id'] as String? : null,
+      imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+    );
+  }
+}
+
+class SpotifyArtistDetails {
+  final String id;
+  final String name;
+  final String? imageUrl;
+
+  const SpotifyArtistDetails({
+    required this.id,
+    required this.name,
+    this.imageUrl,
+  });
+
+  factory SpotifyArtistDetails.fromJson(Map<String, dynamic> json) {
+    final images = (json['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return SpotifyArtistDetails(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Unknown Artist',
       imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
     );
   }
@@ -471,6 +495,15 @@ class SpotifyApi {
     if (resp.statusCode != 200) return null;
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return SpotifyAlbumDetails.fromJson(json);
+  }
+
+  /// Fetches Spotify artist metadata for one artist ID (name, profile image).
+  Future<SpotifyArtistDetails?> getArtistDetails(String artistId) async {
+    if (artistId.isEmpty) return null;
+    final resp = await _get('/artists/$artistId');
+    if (resp.statusCode != 200) return null;
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return SpotifyArtistDetails.fromJson(json);
   }
 
   /// Fetches full album data including the track list for a single album ID.
