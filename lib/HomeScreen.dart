@@ -373,12 +373,80 @@ class HomeScreenContent extends StatelessWidget {
         ),
         SliverToBoxAdapter(child: SizedBox(height: 10.0)),
         SliverToBoxAdapter(child: SearchIcon()),
-        SliverToBoxAdapter(child: SizedBox(height: 25.0)),
+        const SliverToBoxAdapter(child: SizedBox(height: 10.0)),
+        SliverToBoxAdapter(
+          child: _CreateButton(),
+        ),
+        SliverToBoxAdapter(child: SizedBox(height: 14.0)),
         SliverToBoxAdapter(
           child: RepaintBoundary(child: Inbox()),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 20.0)),
       ],
+    );
+  }
+}
+
+/// Sleek create button between search bar and Inbox — purple theme, compact.
+class _CreateButton extends StatelessWidget {
+  const _CreateButton();
+
+  static const _purple = Color(0xFF1E3DE1);
+  static const _pink = Color(0xFFf85187);
+  /// Same green as Stories.dart username text.
+  static const _createGreen = Color.fromARGB(255, 30, 222, 37);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20.0),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    // TODO: navigate to create versus / lockeroom
+                  },
+                  borderRadius: BorderRadius.circular(20.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20.0),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _purple.withOpacity(0.5),
+                          _pink.withOpacity(0.4),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      'Create',
+                      style: TextStyle(
+                        color: _createGreen,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

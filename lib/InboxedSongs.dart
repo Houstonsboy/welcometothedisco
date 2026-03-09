@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/versus/playground.dart';
 
 class InboxedSongs extends StatelessWidget {
   final VersusModel versus;
@@ -17,7 +18,13 @@ class InboxedSongs extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => VersusPlayground(versus: versus),
+            ),
+          );
+        },
         splashColor: Colors.white.withOpacity(0.08),
         highlightColor: Colors.white.withOpacity(0.04),
         child: Padding(

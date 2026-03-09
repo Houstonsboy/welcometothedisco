@@ -28,6 +28,7 @@ class SpotifyUser {
 }
 
 class NowPlaying {
+  final String? trackId;
   final String trackName;
   final String artistName;
   final String albumName;
@@ -37,6 +38,7 @@ class NowPlaying {
   final bool isPlaying;
 
   const NowPlaying({
+    this.trackId,
     required this.trackName,
     required this.artistName,
     required this.albumName,
@@ -53,6 +55,7 @@ class NowPlaying {
     final images = (album['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
     return NowPlaying(
+      trackId: item['id'] as String?,
       trackName: item['name'] as String? ?? 'Unknown',
       artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
       albumName: album['name'] as String? ?? '',
@@ -139,6 +142,77 @@ class SpotifyAlbumDetails {
       title: json['name'] as String? ?? 'Unknown Album',
       artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
       imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+    );
+  }
+}
+
+class SpotifyAlbumTrack {
+  final String id;
+  final int trackNumber;
+  final String name;
+  final String artistName;
+  final int durationMs;
+
+  const SpotifyAlbumTrack({
+    required this.id,
+    required this.trackNumber,
+    required this.name,
+    required this.artistName,
+    required this.durationMs,
+  });
+
+  String get uri => 'spotify:track:$id';
+
+  String get durationFormatted {
+    final m = durationMs ~/ 60000;
+    final s = ((durationMs % 60000) ~/ 1000).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  factory SpotifyAlbumTrack.fromJson(Map<String, dynamic> json) {
+    final artists = (json['artists'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return SpotifyAlbumTrack(
+      id: json['id'] as String? ?? '',
+      trackNumber: json['track_number'] as int? ?? 0,
+      name: json['name'] as String? ?? 'Unknown Track',
+      artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      durationMs: json['duration_ms'] as int? ?? 0,
+    );
+  }
+}
+
+class SpotifyAlbumWithTracks {
+  final String id;
+  final String title;
+  final String artistName;
+  final String? imageUrl;
+  final int totalTracks;
+  final String releaseDate;
+  final List<SpotifyAlbumTrack> tracks;
+
+  const SpotifyAlbumWithTracks({
+    required this.id,
+    required this.title,
+    required this.artistName,
+    this.imageUrl,
+    required this.totalTracks,
+    required this.releaseDate,
+    required this.tracks,
+  });
+
+  factory SpotifyAlbumWithTracks.fromJson(Map<String, dynamic> json) {
+    final artists = (json['artists'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final images = (json['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final tracksJson = json['tracks'] as Map<String, dynamic>? ?? {};
+    final trackItems = (tracksJson['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return SpotifyAlbumWithTracks(
+      id: json['id'] as String? ?? '',
+      title: json['name'] as String? ?? 'Unknown Album',
+      artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+      totalTracks: json['total_tracks'] as int? ?? trackItems.length,
+      releaseDate: json['release_date'] as String? ?? '',
+      tracks: trackItems.map(SpotifyAlbumTrack.fromJson).toList(),
     );
   }
 }
@@ -265,6 +339,17 @@ class SpotifyApi {
     return resp.statusCode == 204 || resp.statusCode == 200;
   }
 
+  /// Queue two tracks for a versus round in sequence.
+  /// Returns true only when both queue calls succeed.
+  Future<bool> queueRoundTracks(String track1Uri, String track2Uri) async {
+    final firstOk = await queueTrack(track1Uri);
+    if (!firstOk) return false;
+    final secondOk = await queueTrack(track2Uri);
+    if (!secondOk) return false;
+    debugPrint('[SpotifyApi] queued round tracks: $track1Uri | $track2Uri');
+    return true;
+  }
+
   // ── Now playing ───────────────────────────────────────────────────────────
 
   Future<NowPlaying?> getNowPlaying() async {
@@ -360,13 +445,34 @@ class SpotifyApi {
 
   // ── Versus album enrichment ───────────────────────────────────────────────
 
-  /// Fetches Spotify album metadata for one album ID.
+  /// Fetches Spotify album metadata for one album ID (cover, title, artist only).
   Future<SpotifyAlbumDetails?> getAlbumDetails(String albumId) async {
     if (albumId.isEmpty) return null;
     final resp = await _get('/albums/$albumId');
     if (resp.statusCode != 200) return null;
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return SpotifyAlbumDetails.fromJson(json);
+  }
+
+  /// Fetches full album data including the track list for a single album ID.
+  Future<SpotifyAlbumWithTracks?> getAlbumWithTracks(String albumId) async {
+    if (albumId.isEmpty) return null;
+    final resp = await _get('/albums/$albumId');
+    if (resp.statusCode != 200) {
+      debugPrint('[SpotifyApi] getAlbumWithTracks($albumId) → ${resp.statusCode}');
+      return null;
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    return SpotifyAlbumWithTracks.fromJson(json);
+  }
+
+  /// Fetches full album data for two album IDs in parallel.
+  Future<List<SpotifyAlbumWithTracks?>> getBothAlbumsWithTracks(
+      String album1Id, String album2Id) async {
+    return Future.wait([
+      getAlbumWithTracks(album1Id),
+      getAlbumWithTracks(album2Id),
+    ]);
   }
 
   /// Takes a VersusModel, fetches album1/album2 details in parallel,
