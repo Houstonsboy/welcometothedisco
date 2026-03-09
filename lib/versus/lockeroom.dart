@@ -254,15 +254,20 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
             if (_searchResults.isNotEmpty && !bothSelected)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                sliver: SliverList(
+                sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
-                    (context, i) => _AlbumResultTile(
+                    (context, i) => _AlbumResultGridTile(
                       album: _searchResults[i],
                       onTap: () => _selectAlbum(_searchResults[i]),
-                      accentColor:
-                          hasAlbum1 ? _kPink : _kBlue,
+                      accentColor: hasAlbum1 ? _kPink : _kBlue,
                     ),
                     childCount: _searchResults.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.70,
                   ),
                 ),
               ),
@@ -809,13 +814,13 @@ class _FilledSlot extends StatelessWidget {
   }
 }
 
-// ── Album Result Tile ─────────────────────────────────────────────────────────
-class _AlbumResultTile extends StatelessWidget {
+// ── Album Result Grid Tile ────────────────────────────────────────────────────
+class _AlbumResultGridTile extends StatelessWidget {
   final AlbumResult album;
   final VoidCallback onTap;
   final Color accentColor;
 
-  const _AlbumResultTile({
+  const _AlbumResultGridTile({
     required this.album,
     required this.onTap,
     required this.accentColor,
@@ -830,74 +835,57 @@ class _AlbumResultTile extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: Colors.white.withOpacity(0.1),
               border: Border.all(
                   color: Colors.white.withOpacity(0.15), width: 0.8),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: album.imageUrl != null
-                        ? Image.network(album.imageUrl!, fit: BoxFit.cover)
-                        : Container(
-                            color: accentColor.withOpacity(0.2),
-                            child: Icon(Icons.album_rounded,
-                                color: accentColor.withOpacity(0.6),
-                                size: 24),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        album.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox.expand(
+                        child: album.imageUrl != null
+                            ? Image.network(album.imageUrl!, fit: BoxFit.cover)
+                            : Container(
+                                color: accentColor.withOpacity(0.2),
+                                child: Icon(Icons.album_rounded,
+                                    color: accentColor.withOpacity(0.6),
+                                    size: 28),
+                              ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        album.artistName,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    color: accentColor.withOpacity(0.2),
-                    border: Border.all(
-                        color: accentColor.withOpacity(0.5), width: 0.8),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Text(
-                    'PICK',
+                    album.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      height: 1.15,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                  child: Text(
+                    album.artistName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
+                      color: Colors.white.withOpacity(0.62),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
