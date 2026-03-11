@@ -333,6 +333,47 @@ class SpotifyApi {
     return resp.statusCode == 204 || resp.statusCode == 200;
   }
 
+  /// Play track1 immediately, then add track2 to "Next in Queue"
+  /// (the user queue via POST /queue) so Bomb tracks appended later
+  /// maintain the correct order.
+  ///
+  /// Using uris=[t1,t2] in /play puts t2 in Spotify's "Next Up" auto-context,
+  /// which is a separate bucket from the user queue. POST /queue tracks only
+  /// play after the auto-context exhausts, breaking Bomb's order.
+  /// This approach puts everything in the same bucket.
+  Future<bool> playRoundTracks(String track1Uri, String track2Uri) async {
+    final deviceId = await getActiveDeviceId();
+    if (deviceId == null) {
+      debugPrint('[SpotifyApi] playRoundTracks() — no active device');
+      return false;
+    }
+
+    // Step 1: Play only track1 as a single-track context.
+    final playResp = await _put(
+      '/me/player/play',
+      query: {'device_id': deviceId},
+      body: {'uris': [track1Uri]},
+    );
+    if (playResp.statusCode != 204 && playResp.statusCode != 200) {
+      debugPrint('[SpotifyApi] playRoundTracks() — play failed: ${playResp.statusCode}');
+      return false;
+    }
+
+    // Step 2: Small delay so Spotify registers the new playback context
+    // before we queue — without this the queue sometimes attaches to the old context.
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Step 3: Queue track2 via /me/player/queue — lands in "Next in Queue"
+    // (same bucket as Bomb tracks), not in "Next Up" (auto-context).
+    final queueResp = await _post(
+      '/me/player/queue',
+      query: {'uri': track2Uri, 'device_id': deviceId},
+    );
+    final queueOk = queueResp.statusCode == 204 || queueResp.statusCode == 200;
+    debugPrint('[SpotifyApi] playRoundTracks() — queue track2: ${queueResp.statusCode}');
+    return queueOk;
+  }
+
   Future<bool> pause() async {
     final deviceId = await getActiveDeviceId();
     if (deviceId == null) return false;

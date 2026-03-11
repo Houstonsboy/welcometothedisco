@@ -124,6 +124,24 @@ class FirebaseService {
     );
   }
 
+  // ── Create / update user profile ─────────────────────────────────────────
+  /// Writes (or overwrites) the user document in the `users` collection.
+  /// Fields: email, username, bio, avatar_path.
+  static Future<void> createUserProfile({
+    required String uid,
+    required String email,
+    required String username,
+    required String bio,
+    required String avatarPath,
+  }) async {
+    await _firestore.collection('users').doc(uid).set({
+      'email': email,
+      'username': username,
+      'bio': bio,
+      'avatar_path': avatarPath,
+    }, SetOptions(merge: true));
+  }
+
   // ── Delete ────────────────────────────────────────────────────────────────
   static Future<void> deleteVersus(String documentId) async {
     final uid = _auth.currentUser?.uid;

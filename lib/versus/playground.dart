@@ -36,6 +36,11 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   int _activeTrackIndex = 0; // shared across both albums — same index = head-to-head
   int? _playingTrackIndex;
 
+  /// Which album's track plays FIRST when Play is pressed.
+  /// 0 = album1 leads (default), 1 = album2 leads.
+  /// Set by tapping a row on a specific album tab.
+  int _leadAlbumIndex = 0;
+
   /// Resolved album data (set once the future completes).
   List<SpotifyAlbumWithTracks?>? _albums;
 
@@ -44,6 +49,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   bool _isBombLoading = false;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
   String? _advanceOnTrackId;
+  String? _currentRoundTrack1Id;
+  String? _currentRoundTrack2Id;
+  bool _roundTrack2Started = false;
 
   /// At each track index, which album was voted: 0 = album1, 1 = album2.
   /// Only one vote per index (toggle: voting for one disables the other).
@@ -147,25 +155,35 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _slideController.forward(from: 0);
   }
 
-  /// Play the album-1 track for the current round, then queue album-2's track.
+  /// Play current round: the lead track (from the album the user tapped, or
+  /// album1 by default) plays first; the other album's track at the same index
+  /// is queued immediately after. Index only advances once the second track finishes.
   Future<void> _handlePlay() async {
     final albums = _albums;
     if (albums == null || albums.length < 2) return;
     final roundIndex = _activeTrackIndex;
-    final t1 = albums[0]?.tracks.elementAtOrNull(roundIndex);
-    final t2 = albums[1]?.tracks.elementAtOrNull(roundIndex);
-    if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) return;
+
+    // Determine lead vs follow based on which album tab was last tapped.
+    final leadAlbum   = _leadAlbumIndex;
+    final followAlbum = leadAlbum == 0 ? 1 : 0;
+
+    final tLead   = albums[leadAlbum]?.tracks.elementAtOrNull(roundIndex);
+    final tFollow = albums[followAlbum]?.tracks.elementAtOrNull(roundIndex);
+    if (tLead == null || tFollow == null ||
+        tLead.id.isEmpty || tFollow.id.isEmpty) return;
 
     setState(() => _isPlayLoading = true);
     try {
-      final played = await _api.play(t1.uri);
+      // play(lead) → queue(follow) so both land in the same "Next in Queue"
+      // bucket that Bomb also uses, preserving correct order.
+      final played = await _api.playRoundTracks(tLead.uri, tFollow.uri);
       if (!played) return;
-      final queued = await _api.queueTrack(t2.uri);
-      if (!queued) return;
 
-      // Keep round highlight in sync with playback progression:
-      // advance once album2 (same index) starts playing.
-      _advanceOnTrackId = t2.id;
+      // Track the follow-track to detect when index should advance.
+      _currentRoundTrack1Id = tLead.id;
+      _currentRoundTrack2Id = tFollow.id;
+      _roundTrack2Started = false;
+      _advanceOnTrackId = tFollow.id;
       _startNowPlayingIndexTracking();
       if (mounted) {
         setState(() => _playingTrackIndex = roundIndex);
@@ -184,16 +202,35 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         .listen((nowPlaying) {
       final trackId = nowPlaying?.trackId;
       if (!mounted || trackId == null || trackId.isEmpty) return;
-      if (_advanceOnTrackId != null && trackId == _advanceOnTrackId) {
+
+      final roundTrack2 = _currentRoundTrack2Id;
+      if (roundTrack2 == null || _advanceOnTrackId == null) return;
+
+      // Detect when round track2 actually starts.
+      if (trackId == roundTrack2) {
+        _roundTrack2Started = true;
+        return;
+      }
+
+      // Once track2 has started, advance only when playback moves away from it.
+      if (_roundTrack2Started && trackId != roundTrack2) {
         final albums = _albums;
         final total = math.min(
           albums?[0]?.tracks.length ?? 0,
           albums?[1]?.tracks.length ?? 0,
         );
         if (_activeTrackIndex < total - 1) {
-          setState(() => _activeTrackIndex++);
+          setState(() {
+            _activeTrackIndex++;
+            _playingTrackIndex = null;
+          });
+        } else {
+          setState(() => _playingTrackIndex = null);
         }
         _advanceOnTrackId = null;
+        _currentRoundTrack1Id = null;
+        _currentRoundTrack2Id = null;
+        _roundTrack2Started = false;
       }
     });
   }
@@ -216,8 +253,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     return _api.queueRoundTracks(a1Track.uri, a2Track.uri);
   }
 
-  /// One-tap bomb queue: queue only future round pairs
-  /// (currentIndex + 1 ... end) without starting playback.
+  /// One-tap bomb: queue round pairs from the *next* index through the last
+  /// (current index is already playing/queued via Play; we do not re-queue it).
   Future<void> _handleNext() async {
     if (_isBombLoading) return;
     final albums = _albums;
@@ -246,6 +283,22 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   void _onVote(int trackIndex, int albumIndex) {
     setState(() {
       _votesByIndex[trackIndex] = albumIndex;
+    });
+  }
+
+  /// Tap any row to jump the active round to that index AND remember which
+  /// album tab was tapped so Play knows which track to start with.
+  void _onTrackTapped(int trackIndex, int albumIndex) {
+    _nowPlayingSub?.cancel();
+    _nowPlayingSub = null;
+    _advanceOnTrackId = null;
+    _currentRoundTrack1Id = null;
+    _currentRoundTrack2Id = null;
+    _roundTrack2Started = false;
+    setState(() {
+      _activeTrackIndex = trackIndex;
+      _leadAlbumIndex = albumIndex;
+      _playingTrackIndex = null;
     });
   }
 
@@ -485,6 +538,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   activeTrackIndex: _activeTrackIndex,
                                   voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
                                   onVote: (int albumIndex) => _onVote(_activeTrackIndex, albumIndex),
+                                  onTrackTap: (trackIndex, albumIndex) =>
+                                      _onTrackTapped(trackIndex, albumIndex),
                                 ),
                                 _TrackPage(
                                   album: album2,
@@ -498,6 +553,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   activeTrackIndex: _activeTrackIndex,
                                   voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
                                   onVote: (int albumIndex) => _onVote(_activeTrackIndex, albumIndex),
+                                  onTrackTap: (trackIndex, albumIndex) =>
+                                      _onTrackTapped(trackIndex, albumIndex),
                                 ),
                               ],
                             ),
@@ -512,6 +569,36 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     ),
     );
   }
+
+  // ── Avatar helper ───────────────────────────────────────────────────────────
+  /// Renders a local asset avatar (e.g. "avatar1.jpeg") or a network URL.
+  Widget _resolveAvatarWidget(String avatarPath, double size) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) {
+      return Container(
+        width: size, height: size,
+        color: Colors.white.withOpacity(0.2),
+        child: Icon(Icons.person_rounded,
+            color: Colors.white.withOpacity(0.8), size: size * 0.55),
+      );
+    }
+    // Network URL
+    if (p.startsWith('http://') || p.startsWith('https://')) {
+      return Image.network(p, width: size, height: size, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _avatarFallback(size));
+    }
+    // Local asset — normalise to "assets/images/<filename>"
+    final assetPath = p.startsWith('assets/') ? p : 'assets/images/$p';
+    return Image.asset(assetPath, width: size, height: size, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _avatarFallback(size));
+  }
+
+  Widget _avatarFallback(double size) => Container(
+        width: size, height: size,
+        color: Colors.white.withOpacity(0.2),
+        child: Icon(Icons.person_rounded,
+            color: Colors.white.withOpacity(0.8), size: size * 0.55),
+      );
 
   // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(
@@ -549,7 +636,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFFf85187), width: 1.5),
               ),
-              child: ClipOval(child: Image.network(avatarPath, fit: BoxFit.cover)),
+              child: ClipOval(
+                child: _resolveAvatarWidget(avatarPath, 34),
+              ),
             ),
           if (avatarPath != null && avatarPath.isNotEmpty)
             const SizedBox(width: 10),
@@ -709,6 +798,7 @@ class _TrackPage extends StatelessWidget {
   final int activeTrackIndex;
   final int? voteAtActiveIndex; // null = no vote, 0/1 = voted for that album
   final void Function(int albumIndex) onVote;
+  final void Function(int trackIndex, int albumIndex) onTrackTap;
 
   const _TrackPage({
     required this.album,
@@ -722,6 +812,7 @@ class _TrackPage extends StatelessWidget {
     required this.activeTrackIndex,
     required this.voteAtActiveIndex,
     required this.onVote,
+    required this.onTrackTap,
   });
 
   @override
@@ -816,6 +907,7 @@ class _TrackPage extends StatelessWidget {
                 voteAtActiveIndex != null &&
                 voteAtActiveIndex != albumIndex,
             onVote: isActive ? () => onVote(albumIndex) : null,
+            onTap: () => onTrackTap(trackIndex, albumIndex),
           ),
         );
       },
@@ -930,6 +1022,7 @@ class _TrackRow extends StatelessWidget {
   final bool isVoted;
   final bool isVoteDisabled;
   final VoidCallback? onVote;
+  final VoidCallback? onTap;
 
   const _TrackRow({
     required this.track,
@@ -943,6 +1036,7 @@ class _TrackRow extends StatelessWidget {
     this.isVoted = false,
     this.isVoteDisabled = false,
     this.onVote,
+    this.onTap,
   });
 
   @override
@@ -958,7 +1052,10 @@ class _TrackRow extends StatelessWidget {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 300),
       opacity: isLocked ? 0.62 : 1.0,
-      child: Column(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
         children: [
           Container(
             decoration: isActive
@@ -1132,6 +1229,7 @@ class _TrackRow extends StatelessWidget {
               color: Colors.white.withOpacity(0.06),
             ),
         ],
+      ),
       ),
     );
   }

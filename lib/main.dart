@@ -15,6 +15,8 @@ import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/models/users_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -165,13 +167,7 @@ class _AppShellState extends State<_AppShell> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: SpotifyHeader(
-                    user: _spotifyUser,
-                    loading: _spotifyLoading,
-                    connecting: _spotifyConnecting,
-                    onConnect: _runSpotifyAuth,
-                    compact: true,
-                  ),
+                  child: _FirebaseHeader(compact: true),
                 ),
               ],
             ),
@@ -224,6 +220,187 @@ class _AppShellState extends State<_AppShell> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Glass-style header showing Firebase user profile from users collection.
+/// Uses avatar_path as local asset filename from assets/images/.
+class _FirebaseHeader extends StatelessWidget {
+  final bool compact;
+
+  const _FirebaseHeader({this.compact = false});
+
+  String? _assetPathFromAvatar(String avatarPath) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    if (p.startsWith('/')) return p.substring(1);
+    return 'assets/images/$p';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    final size = compact ? 32.0 : 40.0;
+    final padding = compact
+        ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+        : const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+
+    return FutureBuilder<UserModel?>(
+      future: FirebaseService.getCurrentUser(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        final displayName = (user?.username.trim().isNotEmpty ?? false)
+            ? user!.username.trim()
+            : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty ?? false)
+                ? FirebaseAuth.instance.currentUser!.displayName!.trim()
+                : 'Profile';
+        final subtitle = (user?.email.trim().isNotEmpty ?? false)
+            ? user!.email.trim()
+            : (FirebaseAuth.instance.currentUser?.email ?? 'Logged in');
+        final assetPath = _assetPathFromAvatar(user?.avatarPath ?? '');
+
+        return Padding(
+          padding:
+              compact ? EdgeInsets.zero : const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(compact ? 20 : 16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: padding,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(compact ? 20 : 16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF1E3DE1).withOpacity(0.40),
+                      const Color(0xFFf85187).withOpacity(0.40),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.18),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: snapshot.connectionState == ConnectionState.waiting
+                    ? Row(
+                        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+                        children: [
+                          SizedBox(
+                            width: compact ? 16 : 20,
+                            height: compact ? 16 : 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          SizedBox(width: compact ? 8 : 12),
+                          Text(
+                            compact ? '…' : 'Loading profile…',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: compact ? 12 : 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(size / 2),
+                            child: assetPath != null
+                                ? Image.asset(
+                                    assetPath,
+                                    width: size,
+                                    height: size,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    width: size,
+                                    height: size,
+                                    color: Colors.white.withOpacity(0.2),
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white.withOpacity(0.8),
+                                      size: compact ? 18 : 24,
+                                    ),
+                                  ),
+                          ),
+                          SizedBox(width: compact ? 8 : 12),
+                          if (!compact)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Account',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (!compact)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.62),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

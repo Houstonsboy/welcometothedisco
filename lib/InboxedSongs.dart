@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/versus/playground.dart';
 
 class InboxedSongs extends StatelessWidget {
@@ -9,7 +12,6 @@ class InboxedSongs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authorUsername = versus.author?.username;
     final leftTitle = versus.album1Title ?? versus.album1Name ?? 'Album 1';
     final rightTitle = versus.album2Title ?? versus.album2Name ?? 'Album 2';
     final leftArtist = versus.album1ArtistName ?? 'Unknown artist';
@@ -32,14 +34,7 @@ class InboxedSongs extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'Author: ${authorUsername != null && authorUsername.isNotEmpty ? authorUsername : versus.authorId}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.62),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              _AuthorProfile(author: versus.author, authorId: versus.authorId),
               const SizedBox(height: 10),
               Row(
                 children: <Widget>[
@@ -81,6 +76,91 @@ class InboxedSongs extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small profile chip: circular avatar + username (no "Author:" label).
+/// Size proportional to username; matches top-bar style.
+class _AuthorProfile extends StatelessWidget {
+  final UserModel? author;
+  final String authorId;
+
+  const _AuthorProfile({this.author, required this.authorId});
+
+  static String? _assetPathFromAvatar(String avatarPath) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    if (p.startsWith('/')) return p.substring(1);
+    return 'assets/images/$p';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final username = author?.username.trim();
+    final displayName = (username != null && username.isNotEmpty)
+        ? username
+        : authorId.isNotEmpty
+            ? authorId
+            : 'Unknown';
+    final assetPath = _assetPathFromAvatar(author?.avatarPath ?? '');
+    const avatarSize = 20.0;
+    const fontSize = 11.0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            color: Colors.white.withOpacity(0.12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.18),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipOval(
+                child: assetPath != null
+                    ? Image.asset(
+                        assetPath,
+                        width: avatarSize,
+                        height: avatarSize,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        color: Colors.white.withOpacity(0.2),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white.withOpacity(0.8),
+                          size: 12,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),

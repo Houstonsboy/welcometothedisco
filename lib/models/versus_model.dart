@@ -40,9 +40,13 @@ class VersusModel {
   });
 
   factory VersusModel.fromFirestore(Map<String, dynamic> data, String id) {
+    final authorRaw = (data['Author'] as String?)?.trim() ?? '';
+    final createdByRaw = (data['createdBy'] as String?)?.trim() ?? '';
+    final resolvedAuthorId = authorRaw.isNotEmpty ? authorRaw : createdByRaw;
+
     return VersusModel(
       id: id,
-      authorId: data['createdBy'] ?? data['Author'] ?? '',
+      authorId: resolvedAuthorId,
       album1ID: data['album1ID'] ?? '',
       album1Name: data['album1Name'] ?? '',
       album2ID: data['album2ID'] ?? '',
