@@ -1132,10 +1132,11 @@ class _TrackRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Voting button (only when this track is the active round)
+                  // Voting button (only when this track is the active round).
+                  // Tappable on both tracks: tap the other track's button to switch vote.
                   if (showVoteButton) ...[
                     GestureDetector(
-                      onTap: isVoteDisabled ? null : onVote,
+                      onTap: onVote,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
