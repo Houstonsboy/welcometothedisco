@@ -30,11 +30,19 @@ class InboxedSongs extends StatelessWidget {
         splashColor: Colors.white.withOpacity(0.08),
         highlightColor: Colors.white.withOpacity(0.04),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
+          child: Transform.scale(
+            scale: 0.85,
+            alignment: Alignment.topCenter,
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              _AuthorProfile(author: versus.author, authorId: versus.authorId),
+              Center(
+                child: _AuthorProfile(
+                  author: versus.author,
+                  authorId: versus.authorId,
+                ),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: <Widget>[
@@ -79,6 +87,7 @@ class InboxedSongs extends StatelessWidget {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -87,7 +96,10 @@ class InboxedSongs extends StatelessWidget {
 
 /// Small profile chip: circular avatar + username (no "Author:" label).
 /// Size proportional to username; matches top-bar style.
+/// Uses #E7188A hue so it sticks out while blending with the glassy aesthetic.
 class _AuthorProfile extends StatelessWidget {
+  static const _accentColor = Color(0xFFE310EF);
+
   final UserModel? author;
   final String authorId;
 
@@ -121,11 +133,18 @@ class _AuthorProfile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: Colors.white.withOpacity(0.12),
+            color: _accentColor.withOpacity(0.18),
             border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-              width: 0.8,
+              color: _accentColor.withOpacity(0.5),
+              width: 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: _accentColor.withOpacity(0.15),
+                blurRadius: 8,
+                spreadRadius: 0,
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -141,10 +160,10 @@ class _AuthorProfile extends StatelessWidget {
                     : Container(
                         width: avatarSize,
                         height: avatarSize,
-                        color: Colors.white.withOpacity(0.2),
+                        color: _accentColor.withOpacity(0.35),
                         child: Icon(
                           Icons.person_rounded,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withOpacity(0.9),
                           size: 12,
                         ),
                       ),
@@ -156,9 +175,15 @@ class _AuthorProfile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withOpacity(0.95),
                     fontSize: fontSize,
                     fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        color: _accentColor.withOpacity(0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -183,67 +208,75 @@ class _AlbumTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.14),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        children: <Widget>[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: imageUrl != null && imageUrl!.isNotEmpty
-                ? Image.network(
-                    imageUrl!,
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 52,
-                    height: 52,
-                    color: Colors.white.withOpacity(0.12),
-                    child: Icon(
-                      Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.white.withOpacity(0.08),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.14),
+              width: 0.8,
+            ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              // Cover dominant, square aspect to fit widget
+              AspectRatio(
+                aspectRatio: 1,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: imageUrl != null && imageUrl!.isNotEmpty
+                        ? Image.network(
+                            imageUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            color: Colors.white.withOpacity(0.12),
+                            child: Icon(
+                              Icons.album_rounded,
+                              color: Colors.white.withOpacity(0.8),
+                              size: 32,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                child: Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: Text(
                   artist,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.72),
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
