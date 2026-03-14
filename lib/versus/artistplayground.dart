@@ -1,0 +1,1132 @@
+import 'dart:async';
+import 'dart:ui';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:welcometothedisco/models/artist_versus_model.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
+
+const _kDefaultColor1 = Color(0xFF1E3DE1);
+const _kDefaultColor2 = Color(0xFFf85187);
+const _kSpotifyGreen  = Color(0xFF17B560);
+
+class ArtistVersusPlayground extends StatefulWidget {
+  final ArtistVersusModel versus;
+
+  const ArtistVersusPlayground({super.key, required this.versus});
+
+  @override
+  State<ArtistVersusPlayground> createState() => _ArtistVersusPlaygroundState();
+}
+
+class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
+    with TickerProviderStateMixin {
+  final SpotifyApi _api = SpotifyApi();
+
+  // ── Hydrated track lists (fetched from stored IDs) ────────────────────────
+  List<SpotifyTrack> _tracks1 = [];
+  List<SpotifyTrack> _tracks2 = [];
+  bool _isLoadingTracks = true;
+  String? _loadError;
+
+  // ── Artist profile images (fetched from Spotify) ──────────────────────────
+  String? _artist1ImageUrl;
+  String? _artist2ImageUrl;
+
+  // ── Playback state ────────────────────────────────────────────────────────
+  int _selectedArtist = 0;
+  late final PageController _pageController;
+  int _activeTrackIndex = 0;
+  int? _playingTrackIndex;
+  int _leadArtistIndex = 0;
+
+  bool _isPlayLoading = false;
+  bool _isBombLoading = false;
+  StreamSubscription<NowPlaying?>? _nowPlayingSub;
+  String? _advanceOnTrackId;
+  String? _currentRoundTrack1Id;
+  String? _currentRoundTrack2Id;
+  bool _roundTrack2Started = false;
+
+  // ── Votes ─────────────────────────────────────────────────────────────────
+  final Map<int, int> _votesByIndex = {};
+
+  // ── Palette colors ────────────────────────────────────────────────────────
+  Color _color1 = _kDefaultColor1;
+  Color _color2 = _kDefaultColor2;
+
+  // ── Animations ────────────────────────────────────────────────────────────
+  late final AnimationController _pulseController;
+  late final AnimationController _slideController;
+  late final Animation<double> _pulseAnim;
+  late final Animation<double> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pageController = PageController();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _slideAnim = CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _slideController.forward();
+    _loadData();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+  Future<void> _loadData() async {
+    setState(() { _isLoadingTracks = true; _loadError = null; });
+    try {
+      // Fetch track details and artist profiles in parallel
+      final results = await Future.wait([
+        _api.getTracksByIds(widget.versus.artist1TrackIDs),
+        _api.getTracksByIds(widget.versus.artist2TrackIDs),
+        _api.getArtistDetails(widget.versus.artist1ID),
+        _api.getArtistDetails(widget.versus.artist2ID),
+      ]);
+
+      final tracks1   = results[0] as List<SpotifyTrack>;
+      final tracks2   = results[1] as List<SpotifyTrack>;
+      final artist1   = results[2] as SpotifyArtistDetails?;
+      final artist2   = results[3] as SpotifyArtistDetails?;
+
+      if (!mounted) return;
+      setState(() {
+        _tracks1 = tracks1;
+        _tracks2 = tracks2;
+        _artist1ImageUrl = artist1?.imageUrl;
+        _artist2ImageUrl = artist2?.imageUrl;
+        _isLoadingTracks = false;
+      });
+
+      // Extract palette from artist profile images
+      _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
+    } catch (e) {
+      debugPrint('[ArtistVersusPlayground] _loadData error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingTracks = false;
+          _loadError = 'Failed to load tracks. Tap to retry.';
+        });
+      }
+    }
+  }
+
+  Future<void> _extractPalette(String? url1, String? url2) async {
+    if (url1 != null && url1.isNotEmpty) {
+      try {
+        final palette = await PaletteGenerator.fromImageProvider(
+          NetworkImage(url1), size: const Size(200, 200),
+        );
+        final color = palette.vibrantColor?.color ??
+            palette.dominantColor?.color ?? _kDefaultColor1;
+        if (mounted) setState(() => _color1 = color);
+      } catch (_) {}
+    }
+    if (url2 != null && url2.isNotEmpty) {
+      try {
+        final palette = await PaletteGenerator.fromImageProvider(
+          NetworkImage(url2), size: const Size(200, 200),
+        );
+        final color = palette.vibrantColor?.color ??
+            palette.dominantColor?.color ?? _kDefaultColor2;
+        if (mounted) setState(() => _color2 = color);
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _nowPlayingSub?.cancel();
+    _pulseController.dispose();
+    _slideController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  void _selectArtist(int index) {
+    if (_selectedArtist == index) return;
+    setState(() => _selectedArtist = index);
+    _slideController.forward(from: 0);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _onPageChanged(int index) {
+    if (_selectedArtist == index) return;
+    setState(() => _selectedArtist = index);
+    _slideController.forward(from: 0);
+  }
+
+  // ── Playback ──────────────────────────────────────────────────────────────
+  Future<void> _handlePlay() async {
+    if (_tracks1.isEmpty || _tracks2.isEmpty) return;
+    final roundIndex = _activeTrackIndex;
+
+    final leadArtist   = _leadArtistIndex;
+    final followArtist = leadArtist == 0 ? 1 : 0;
+
+    final leadTracks   = leadArtist == 0 ? _tracks1 : _tracks2;
+    final followTracks = followArtist == 0 ? _tracks1 : _tracks2;
+
+    final tLead   = leadTracks.elementAtOrNull(roundIndex);
+    final tFollow = followTracks.elementAtOrNull(roundIndex);
+    if (tLead == null || tFollow == null ||
+        tLead.id.isEmpty || tFollow.id.isEmpty) return;
+
+    setState(() => _isPlayLoading = true);
+    try {
+      final played = await _api.playRoundTracks(tLead.uri, tFollow.uri);
+      if (!played) return;
+
+      _currentRoundTrack1Id = tLead.id;
+      _currentRoundTrack2Id = tFollow.id;
+      _roundTrack2Started   = false;
+      _advanceOnTrackId     = tFollow.id;
+      _startNowPlayingIndexTracking();
+      if (mounted) setState(() => _playingTrackIndex = roundIndex);
+    } catch (e) {
+      debugPrint('[ArtistVersusPlayground] _handlePlay error: $e');
+    } finally {
+      if (mounted) setState(() => _isPlayLoading = false);
+    }
+  }
+
+  void _startNowPlayingIndexTracking() {
+    _nowPlayingSub?.cancel();
+    _nowPlayingSub = _api
+        .pollNowPlaying(interval: const Duration(seconds: 2))
+        .listen((nowPlaying) {
+      final trackId = nowPlaying?.trackId;
+      if (!mounted || trackId == null || trackId.isEmpty) return;
+
+      final roundTrack2 = _currentRoundTrack2Id;
+      if (roundTrack2 == null || _advanceOnTrackId == null) return;
+
+      if (trackId == roundTrack2) {
+        _roundTrack2Started = true;
+        return;
+      }
+
+      if (_roundTrack2Started && trackId != roundTrack2) {
+        final total = math.min(_tracks1.length, _tracks2.length);
+        if (_activeTrackIndex < total - 1) {
+          setState(() {
+            _activeTrackIndex++;
+            _playingTrackIndex = null;
+          });
+        } else {
+          setState(() => _playingTrackIndex = null);
+        }
+        _advanceOnTrackId     = null;
+        _currentRoundTrack1Id = null;
+        _currentRoundTrack2Id = null;
+        _roundTrack2Started   = false;
+      }
+    });
+  }
+
+  Future<bool> _queueRoundAtIndex(int index) async {
+    final t1 = _tracks1.elementAtOrNull(index);
+    final t2 = _tracks2.elementAtOrNull(index);
+    if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) return false;
+    return _api.queueRoundTracks(t1.uri, t2.uri);
+  }
+
+  Future<void> _handleBomb() async {
+    if (_isBombLoading) return;
+    final total = math.min(_tracks1.length, _tracks2.length);
+    if (total <= 0 || _activeTrackIndex >= total - 1) return;
+
+    setState(() => _isBombLoading = true);
+    try {
+      for (int i = _activeTrackIndex + 1; i < total; i++) {
+        final queued = await _queueRoundAtIndex(i);
+        if (!queued) {
+          debugPrint('[ArtistVersusPlayground] bomb stopped at index $i');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ArtistVersusPlayground] _handleBomb error: $e');
+    } finally {
+      if (mounted) setState(() => _isBombLoading = false);
+    }
+  }
+
+  // ── Votes ─────────────────────────────────────────────────────────────────
+  void _onVote(int trackIndex, int artistIndex) {
+    setState(() => _votesByIndex[trackIndex] = artistIndex);
+  }
+
+  void _onTrackTapped(int trackIndex, int artistIndex) {
+    _nowPlayingSub?.cancel();
+    _nowPlayingSub        = null;
+    _advanceOnTrackId     = null;
+    _currentRoundTrack1Id = null;
+    _currentRoundTrack2Id = null;
+    _roundTrack2Started   = false;
+    setState(() {
+      _activeTrackIndex  = trackIndex;
+      _leadArtistIndex   = artistIndex;
+      _playingTrackIndex = null;
+    });
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final authorLabel = widget.versus.author?.username != null
+        ? '@${widget.versus.author!.username}'
+        : widget.versus.authorID;
+    final avatarPath = widget.versus.author?.avatarPath;
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: _isLoadingTracks
+            ? _buildLoadingState()
+            : _loadError != null
+                ? _buildErrorState()
+                : _buildContent(context, authorLabel, avatarPath),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: _color1),
+          const SizedBox(height: 16),
+          Text('Loading tracks...',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 13, fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: GestureDetector(
+        onTap: _loadData,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.refresh_rounded,
+                color: Colors.white.withOpacity(0.6), size: 40),
+            const SizedBox(height: 12),
+            Text(_loadError ?? 'Something went wrong',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 13, fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(
+      BuildContext context, String authorLabel, String? avatarPath) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        // ── Header ──────────────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: _buildHeader(context, authorLabel, avatarPath),
+        ),
+
+        // ── Artist selector (replaces album selector) ────────────────────────
+        SliverToBoxAdapter(
+          child: _buildArtistSelector(),
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+        // ── Swipe dots ───────────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _SwipeDot(
+                    isActive: _selectedArtist == 0, color: _color1),
+                const SizedBox(width: 6),
+                _SwipeDot(
+                    isActive: _selectedArtist == 1, color: _color2),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Track PageView ───────────────────────────────────────────────────
+        SliverFillRemaining(
+          child: Column(
+            children: [
+              // ── Playback controls ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    // Play button
+                    GestureDetector(
+                      onTap: _isPlayLoading ? null : _handlePlay,
+                      child: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _kSpotifyGreen.withOpacity(
+                              _isPlayLoading ? 0.12 : 0.25),
+                          border: Border.all(
+                            color: _kSpotifyGreen.withOpacity(
+                                _isPlayLoading ? 0.3 : 0.6),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: _isPlayLoading
+                            ? const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: CircularProgressIndicator(
+                                    color: _kSpotifyGreen, strokeWidth: 2),
+                              )
+                            : const Icon(Icons.play_arrow_rounded,
+                                color: _kSpotifyGreen, size: 24),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Round pill
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 7, horizontal: 14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: _kSpotifyGreen.withOpacity(0.2),
+                          border: Border.all(
+                              color: _kSpotifyGreen.withOpacity(0.5),
+                              width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 8, height: 8,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _kSpotifyGreen,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ROUND ${_activeTrackIndex + 1}',
+                              style: const TextStyle(
+                                color: Colors.white, fontSize: 12,
+                                fontWeight: FontWeight.w800, letterSpacing: 2,
+                              ),
+                            ),
+                            if (_playingTrackIndex != null) ...[
+                              const SizedBox(width: 10),
+                              Text(
+                                'PLAY ${_playingTrackIndex! + 1}',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.82),
+                                  fontSize: 10, fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Bomb button
+                    GestureDetector(
+                      onTap: _isBombLoading ? null : _handleBomb,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: _kSpotifyGreen.withOpacity(
+                              _isBombLoading ? 0.12 : 0.25),
+                          border: Border.all(
+                            color: _kSpotifyGreen.withOpacity(
+                                _isBombLoading ? 0.3 : 0.6),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isBombLoading)
+                              const SizedBox(
+                                width: 12, height: 12,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 1.8, color: _kSpotifyGreen),
+                              )
+                            else
+                              const Text('BOMB', style: TextStyle(
+                                color: _kSpotifyGreen, fontSize: 11,
+                                fontWeight: FontWeight.w800, letterSpacing: 1.2,
+                              )),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_rounded,
+                                color: _kSpotifyGreen, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Track pages ────────────────────────────────────────────────
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: _onPageChanged,
+                  children: [
+                    _ArtistTrackPage(
+                      tracks:           _tracks1,
+                      artistIndex:      0,
+                      artistName:       widget.versus.artist1Name,
+                      artistImageUrl:   _artist1ImageUrl,
+                      slideAnim:        _slideAnim,
+                      accentColor:      _color1,
+                      activeTrackIndex: _activeTrackIndex,
+                      voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
+                      onVote: (i) => _onVote(_activeTrackIndex, i),
+                      onTrackTap:       _onTrackTapped,
+                    ),
+                    _ArtistTrackPage(
+                      tracks:           _tracks2,
+                      artistIndex:      1,
+                      artistName:       widget.versus.artist2Name,
+                      artistImageUrl:   _artist2ImageUrl,
+                      slideAnim:        _slideAnim,
+                      accentColor:      _color2,
+                      activeTrackIndex: _activeTrackIndex,
+                      voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
+                      onVote: (i) => _onVote(_activeTrackIndex, i),
+                      onTrackTap:       _onTrackTapped,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  Widget _buildHeader(
+      BuildContext context, String authorLabel, String? avatarPath) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 20, right: 20, bottom: 8,
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.15),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.2), width: 0.8),
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white, size: 16),
+            ),
+          ),
+          const SizedBox(width: 14),
+          if (avatarPath != null && avatarPath.isNotEmpty) ...[
+            Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: const Color(0xFFf85187), width: 1.5),
+              ),
+              child: ClipOval(child: _resolveAvatarWidget(avatarPath, 34)),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('ARTIST VS', style: TextStyle(
+                color: Colors.white, fontSize: 13,
+                fontWeight: FontWeight.w900, letterSpacing: 3.5,
+              )),
+              Text(authorLabel, style: TextStyle(
+                color: _color2.withOpacity(0.9), fontSize: 11,
+                fontWeight: FontWeight.w500, letterSpacing: 0.3,
+              )),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Artist selector (replaces album cards) ────────────────────────────────
+  Widget _buildArtistSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _selectArtist(0),
+                  child: _ArtistCard(
+                    name:       widget.versus.artist1Name,
+                    imageUrl:   _artist1ImageUrl,
+                    isSelected: _selectedArtist == 0,
+                    accentColor: _color1,
+                    trackCount: _tracks1.length,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 52),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _selectArtist(1),
+                  child: _ArtistCard(
+                    name:       widget.versus.artist2Name,
+                    imageUrl:   _artist2ImageUrl,
+                    isSelected: _selectedArtist == 1,
+                    accentColor: _color2,
+                    trackCount: _tracks2.length,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // VS badge
+          AnimatedBuilder(
+            animation: _pulseAnim,
+            builder: (context, child) =>
+                Transform.scale(scale: _pulseAnim.value, child: child),
+            child: Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_color1, _color2],
+                ),
+                boxShadow: [BoxShadow(
+                  color: _color2.withOpacity(0.5),
+                  blurRadius: 18, spreadRadius: 2,
+                )],
+              ),
+              child: const Center(
+                child: Text('VS', style: TextStyle(
+                  color: Colors.white, fontSize: 14,
+                  fontWeight: FontWeight.w900, letterSpacing: 1.5,
+                )),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Avatar helper ─────────────────────────────────────────────────────────
+  Widget _resolveAvatarWidget(String avatarPath, double size) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return _avatarFallback(size);
+    if (p.startsWith('http://') || p.startsWith('https://')) {
+      return Image.network(p, width: size, height: size, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _avatarFallback(size));
+    }
+    final assetPath = p.startsWith('assets/') ? p : 'assets/images/$p';
+    return Image.asset(assetPath, width: size, height: size, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _avatarFallback(size));
+  }
+
+  Widget _avatarFallback(double size) => Container(
+    width: size, height: size,
+    color: Colors.white.withOpacity(0.2),
+    child: Icon(Icons.person_rounded,
+        color: Colors.white.withOpacity(0.8), size: size * 0.55),
+  );
+}
+
+// ── Artist Card (circular profile — replaces square album card) ───────────────
+class _ArtistCard extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+  final bool isSelected;
+  final Color accentColor;
+  final int trackCount;
+
+  const _ArtistCard({
+    required this.name,
+    required this.isSelected,
+    required this.accentColor,
+    required this.trackCount,
+    this.imageUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Circular profile only (no card background)
+        AspectRatio(
+          aspectRatio: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected
+                    ? accentColor.withOpacity(0.7)
+                    : Colors.white.withOpacity(0.12),
+                width: isSelected ? 2.5 : 1,
+              ),
+              boxShadow: isSelected
+                  ? [BoxShadow(
+                      color: accentColor.withOpacity(0.4),
+                      blurRadius: 18, spreadRadius: 2)]
+                  : [],
+            ),
+            child: ClipOval(
+              child: imageUrl != null && imageUrl!.isNotEmpty
+                  ? Image.network(imageUrl!, fit: BoxFit.cover)
+                  : Container(
+                      color: Colors.white.withOpacity(0.06),
+                      child: Icon(Icons.person_rounded, size: 36,
+                          color: Colors.white.withOpacity(0.3)),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected
+                  ? Colors.white
+                  : Colors.white.withOpacity(0.7),
+              fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Artist Track Page ─────────────────────────────────────────────────────────
+class _ArtistTrackPage extends StatelessWidget {
+  final List<SpotifyTrack> tracks;
+  final int artistIndex;
+  final String artistName;
+  final String? artistImageUrl;
+  final Animation<double> slideAnim;
+  final Color accentColor;
+  final int activeTrackIndex;
+  final int? voteAtActiveIndex;
+  final void Function(int artistIndex) onVote;
+  final void Function(int trackIndex, int artistIndex) onTrackTap;
+
+  const _ArtistTrackPage({
+    required this.tracks,
+    required this.artistIndex,
+    required this.artistName,
+    required this.artistImageUrl,
+    required this.slideAnim,
+    required this.accentColor,
+    required this.activeTrackIndex,
+    required this.voteAtActiveIndex,
+    required this.onVote,
+    required this.onTrackTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
+      physics: const BouncingScrollPhysics(),
+      itemCount: tracks.isEmpty ? 2 : tracks.length + 1,
+      itemBuilder: (context, index) {
+        // Header
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Row(
+              children: [
+                // Small circular artist avatar in header
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: accentColor.withOpacity(0.6), width: 1.2),
+                    boxShadow: [BoxShadow(
+                        color: accentColor.withOpacity(0.25), blurRadius: 6)],
+                  ),
+                  child: ClipOval(
+                    child: artistImageUrl != null && artistImageUrl!.isNotEmpty
+                        ? Image.network(artistImageUrl!, fit: BoxFit.cover)
+                        : Container(
+                            color: accentColor.withOpacity(0.3),
+                            child: const Icon(Icons.person_rounded,
+                                color: Colors.white, size: 14)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 3, height: 16,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('TRACKS', style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5,
+                )),
+                const SizedBox(width: 8),
+                Text('${tracks.length}', style: TextStyle(
+                  color: accentColor.withOpacity(0.9),
+                  fontSize: 11, fontWeight: FontWeight.w700,
+                )),
+              ],
+            ),
+          );
+        }
+
+        if (tracks.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Text('No tracks found.',
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.4), fontSize: 14)),
+          );
+        }
+
+        final trackIndex = index - 1;
+        if (trackIndex >= tracks.length) return const SizedBox.shrink();
+        final track = tracks[trackIndex];
+
+        final isActive = trackIndex == activeTrackIndex;
+        final isPast   = trackIndex < activeTrackIndex;
+        final isLocked = trackIndex > activeTrackIndex;
+
+        return AnimatedBuilder(
+          animation: slideAnim,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0,
+                24 * (1 - slideAnim.value) *
+                    math.max(0, 1 - trackIndex * 0.05)),
+            child: Opacity(
+                opacity: slideAnim.value.clamp(0.0, 1.0), child: child),
+          ),
+          child: _ArtistTrackRow(
+            track:            track,
+            index:            trackIndex,
+            accentColor:      accentColor,
+            isLast:           trackIndex == tracks.length - 1,
+            isActive:         isActive,
+            isPast:           isPast,
+            isLocked:         isLocked,
+            showVoteButton:   isActive,
+            isVoted:          isActive && voteAtActiveIndex == artistIndex,
+            isVoteDisabled:   isActive &&
+                              voteAtActiveIndex != null &&
+                              voteAtActiveIndex != artistIndex,
+            onVote:           isActive ? () => onVote(artistIndex) : null,
+            onTap:            () => onTrackTap(trackIndex, artistIndex),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Artist Track Row (uses SpotifyTrack instead of SpotifyAlbumTrack) ─────────
+class _ArtistTrackRow extends StatelessWidget {
+  final SpotifyTrack track;
+  final int index;
+  final Color accentColor;
+  final bool isLast, isActive, isPast, isLocked;
+  final bool showVoteButton, isVoted, isVoteDisabled;
+  final VoidCallback? onVote;
+  final VoidCallback? onTap;
+
+  const _ArtistTrackRow({
+    required this.track,
+    required this.index,
+    required this.accentColor,
+    this.isLast        = false,
+    this.isActive      = false,
+    this.isPast        = false,
+    this.isLocked      = false,
+    this.showVoteButton = false,
+    this.isVoted       = false,
+    this.isVoteDisabled = false,
+    this.onVote,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textOpacity  = isActive ? 1.0 : isPast ? 0.6 : 0.52;
+    final numberColor  = isActive
+        ? accentColor
+        : isPast
+            ? accentColor.withOpacity(0.5)
+            : Colors.white.withOpacity(0.42);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: isLocked ? 0.62 : 1.0,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(children: [
+          Container(
+            decoration: isActive
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: accentColor.withOpacity(0.42),
+                    border: Border.all(
+                        color: accentColor.withOpacity(0.65), width: 1.2),
+                  )
+                : null,
+            padding: isActive
+                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
+                : EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Row(children: [
+                // Track number / state icon
+                SizedBox(
+                  width: 32,
+                  child: isPast
+                      ? Icon(Icons.check_rounded,
+                          size: 15, color: accentColor.withOpacity(0.5))
+                      : isLocked
+                          ? Icon(Icons.lock_rounded,
+                              size: 14,
+                              color: Colors.white.withOpacity(0.45))
+                          : Text(
+                              '${index + 1}'.padLeft(2, '0'),
+                              style: TextStyle(
+                                color: numberColor, fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                ),
+                const SizedBox(width: 8),
+
+                // Album art thumbnail
+                if (track.albumArtUrl != null && track.albumArtUrl!.isNotEmpty)
+                  Container(
+                    width: 40, height: 40,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [BoxShadow(
+                          color: Colors.black.withOpacity(0.2), blurRadius: 5)],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                          track.albumArtUrl!, fit: BoxFit.cover),
+                    ),
+                  ),
+
+                // Track info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(track.name,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(textOpacity),
+                          fontSize: 14,
+                          fontWeight:
+                              isActive ? FontWeight.w700 : FontWeight.w500,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                      if (track.artistName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(track.artistName,
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white
+                                .withOpacity(textOpacity * 0.6),
+                            fontSize: 12, fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Vote button
+                if (showVoteButton) ...[
+                  GestureDetector(
+                    onTap: onVote,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(99),
+                        color: isVoted
+                            ? _kSpotifyGreen.withOpacity(0.5)
+                            : isVoteDisabled
+                                ? Colors.white.withOpacity(0.08)
+                                : _kSpotifyGreen.withOpacity(0.25),
+                        border: Border.all(
+                          color: isVoted
+                              ? _kSpotifyGreen
+                              : isVoteDisabled
+                                  ? Colors.white.withOpacity(0.12)
+                                  : _kSpotifyGreen.withOpacity(0.6),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          isVoted
+                              ? Icons.check_rounded
+                              : Icons.how_to_vote_rounded,
+                          size: 14,
+                          color: isVoteDisabled
+                              ? Colors.white.withOpacity(0.3)
+                              : isVoted ? Colors.white : _kSpotifyGreen,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(isVoted ? 'Voted' : 'Vote',
+                          style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: isVoteDisabled
+                                ? Colors.white.withOpacity(0.3)
+                                : isVoted ? Colors.white : _kSpotifyGreen,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+
+                // Active badge or nothing (SpotifyTrack has no duration field)
+                if (isActive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      color: accentColor.withOpacity(0.55),
+                    ),
+                    child: const Text('NOW', style: TextStyle(
+                      color: Colors.white, fontSize: 9,
+                      fontWeight: FontWeight.w800, letterSpacing: 1.5,
+                    )),
+                  ),
+              ]),
+            ),
+          ),
+          if (!isLast)
+            Divider(height: 0, indent: 44,
+                color: Colors.white.withOpacity(0.06)),
+        ]),
+      ),
+    );
+  }
+}
+
+// ── Swipe dot ─────────────────────────────────────────────────────────────────
+class _SwipeDot extends StatelessWidget {
+  final bool isActive;
+  final Color color;
+
+  const _SwipeDot({required this.isActive, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      width: isActive ? 20 : 6,
+      height: 6,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: isActive ? color : Colors.white.withOpacity(0.3),
+      ),
+    );
+  }
+}

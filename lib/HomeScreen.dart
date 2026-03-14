@@ -359,8 +359,16 @@ class SpotifyHeader extends StatelessWidget {
 
 /// Content-only home view (no app bar, no Spotify header, no bottom nav).
 /// Used inside [main.dart] app shell so the top bar is shared across all pages.
-class HomeScreenContent extends StatelessWidget {
+class HomeScreenContent extends StatefulWidget {
   const HomeScreenContent({super.key});
+
+  @override
+  State<HomeScreenContent> createState() => _HomeScreenContentState();
+}
+
+class _HomeScreenContentState extends State<HomeScreenContent> {
+  /// null = all (by timestamp), 'album' | 'artist' = filter.
+  String? _versusTypeFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -377,14 +385,117 @@ class HomeScreenContent extends StatelessWidget {
         SliverToBoxAdapter(child: SearchIcon()),
         const SliverToBoxAdapter(child: SizedBox(height: 10.0)),
         SliverToBoxAdapter(
-          child: _CreateButton(),
+          child: _InboxFilterRow(
+            typeFilter: _versusTypeFilter,
+            onFilterChanged: (v) => setState(() => _versusTypeFilter = v),
+            createButton: const _CreateButton(),
+          ),
         ),
         SliverToBoxAdapter(child: SizedBox(height: 14.0)),
         SliverToBoxAdapter(
-          child: RepaintBoundary(child: Inbox()),
+          child: RepaintBoundary(child: Inbox(typeFilter: _versusTypeFilter)),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 20.0)),
       ],
+    );
+  }
+}
+
+/// Filter chips (All | Album | Artist) to the left of the Create button.
+class _InboxFilterRow extends StatelessWidget {
+  final String? typeFilter;
+  final ValueChanged<String?> onFilterChanged;
+  final Widget createButton;
+
+  const _InboxFilterRow({
+    required this.typeFilter,
+    required this.onFilterChanged,
+    required this.createButton,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _FilterChip(
+                    label: 'All',
+                    isSelected: typeFilter == null,
+                    onTap: () => onFilterChanged(null),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: 'Album',
+                    isSelected: typeFilter == 'album',
+                    onTap: () => onFilterChanged('album'),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: 'Artist',
+                    isSelected: typeFilter == 'artist',
+                    onTap: () => onFilterChanged('artist'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          createButton,
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: isSelected
+                ? Colors.white.withOpacity(0.22)
+                : Colors.white.withOpacity(0.08),
+            border: Border.all(
+              color: isSelected
+                  ? Colors.white.withOpacity(0.4)
+                  : Colors.white.withOpacity(0.18),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(isSelected ? 0.95 : 0.7),
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

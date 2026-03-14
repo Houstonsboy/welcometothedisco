@@ -3,14 +3,17 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/InboxedSongs.dart';
-import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/models/inbox_versus_entry.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
-import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 
 class Inbox extends StatefulWidget {
-  const Inbox({super.key});
+  /// null = all (album + artist by timestamp), 'album' | 'artist' = filter.
+  final String? typeFilter;
+
+  const Inbox({super.key, this.typeFilter});
 
   @override
   State<Inbox> createState() => _InboxState();
@@ -20,7 +23,7 @@ class _InboxState extends State<Inbox> with RouteAware {
   final SpotifyApi _spotifyApi = SpotifyApi();
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
 
-  Future<List<VersusModel>>? _versusFuture;
+  Future<List<InboxVersusEntry>>? _versusFuture;
 
   @override
   void initState() {
@@ -50,6 +53,12 @@ class _InboxState extends State<Inbox> with RouteAware {
     _refresh();
   }
 
+  @override
+  void didUpdateWidget(covariant Inbox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.typeFilter != widget.typeFilter) _refresh();
+  }
+
   // ── Token check + data load ────────────────────────────────────────────────
   void _refresh() {
     setState(() {
@@ -57,8 +66,7 @@ class _InboxState extends State<Inbox> with RouteAware {
     });
   }
 
-  Future<List<VersusModel>> _loadWithTokenRefresh() async {
-    // Ensure Spotify token is valid; silently re-auth if missing.
+  Future<List<InboxVersusEntry>> _loadWithTokenRefresh() async {
     final hasToken = await TokenStorageService.hasSpotifyTokens();
     if (!hasToken) {
       try {
@@ -69,18 +77,32 @@ class _InboxState extends State<Inbox> with RouteAware {
       }
     }
 
-    // Pull a fresh access token (auto-refreshes if expired).
     await TokenStorageService.getAccessToken();
 
-    // Fetch versus list from Firestore.
     try {
-      final List<VersusModel> versus = await FirebaseService.getVersusList();
-      try {
-        return await _spotifyApi.enrichVersusList(versus);
-      } catch (e) {
-        debugPrint('[Inbox] Spotify enrichment failed, showing Firestore data: $e');
-        return versus;
+      final List<InboxVersusEntry> entries =
+          await FirebaseService.getInboxVersusList(typeFilter: widget.typeFilter);
+      // Enrich album entries with Spotify (titles, images)
+      final albumVersus =
+          entries.where((e) => e.albumVersus != null).map((e) => e.albumVersus!).toList();
+      if (albumVersus.isNotEmpty) {
+        try {
+          await _spotifyApi.enrichVersusList(albumVersus);
+        } catch (e) {
+          debugPrint('[Inbox] Spotify album enrichment failed: $e');
+        }
       }
+      // Enrich artist entries with Spotify (artist profile images)
+      final artistVersus =
+          entries.where((e) => e.artistVersus != null).map((e) => e.artistVersus!).toList();
+      if (artistVersus.isNotEmpty) {
+        try {
+          await _spotifyApi.enrichArtistVersusList(artistVersus);
+        } catch (e) {
+          debugPrint('[Inbox] Spotify artist enrichment failed: $e');
+        }
+      }
+      return entries;
     } catch (e) {
       debugPrint('[Inbox] Failed to load versus list: $e');
       rethrow;
@@ -111,7 +133,7 @@ class _InboxState extends State<Inbox> with RouteAware {
                 width: 0.8,
               ),
             ),
-            child: FutureBuilder<List<VersusModel>>(
+            child: FutureBuilder<List<InboxVersusEntry>>(
               future: _versusFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -128,7 +150,7 @@ class _InboxState extends State<Inbox> with RouteAware {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Could not load versus albums right now.',
+                          'Could not load versus right now.',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.85),
                             fontSize: 14,
@@ -152,17 +174,41 @@ class _InboxState extends State<Inbox> with RouteAware {
                   );
                 }
 
-                final versus = snapshot.data ?? [];
-                if (versus.isEmpty) {
+                final entries = snapshot.data ?? [];
+                if (entries.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.all(18),
-                    child: Text(
-                      'No versus entries yet.',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'No versus entries yet.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () async {
+                            try {
+                              await FirebaseService.backfillVersusType();
+                              if (context.mounted) _refresh();
+                            } catch (e) {
+                              debugPrint('[Inbox] backfillVersusType failed: $e');
+                            }
+                          },
+                          child: Text(
+                            'Run backfill (add type to old docs)',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 11,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -170,7 +216,7 @@ class _InboxState extends State<Inbox> with RouteAware {
                 return ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: versus.length,
+                  itemCount: entries.length,
                   separatorBuilder: (_, __) => Divider(
                     height: 0,
                     indent: 16,
@@ -178,7 +224,7 @@ class _InboxState extends State<Inbox> with RouteAware {
                     color: Colors.white.withOpacity(0.1),
                   ),
                   itemBuilder: (context, index) {
-                    return InboxedSongs(versus: versus[index]);
+                    return InboxedSongs(entry: entries[index]);
                   },
                 );
               },

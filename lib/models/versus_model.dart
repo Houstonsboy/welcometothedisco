@@ -4,6 +4,8 @@ import 'package:welcometothedisco/models/users_model.dart';
 
 class VersusModel {
   final String id;
+  /// Firestore document type: "album" or "artist".
+  final String type;
   final String authorId;
   final String album1ID;
   final String album1Name;
@@ -24,6 +26,7 @@ class VersusModel {
 
   VersusModel({
     required this.id,
+    this.type = 'album',
     required this.authorId,
     required this.album1ID,
     required this.album1Name,
@@ -46,6 +49,7 @@ class VersusModel {
 
     return VersusModel(
       id: id,
+      type: (data['type'] as String?)?.trim() ?? 'album',
       authorId: resolvedAuthorId,
       album1ID: data['album1ID'] ?? '',
       album1Name: data['album1Name'] ?? '',

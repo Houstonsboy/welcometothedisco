@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 
@@ -71,8 +72,10 @@ class SpotifyTrack {
   final String id;
   final String uri;
   final String name;
-  final String artistName;
-  final String? artistId;
+  final String artistName;      // primary artist display name
+  final String? artistId;       // primary artist ID
+  final List<String> allArtistIds;    // ALL credited artist IDs
+  final List<String> allArtistNames;  // ALL credited artist names
   final String? albumArtUrl;
 
   const SpotifyTrack({
@@ -81,21 +84,45 @@ class SpotifyTrack {
     required this.name,
     required this.artistName,
     this.artistId,
+    this.allArtistIds = const [],
+    this.allArtistNames = const [],
     this.albumArtUrl,
   });
 
   factory SpotifyTrack.fromJson(Map<String, dynamic> json) {
-    final artists = (json['artists'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final artists =
+        (json['artists'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final album = json['album'] as Map<String, dynamic>? ?? {};
-    final images = (album['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final images =
+        (album['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     return SpotifyTrack(
       id: json['id'] as String? ?? '',
       uri: json['uri'] as String? ?? '',
       name: json['name'] as String? ?? 'Unknown',
-      artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      artistName:
+          artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
       artistId: artists.isNotEmpty ? artists.first['id'] as String? : null,
+      allArtistIds: artists
+          .map((a) => a['id'] as String? ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList(),
+      allArtistNames: artists
+          .map((a) => a['name'] as String? ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList(),
       albumArtUrl: images.isNotEmpty ? images.first['url'] as String? : null,
     );
+  }
+
+  /// Returns true if [artistId] or [artistName] appears anywhere in
+  /// the full credited artists list — covers features and collabs.
+  bool hasArtist({String? id, String? name}) {
+    if (id != null && allArtistIds.contains(id)) return true;
+    if (name != null) {
+      final lower = name.toLowerCase();
+      return allArtistNames.any((n) => n.toLowerCase().contains(lower));
+    }
+    return false;
   }
 }
 
@@ -498,47 +525,74 @@ class SpotifyApi {
   /// This gives real Spotify search ranking (not just top-tracks)
   /// while guaranteeing results belong to the selected artists.
   Future<Map<String, List<SpotifyTrack>>> searchTracksByArtists(
-    String query, {
-    required String artist1Id,
-    required String artist1Name,
-    required String artist2Id,
-    required String artist2Name,
-    int limitPerArtist = 20,
-  }) async {
-    final q = query.trim();
-    if (q.isEmpty) return {artist1Id: [], artist2Id: []};
+  String query, {
+  required String artist1Id,
+  required String artist1Name,
+  required String artist2Id,
+  required String artist2Name,
+  int limitPerArtist = 20,
+}) async {
+  final q = query.trim();
+  if (q.isEmpty) return {artist1Id: [], artist2Id: []};
 
-    // Build artist-scoped queries: "track name artist:Artist Name"
-    final q1 = '$q artist:$artist1Name';
-    final q2 = '$q artist:$artist2Name';
+  // Run three searches in parallel:
+  // [0] artist-scoped for artist1 (catches their main tracks)
+  // [1] artist-scoped for artist2 (catches their main tracks)
+  // [2] broad query with no artist qualifier (catches features for both)
+  // The broad search returns more results so we request a higher limit.
+  final responses = await Future.wait([
+    _get('/search', query: {
+      'q': '$q artist:$artist1Name',
+      'type': 'track',
+      'limit': '$limitPerArtist',
+    }),
+    _get('/search', query: {
+      'q': '$q artist:$artist2Name',
+      'type': 'track',
+      'limit': '$limitPerArtist',
+    }),
+    _get('/search', query: {
+      'q': q,
+      'type': 'track',
+      'limit': '50', // broader net to surface features
+    }),
+  ]);
 
-    final responses = await Future.wait([
-      _get('/search', query: {'q': q1, 'type': 'track', 'limit': '$limitPerArtist'}),
-      _get('/search', query: {'q': q2, 'type': 'track', 'limit': '$limitPerArtist'}),
-    ]);
-
-    List<SpotifyTrack> _parseAndFilter(http.Response resp, String artistId) {
-      if (resp.statusCode != 200) return [];
-      final json = jsonDecode(resp.body) as Map<String, dynamic>;
-      final items = (json['tracks']?['items'] as List?)
-              ?.cast<Map<String, dynamic>>() ??
-          [];
-      return items
-          .map((t) => SpotifyTrack.fromJson(t))
-          // Strict filter: primary artist ID must match the selected artist
-          .where((t) => t.artistId == artistId)
-          .toList();
-    }
-
-    final tracks1 = _parseAndFilter(responses[0], artist1Id);
-    final tracks2 = _parseAndFilter(responses[1], artist2Id);
-
-    return {
-      artist1Id: tracks1,
-      artist2Id: tracks2,
-    };
+  List<SpotifyTrack> _parseTracks(http.Response resp) {
+    if (resp.statusCode != 200) return [];
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final items =
+        (json['tracks']?['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return items.map((t) => SpotifyTrack.fromJson(t)).toList();
   }
 
+  // Merge artist-scoped + broad results, then partition by artist.
+  // Deduplication is by track ID within each artist's final list.
+  final artist1Scoped = _parseTracks(responses[0]);
+  final artist2Scoped = _parseTracks(responses[1]);
+  final broad = _parseTracks(responses[2]);
+
+  List<SpotifyTrack> _buildList(
+      List<SpotifyTrack> scoped, String artistId, String artistName) {
+    // Start with artist-scoped results (best ranking), then append
+    // any featured tracks found in the broad search not already present.
+    final seen = <String>{};
+    final result = <SpotifyTrack>[];
+
+    for (final track in [...scoped, ...broad]) {
+      if (seen.contains(track.id)) continue;
+      if (!track.hasArtist(id: artistId, name: artistName)) continue;
+      seen.add(track.id);
+      result.add(track);
+    }
+    return result;
+  }
+
+  return {
+    artist1Id: _buildList(artist1Scoped, artist1Id, artist1Name),
+    artist2Id: _buildList(artist2Scoped, artist2Id, artist2Name),
+  };
+}
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<List<SpotifyPlaylist>> getMyPlaylists({int limit = 50}) async {
@@ -644,6 +698,40 @@ class SpotifyApi {
       getAlbumWithTracks(album2Id),
     ]);
   }
+  /// Fetches full track details for up to 50 track IDs in one request.
+/// Preserves the original ID order so round indices stay consistent
+/// with what was saved in Firestore.
+Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
+  if (trackIds.isEmpty) return [];
+
+  // Spotify /tracks accepts max 50 IDs per request.
+  // If somehow more than 50 are passed, chunk into batches.
+  final allTracks = <SpotifyTrack>[];
+
+  final chunks = <List<String>>[];
+  for (int i = 0; i < trackIds.length; i += 50) {
+    chunks.add(trackIds.sublist(i, math.min(i + 50, trackIds.length)));
+  }
+
+  for (final chunk in chunks) {
+    final resp = await _get('/tracks', query: {'ids': chunk.join(',')});
+    if (resp.statusCode != 200) {
+      debugPrint('[SpotifyApi] getTracksByIds → ${resp.statusCode}');
+      continue;
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final items =
+        (json['tracks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    // Spotify returns null for invalid/unavailable track IDs — filter them out
+    allTracks.addAll(
+      items
+          .where((t) => t['id'] != null)
+          .map((t) => SpotifyTrack.fromJson(t)),
+    );
+  }
+
+  return allTracks;
+}
 
   Future<VersusModel> enrichWithSpotifyData(VersusModel versus) async {
     final token = await TokenStorageService.getAccessToken();
@@ -670,5 +758,26 @@ class SpotifyApi {
 
   Future<List<VersusModel>> enrichVersusList(List<VersusModel> list) async {
     return Future.wait(list.map(enrichWithSpotifyData));
+  }
+
+  /// Fetches artist images from Spotify and sets artist1ImageUrl / artist2ImageUrl.
+  Future<ArtistVersusModel> enrichArtistVersus(ArtistVersusModel versus) async {
+    final token = await TokenStorageService.getAccessToken();
+    if (token == null) return versus;
+
+    final results = await Future.wait([
+      getArtistDetails(versus.artist1ID),
+      getArtistDetails(versus.artist2ID),
+    ]);
+    final artist1 = results[0];
+    final artist2 = results[1];
+    versus.artist1ImageUrl = artist1?.imageUrl;
+    versus.artist2ImageUrl = artist2?.imageUrl;
+    return versus;
+  }
+
+  Future<List<ArtistVersusModel>> enrichArtistVersusList(
+      List<ArtistVersusModel> list) async {
+    return Future.wait(list.map(enrichArtistVersus));
   }
 }
