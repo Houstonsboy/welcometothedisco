@@ -72,6 +72,7 @@ class SpotifyTrack {
   final String uri;
   final String name;
   final String artistName;
+  final String? artistId;
   final String? albumArtUrl;
 
   const SpotifyTrack({
@@ -79,6 +80,7 @@ class SpotifyTrack {
     required this.uri,
     required this.name,
     required this.artistName,
+    this.artistId,
     this.albumArtUrl,
   });
 
@@ -91,6 +93,7 @@ class SpotifyTrack {
       uri: json['uri'] as String? ?? '',
       name: json['name'] as String? ?? 'Unknown',
       artistName: artists.isNotEmpty ? artists.first['name'] as String? ?? '' : '',
+      artistId: artists.isNotEmpty ? artists.first['id'] as String? : null,
       albumArtUrl: images.isNotEmpty ? images.first['url'] as String? : null,
     );
   }
@@ -295,7 +298,6 @@ class SpotifyApi {
 
   // ── Devices ───────────────────────────────────────────────────────────────
 
-  /// Current Spotify user profile (display name, image). Returns null if not connected or request fails.
   Future<SpotifyUser?> getCurrentUser() async {
     final resp = await _get('/me');
     if (resp.statusCode != 200) return null;
@@ -303,7 +305,6 @@ class SpotifyApi {
     return SpotifyUser.fromJson(json);
   }
 
-  /// Returns the ID of the current active device, or null if none.
   Future<String?> getActiveDeviceId() async {
     final resp = await _get('/me/player/devices');
     if (resp.statusCode != 200) return null;
@@ -318,7 +319,6 @@ class SpotifyApi {
 
   // ── Playback control ──────────────────────────────────────────────────────
 
-  /// Play a specific track URI. Requires Premium + an active device.
   Future<bool> play(String spotifyUri) async {
     final deviceId = await getActiveDeviceId();
     if (deviceId == null) {
@@ -333,22 +333,12 @@ class SpotifyApi {
     return resp.statusCode == 204 || resp.statusCode == 200;
   }
 
-  /// Play track1 immediately, then add track2 to "Next in Queue"
-  /// (the user queue via POST /queue) so Bomb tracks appended later
-  /// maintain the correct order.
-  ///
-  /// Using uris=[t1,t2] in /play puts t2 in Spotify's "Next Up" auto-context,
-  /// which is a separate bucket from the user queue. POST /queue tracks only
-  /// play after the auto-context exhausts, breaking Bomb's order.
-  /// This approach puts everything in the same bucket.
   Future<bool> playRoundTracks(String track1Uri, String track2Uri) async {
     final deviceId = await getActiveDeviceId();
     if (deviceId == null) {
       debugPrint('[SpotifyApi] playRoundTracks() — no active device');
       return false;
     }
-
-    // Step 1: Play only track1 as a single-track context.
     final playResp = await _put(
       '/me/player/play',
       query: {'device_id': deviceId},
@@ -358,13 +348,7 @@ class SpotifyApi {
       debugPrint('[SpotifyApi] playRoundTracks() — play failed: ${playResp.statusCode}');
       return false;
     }
-
-    // Step 2: Small delay so Spotify registers the new playback context
-    // before we queue — without this the queue sometimes attaches to the old context.
     await Future.delayed(const Duration(milliseconds: 300));
-
-    // Step 3: Queue track2 via /me/player/queue — lands in "Next in Queue"
-    // (same bucket as Bomb tracks), not in "Next Up" (auto-context).
     final queueResp = await _post(
       '/me/player/queue',
       query: {'uri': track2Uri, 'device_id': deviceId},
@@ -398,14 +382,11 @@ class SpotifyApi {
     return resp.statusCode == 204 || resp.statusCode == 200;
   }
 
-  /// Add a track URI to the user's playback queue.
   Future<bool> queueTrack(String trackUri) async {
     final resp = await _post('/me/player/queue', query: {'uri': trackUri});
     return resp.statusCode == 204 || resp.statusCode == 200;
   }
 
-  /// Queue two tracks for a versus round in sequence.
-  /// Returns true only when both queue calls succeed.
   Future<bool> queueRoundTracks(String track1Uri, String track2Uri) async {
     final firstOk = await queueTrack(track1Uri);
     if (!firstOk) return false;
@@ -426,8 +407,6 @@ class SpotifyApi {
     return NowPlaying.fromJson(json);
   }
 
-  /// Polls now-playing every [interval]. Close the returned StreamController
-  /// to stop polling.
   Stream<NowPlaying?> pollNowPlaying({Duration interval = const Duration(seconds: 3)}) {
     late StreamController<NowPlaying?> controller;
     Timer? timer;
@@ -442,7 +421,6 @@ class SpotifyApi {
             debugPrint('[SpotifyApi] pollNowPlaying error: $e');
           }
         });
-        // Fire immediately on first listen
         getNowPlaying().then((np) {
           if (!controller.isClosed) controller.add(np);
         });
@@ -474,7 +452,6 @@ class SpotifyApi {
         .toList();
   }
 
-  /// Search for albums by user query. Returns list of album details (id, title, artist, image).
   Future<List<SpotifyAlbumDetails>> searchAlbums(String query, {int limit = 20}) async {
     final q = query.trim();
     if (q.isEmpty) return [];
@@ -493,7 +470,6 @@ class SpotifyApi {
         .toList();
   }
 
-  /// Search for artists by user query. Returns list of artist details (id, name, image).
   Future<List<SpotifyArtistDetails>> searchArtists(String query, {int limit = 20}) async {
     final q = query.trim();
     if (q.isEmpty) return [];
@@ -512,6 +488,57 @@ class SpotifyApi {
         .toList();
   }
 
+  /// Search for tracks by query, scoped to two artist IDs.
+  ///
+  /// Strategy: run two parallel Spotify track searches using
+  /// `artist:<name>` qualifier — one per artist — then merge,
+  /// deduplicate by track ID, and filter to only tracks whose
+  /// primary artist ID matches one of the two provided IDs.
+  ///
+  /// This gives real Spotify search ranking (not just top-tracks)
+  /// while guaranteeing results belong to the selected artists.
+  Future<Map<String, List<SpotifyTrack>>> searchTracksByArtists(
+    String query, {
+    required String artist1Id,
+    required String artist1Name,
+    required String artist2Id,
+    required String artist2Name,
+    int limitPerArtist = 20,
+  }) async {
+    final q = query.trim();
+    if (q.isEmpty) return {artist1Id: [], artist2Id: []};
+
+    // Build artist-scoped queries: "track name artist:Artist Name"
+    final q1 = '$q artist:$artist1Name';
+    final q2 = '$q artist:$artist2Name';
+
+    final responses = await Future.wait([
+      _get('/search', query: {'q': q1, 'type': 'track', 'limit': '$limitPerArtist'}),
+      _get('/search', query: {'q': q2, 'type': 'track', 'limit': '$limitPerArtist'}),
+    ]);
+
+    List<SpotifyTrack> _parseAndFilter(http.Response resp, String artistId) {
+      if (resp.statusCode != 200) return [];
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final items = (json['tracks']?['items'] as List?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+      return items
+          .map((t) => SpotifyTrack.fromJson(t))
+          // Strict filter: primary artist ID must match the selected artist
+          .where((t) => t.artistId == artistId)
+          .toList();
+    }
+
+    final tracks1 = _parseAndFilter(responses[0], artist1Id);
+    final tracks2 = _parseAndFilter(responses[1], artist2Id);
+
+    return {
+      artist1Id: tracks1,
+      artist2Id: tracks2,
+    };
+  }
+
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<List<SpotifyPlaylist>> getMyPlaylists({int limit = 50}) async {
@@ -525,10 +552,12 @@ class SpotifyApi {
         .toList();
   }
 
-  Future<String?> createPlaylist(String name, {String description = '', bool public = false}) async {
+  Future<String?> createPlaylist(String name,
+      {String description = '', bool public = false}) async {
     final userResp = await _get('/me');
     if (userResp.statusCode != 200) return null;
-    final userId = (jsonDecode(userResp.body) as Map<String, dynamic>)['id'] as String;
+    final userId =
+        (jsonDecode(userResp.body) as Map<String, dynamic>)['id'] as String;
 
     final resp = await _post('/users/$userId/playlists', body: {
       'name': name,
@@ -548,7 +577,6 @@ class SpotifyApi {
 
   // ── Versus album enrichment ───────────────────────────────────────────────
 
-  /// Fetches Spotify album metadata for one album ID (cover, title, artist only).
   Future<SpotifyAlbumDetails?> getAlbumDetails(String albumId) async {
     if (albumId.isEmpty) return null;
     final resp = await _get('/albums/$albumId');
@@ -557,7 +585,6 @@ class SpotifyApi {
     return SpotifyAlbumDetails.fromJson(json);
   }
 
-  /// Fetches Spotify artist metadata for one artist ID (name, profile image).
   Future<SpotifyArtistDetails?> getArtistDetails(String artistId) async {
     if (artistId.isEmpty) return null;
     final resp = await _get('/artists/$artistId');
@@ -566,8 +593,6 @@ class SpotifyApi {
     return SpotifyArtistDetails.fromJson(json);
   }
 
-  /// Fetches the top tracks for a single artist ID.
-  /// [market] defaults to 'US' — required by the Spotify endpoint.
   Future<List<SpotifyTrack>> getArtistTopTracks(
     String artistId, {
     String market = 'US',
@@ -578,16 +603,16 @@ class SpotifyApi {
       query: {'market': market},
     );
     if (resp.statusCode != 200) {
-      debugPrint('[SpotifyApi] getArtistTopTracks($artistId) → ${resp.statusCode}');
+      debugPrint(
+          '[SpotifyApi] getArtistTopTracks($artistId) → ${resp.statusCode}');
       return [];
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
-    final items = (json['tracks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final items =
+        (json['tracks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     return items.map((t) => SpotifyTrack.fromJson(t)).toList();
   }
 
-  /// Fetches top tracks for two artist IDs in parallel.
-  /// Returns a list of two lists: [artist1Tracks, artist2Tracks].
   Future<List<List<SpotifyTrack>>> getBothArtistsTopTracks(
     String artist1Id,
     String artist2Id, {
@@ -600,19 +625,18 @@ class SpotifyApi {
     return results;
   }
 
-  /// Fetches full album data including the track list for a single album ID.
   Future<SpotifyAlbumWithTracks?> getAlbumWithTracks(String albumId) async {
     if (albumId.isEmpty) return null;
     final resp = await _get('/albums/$albumId');
     if (resp.statusCode != 200) {
-      debugPrint('[SpotifyApi] getAlbumWithTracks($albumId) → ${resp.statusCode}');
+      debugPrint(
+          '[SpotifyApi] getAlbumWithTracks($albumId) → ${resp.statusCode}');
       return null;
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return SpotifyAlbumWithTracks.fromJson(json);
   }
 
-  /// Fetches full album data for two album IDs in parallel.
   Future<List<SpotifyAlbumWithTracks?>> getBothAlbumsWithTracks(
       String album1Id, String album2Id) async {
     return Future.wait([
@@ -621,8 +645,6 @@ class SpotifyApi {
     ]);
   }
 
-  /// Takes a VersusModel, fetches album1/album2 details in parallel,
-  /// and mutates the same model with title/artist/image fields.
   Future<VersusModel> enrichWithSpotifyData(VersusModel versus) async {
     final token = await TokenStorageService.getAccessToken();
     if (token == null) return versus;
@@ -646,7 +668,6 @@ class SpotifyApi {
     return versus;
   }
 
-  /// Enriches all versus docs with album metadata.
   Future<List<VersusModel>> enrichVersusList(List<VersusModel> list) async {
     return Future.wait(list.map(enrichWithSpotifyData));
   }
