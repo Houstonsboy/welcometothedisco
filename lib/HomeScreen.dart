@@ -8,6 +8,7 @@ import 'package:welcometothedisco/StoriesTemplate.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/versus/artistlockeroom.dart';
 import 'package:welcometothedisco/versus/lockeroom.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -388,14 +389,34 @@ class HomeScreenContent extends StatelessWidget {
   }
 }
 
-/// Sleek create button between search bar and Inbox — purple theme, compact.
+/// Sleek create button between search bar and Inbox — tap shows floating options: AlbumVs / ArtistVs.
 class _CreateButton extends StatelessWidget {
   const _CreateButton();
 
   static const _purple = Color(0xFF1E3DE1);
   static const _pink = Color(0xFFf85187);
-  /// Same green as Stories.dart username text.
   static const _createGreen = Color.fromARGB(255, 30, 222, 37);
+
+  void _showCreateOptions(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black38,
+      builder: (context) => _CreateOptionsPopup(
+        onAlbumVs: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const Lockeroom()),
+          );
+        },
+        onArtistVs: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ArtistLockeroom()),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,11 +432,7 @@ class _CreateButton extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const Lockeroom()),
-                    );
-                  },
+                  onTap: () => _showCreateOptions(context),
                   borderRadius: BorderRadius.circular(20.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -449,6 +466,260 @@ class _CreateButton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Floating popup with Album VS / Artist VS options — glassy style with glow tiles.
+class _CreateOptionsPopup extends StatelessWidget {
+  final VoidCallback onAlbumVs;
+  final VoidCallback onArtistVs;
+
+  const _CreateOptionsPopup({
+    required this.onAlbumVs,
+    required this.onArtistVs,
+  });
+
+  static const _purple = Color(0xFF1E3DE1);
+  static const _pink = Color(0xFFf85187);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: 240,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _purple.withOpacity(0.55),
+                  _pink.withOpacity(0.45),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.18),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _purple.withOpacity(0.35),
+                  blurRadius: 40,
+                  offset: const Offset(-8, 8),
+                ),
+                BoxShadow(
+                  color: _pink.withOpacity(0.30),
+                  blurRadius: 40,
+                  offset: const Offset(8, 16),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.30),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top accent bar
+                Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    gradient: LinearGradient(
+                      colors: [_purple, _pink],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _pink,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _pink.withOpacity(0.8),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'CREATE',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.95),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.4,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _purple.withOpacity(0.8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _purple.withOpacity(0.8),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Option tiles
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    children: [
+                      _GlowOptionTile(
+                        label: 'Album VS',
+                        icon: Icons.album_rounded,
+                        glowColor: _purple,
+                        onTap: onAlbumVs,
+                      ),
+                      const SizedBox(height: 8),
+                      _GlowOptionTile(
+                        label: 'Artist VS',
+                        icon: Icons.person_rounded,
+                        glowColor: _pink,
+                        onTap: onArtistVs,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlowOptionTile extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final Color glowColor;
+  final VoidCallback onTap;
+
+  const _GlowOptionTile({
+    required this.label,
+    required this.icon,
+    required this.glowColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_GlowOptionTile> createState() => _GlowOptionTileState();
+}
+
+class _GlowOptionTileState extends State<_GlowOptionTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _hovered = true),
+      onTapUp: (_) => setState(() => _hovered = false),
+      onTapCancel: () => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: _hovered
+              ? Colors.white.withOpacity(0.18)
+              : Colors.white.withOpacity(0.08),
+          border: Border.all(
+            color: _hovered
+                ? widget.glowColor.withOpacity(0.6)
+                : Colors.white.withOpacity(0.10),
+            width: 1.0,
+          ),
+          boxShadow: _hovered
+              ? [
+                  BoxShadow(
+                    color: widget.glowColor.withOpacity(0.4),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            // Icon badge
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.glowColor.withOpacity(0.7),
+                    widget.glowColor.withOpacity(0.4),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.glowColor.withOpacity(0.45),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Icon(
+                widget.icon,
+                color: Colors.white.withOpacity(0.95),
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              widget.label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.92),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.white.withOpacity(0.35),
+              size: 12,
+            ),
+          ],
+        ),
       ),
     );
   }

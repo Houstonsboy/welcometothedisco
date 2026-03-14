@@ -493,6 +493,25 @@ class SpotifyApi {
         .toList();
   }
 
+  /// Search for artists by user query. Returns list of artist details (id, name, image).
+  Future<List<SpotifyArtistDetails>> searchArtists(String query, {int limit = 20}) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+    final resp = await _get('/search', query: {
+      'q': q,
+      'type': 'artist',
+      'limit': '$limit',
+    });
+    if (resp.statusCode != 200) return [];
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final artists = json['artists'] as Map<String, dynamic>? ?? {};
+    final items = (artists['items'] as List?) ?? [];
+    return items
+        .cast<Map<String, dynamic>>()
+        .map((a) => SpotifyArtistDetails.fromJson(a))
+        .toList();
+  }
+
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<List<SpotifyPlaylist>> getMyPlaylists({int limit = 50}) async {
@@ -545,6 +564,40 @@ class SpotifyApi {
     if (resp.statusCode != 200) return null;
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     return SpotifyArtistDetails.fromJson(json);
+  }
+
+  /// Fetches the top tracks for a single artist ID.
+  /// [market] defaults to 'US' — required by the Spotify endpoint.
+  Future<List<SpotifyTrack>> getArtistTopTracks(
+    String artistId, {
+    String market = 'US',
+  }) async {
+    if (artistId.isEmpty) return [];
+    final resp = await _get(
+      '/artists/$artistId/top-tracks',
+      query: {'market': market},
+    );
+    if (resp.statusCode != 200) {
+      debugPrint('[SpotifyApi] getArtistTopTracks($artistId) → ${resp.statusCode}');
+      return [];
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final items = (json['tracks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    return items.map((t) => SpotifyTrack.fromJson(t)).toList();
+  }
+
+  /// Fetches top tracks for two artist IDs in parallel.
+  /// Returns a list of two lists: [artist1Tracks, artist2Tracks].
+  Future<List<List<SpotifyTrack>>> getBothArtistsTopTracks(
+    String artist1Id,
+    String artist2Id, {
+    String market = 'US',
+  }) async {
+    final results = await Future.wait([
+      getArtistTopTracks(artist1Id, market: market),
+      getArtistTopTracks(artist2Id, market: market),
+    ]);
+    return results;
   }
 
   /// Fetches full album data including the track list for a single album ID.
