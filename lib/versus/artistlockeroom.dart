@@ -15,7 +15,7 @@ class ArtistLockeroom extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ArtistSearchScreen(
-      onCreateVersus: (artist1, artist2) {
+      onCreateVersus: (artist1, artist2, selected1, selected2) {
         // TODO: wire to Firebase createArtistVersus + navigate to playground
         Navigator.of(context).pop();
       },
@@ -25,7 +25,11 @@ class ArtistLockeroom extends StatelessWidget {
 
 class ArtistSearchScreen extends StatefulWidget {
   final void Function(
-      SpotifyArtistDetails artist1, SpotifyArtistDetails artist2) onCreateVersus;
+    SpotifyArtistDetails artist1,
+    SpotifyArtistDetails artist2,
+    List<SpotifyTrack> selectedTracks1,
+    List<SpotifyTrack> selectedTracks2,
+  ) onCreateVersus;
 
   const ArtistSearchScreen({super.key, required this.onCreateVersus});
 
@@ -47,19 +51,19 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
 
   final List<SpotifyArtistDetails?> _selected = [null, null];
 
-  // ── Top tracks (loaded once both artists selected) ────────────────────────
+  // ── Top tracks ────────────────────────────────────────────────────────────
   List<List<SpotifyTrack>> _topTracks = [[], []];
   bool _isLoadingTracks = false;
 
-  // ── Track search (live Spotify search scoped to the two artists) ──────────
+  // ── Selected tracks per artist slot (user-curated playlist) ──────────────
+  // index 0 = artist1's picks, index 1 = artist2's picks
+  final List<List<SpotifyTrack>> _selectedTracks = [[], []];
+
+  // ── Track search ──────────────────────────────────────────────────────────
   final TextEditingController _trackFilterController = TextEditingController();
   final FocusNode _trackFilterFocus = FocusNode();
   String _trackFilterQuery = '';
-
-  // Debounce for track search
   Timer? _trackDebounce;
-
-  // Search results per artist — null means "not in search mode, show top tracks"
   Map<String, List<SpotifyTrack>>? _trackSearchResults;
   bool _isSearchingTracks = false;
 
@@ -136,12 +140,14 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       if (_selected[0]?.id == artist.id) {
         _selected[0] = null;
         _topTracks[0] = [];
+        _selectedTracks[0] = [];
         _trackSearchResults = null;
         return;
       }
       if (_selected[1]?.id == artist.id) {
         _selected[1] = null;
         _topTracks[1] = [];
+        _selectedTracks[1] = [];
         _trackSearchResults = null;
         return;
       }
@@ -152,6 +158,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       } else {
         _selected[1] = artist;
         _topTracks[1] = [];
+        _selectedTracks[1] = [];
         _trackSearchResults = null;
       }
     });
@@ -179,7 +186,6 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       if (!mounted) return;
       setState(() {
         _topTracks = [both[0], both[1]];
-        // Reset any previous search results so top tracks show fresh
         _trackSearchResults = null;
         _trackFilterController.clear();
         _trackFilterQuery = '';
@@ -190,7 +196,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     }
   }
 
-  // ── Track filter / search ─────────────────────────────────────────────────
+  // ── Track search ──────────────────────────────────────────────────────────
   void _onTrackFilterChanged() {
     final q = _trackFilterController.text.trim();
     if (q == _trackFilterQuery) return;
@@ -199,7 +205,6 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     _trackDebounce?.cancel();
 
     if (q.isEmpty) {
-      // Back to top-tracks mode
       setState(() {
         _trackSearchResults = null;
         _isSearchingTracks = false;
@@ -230,17 +235,52 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     });
   }
 
-  // ── Tracks to display for a given page ───────────────────────────────────
-  /// When a search query is active, returns live Spotify results for that
-  /// artist. When empty, returns the top-tracks loaded on artist selection.
+  // ── Track selection ───────────────────────────────────────────────────────
+  /// Determines which artist slot a track belongs to based on its artistId.
+  int? _artistSlotForTrack(SpotifyTrack track) {
+    if (_selected[0] != null && track.artistId == _selected[0]!.id) return 0;
+    if (_selected[1] != null && track.artistId == _selected[1]!.id) return 1;
+    // Fallback: match by name if IDs don't match (e.g. features)
+    final lowerArtist = track.artistName.toLowerCase();
+    if (_selected[0] != null &&
+        lowerArtist.contains(_selected[0]!.name.toLowerCase())) return 0;
+    if (_selected[1] != null &&
+        lowerArtist.contains(_selected[1]!.name.toLowerCase())) return 1;
+    return null;
+  }
+
+  bool _isTrackSelected(SpotifyTrack track) {
+    return _selectedTracks[0].any((t) => t.id == track.id) ||
+        _selectedTracks[1].any((t) => t.id == track.id);
+  }
+
+  void _toggleTrackSelection(SpotifyTrack track) {
+    final slot = _artistSlotForTrack(track);
+    if (slot == null) return;
+
+    setState(() {
+      final already = _selectedTracks[slot].indexWhere((t) => t.id == track.id);
+      if (already >= 0) {
+        _selectedTracks[slot].removeAt(already);
+      } else {
+        _selectedTracks[slot].add(track);
+      }
+    });
+  }
+
+  void _removeSelectedTrack(int slot, String trackId) {
+    setState(() {
+      _selectedTracks[slot].removeWhere((t) => t.id == trackId);
+    });
+  }
+
+  // ── Track list for page ───────────────────────────────────────────────────
   List<SpotifyTrack> _tracksForPage(int pageIndex) {
     final artist = _selected[pageIndex];
     if (artist == null) return [];
-
     if (_trackFilterQuery.isNotEmpty && _trackSearchResults != null) {
       return _trackSearchResults![artist.id] ?? [];
     }
-
     return _topTracks[pageIndex];
   }
 
@@ -318,8 +358,8 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.15),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.2), width: 0.8),
+                border:
+                    Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
                   color: Colors.white, size: 16),
@@ -355,8 +395,12 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             opacity: _canCreate ? 1.0 : 0.0,
             child: GestureDetector(
               onTap: _canCreate
-                  ? () =>
-                      widget.onCreateVersus(_selected[0]!, _selected[1]!)
+                  ? () => widget.onCreateVersus(
+                        _selected[0]!,
+                        _selected[1]!,
+                        _selectedTracks[0],
+                        _selectedTracks[1],
+                      )
                   : null,
               child: Container(
                 padding:
@@ -389,7 +433,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     );
   }
 
-  // ── Artist search bar (hidden once both picked + tracks loaded) ───────────
+  // ── Artist search bar ─────────────────────────────────────────────────────
   Widget _buildArtistSearchBar() {
     if (_canCreate &&
         !_isLoadingTracks &&
@@ -406,8 +450,8 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               color: Colors.white.withOpacity(0.12),
-              border: Border.all(
-                  color: Colors.white.withOpacity(0.18), width: 0.8),
+              border:
+                  Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
             ),
             child: TextField(
               controller: _searchController,
@@ -415,38 +459,28 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               onChanged: _onSearchChanged,
               autofocus: true,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500),
               cursorColor: _kPink,
               decoration: InputDecoration(
                 hintText: 'Search artists...',
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
-                  fontSize: 15,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: Colors.white.withOpacity(0.5),
-                  size: 20,
-                ),
+                    color: Colors.white.withOpacity(0.35), fontSize: 15),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.5), size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? GestureDetector(
                         onTap: () {
                           _searchController.clear();
                           _onSearchChanged('');
                         },
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.white.withOpacity(0.4),
-                          size: 18,
-                        ),
+                        child: Icon(Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.4), size: 18),
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
@@ -455,10 +489,9 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     );
   }
 
-  // ── Track search bar (live Spotify search scoped to both artists) ─────────
+  // ── Track search bar ──────────────────────────────────────────────────────
   Widget _buildTrackSearchBar() {
     final bool inSearchMode = _trackFilterQuery.isNotEmpty;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: ClipRRect(
@@ -483,19 +516,16 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               controller: _trackFilterController,
               focusNode: _trackFilterFocus,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
               cursorColor: _kPink,
               decoration: InputDecoration(
                 hintText: inSearchMode
                     ? 'Searching Spotify...'
                     : 'Search tracks from these artists...',
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 13,
-                ),
+                    color: Colors.white.withOpacity(0.3), fontSize: 13),
                 prefixIcon: _isSearchingTracks
                     ? Padding(
                         padding: const EdgeInsets.all(11),
@@ -521,16 +551,12 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                           _trackFilterController.clear();
                           _trackFilterFocus.unfocus();
                         },
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.white.withOpacity(0.35),
-                          size: 16,
-                        ),
+                        child: Icon(Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.35), size: 16),
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 11),
+                contentPadding: const EdgeInsets.symmetric(vertical: 11),
                 isDense: true,
               ),
             ),
@@ -559,6 +585,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                       onRemove: () => setState(() {
                         _selected[0] = null;
                         _topTracks[0] = [];
+                        _selectedTracks[0] = [];
                         _trackSearchResults = null;
                       }),
                     ),
@@ -583,6 +610,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                       onRemove: () => setState(() {
                         _selected[1] = null;
                         _topTracks[1] = [];
+                        _selectedTracks[1] = [];
                         _trackSearchResults = null;
                       }),
                     ),
@@ -609,8 +637,8 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () => _goToArtistPage(1),
-            child: _SwipeDot(
-                isActive: _selectedArtistPage == 1, color: _kPink),
+            child:
+                _SwipeDot(isActive: _selectedArtistPage == 1, color: _kPink),
           ),
         ],
       ),
@@ -634,7 +662,6 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     final artist = _selected[pageIndex];
     if (artist == null) return const SizedBox.shrink();
 
-    // Show shimmer while loading top tracks initially
     if (_isLoadingTracks) {
       return ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -646,7 +673,6 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       );
     }
 
-    // Show shimmer while live-searching tracks
     if (_isSearchingTracks) {
       return ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -659,152 +685,271 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     }
 
     final tracks = _tracksForPage(pageIndex);
+    final picked = _selectedTracks[pageIndex];
     final isSearchMode = _trackFilterQuery.isNotEmpty;
 
-    if (tracks.isEmpty && isSearchMode) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off_rounded,
-                color: Colors.white.withOpacity(0.25), size: 36),
-            const SizedBox(height: 10),
-            Text(
-              'No tracks found for "${artist.name}"',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.4), fontSize: 13),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (tracks.isEmpty) {
-      return Center(
-        child: Text(
-          'No top tracks available',
-          style: TextStyle(
-              color: Colors.white.withOpacity(0.35), fontSize: 13),
-        ),
-      );
-    }
-
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       physics: const BouncingScrollPhysics(),
-      itemCount: tracks.length + 1,
-      itemBuilder: (context, index) {
-        // Header
-        if (index == 0) {
-          final isSecondArtist = pageIndex == 1;
-          final profile = Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                  color: accentColor.withOpacity(0.7), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                    color: accentColor.withOpacity(0.3), blurRadius: 8),
-              ],
-            ),
-            child: ClipOval(
-              child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
-                  ? Image.network(artist.imageUrl!, fit: BoxFit.cover)
-                  : Container(
-                      color: accentColor.withOpacity(0.3),
-                      child: const Icon(Icons.person_rounded,
-                          color: Colors.white, size: 16),
-                    ),
-            ),
-          );
+      children: [
+        // ── Artist header ────────────────────────────────────────────────
+        _buildTrackListHeader(
+            artist: artist,
+            accentColor: accentColor,
+            pageIndex: pageIndex,
+            isSearchMode: isSearchMode,
+            trackCount: tracks.length),
 
-          final badge = Container(
+        // ── Selected tracks section ──────────────────────────────────────
+        if (picked.isNotEmpty) ...[
+          _buildSectionLabel(
+            icon: Icons.playlist_add_check_rounded,
+            label: 'SELECTED',
+            count: picked.length,
+            accentColor: accentColor,
+          ),
+          ...picked.map((track) => AnimatedBuilder(
+                animation: _slideAnim,
+                builder: (_, child) => child!,
+                child: _SelectedTrackTile(
+                  track: track,
+                  accentColor: accentColor,
+                  onRemove: () =>
+                      _removeSelectedTrack(pageIndex, track.id),
+                ),
+              )),
+          const SizedBox(height: 10),
+          // Divider between selected and suggested
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 0.8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        accentColor.withOpacity(0.0),
+                        accentColor.withOpacity(0.4),
+                        accentColor.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // ── Suggested / search results section ───────────────────────────
+        if (tracks.isNotEmpty)
+          _buildSectionLabel(
+            icon: isSearchMode
+                ? Icons.manage_search_rounded
+                : Icons.star_rounded,
+            label: isSearchMode ? 'SEARCH RESULTS' : 'TOP TRACKS',
+            count: tracks.length,
+            accentColor: accentColor,
+            dimmed: picked.isNotEmpty,
+          ),
+
+        if (tracks.isEmpty && isSearchMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off_rounded,
+                      color: Colors.white.withOpacity(0.25), size: 36),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No tracks found for "${artist.name}"',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.4), fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (tracks.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Center(
+              child: Text(
+                'No top tracks available',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.35), fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ...tracks.asMap().entries.map((entry) {
+            final i = entry.key;
+            final track = entry.value;
+            final alreadyPicked =
+                picked.any((t) => t.id == track.id);
+            return AnimatedBuilder(
+              animation: _slideAnim,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(
+                  0,
+                  20 *
+                      (1 - _slideAnim.value) *
+                      math.max(0, 1 - i * 0.06),
+                ),
+                child: Opacity(
+                  opacity: _slideAnim.value.clamp(0.0, 1.0),
+                  child: child,
+                ),
+              ),
+              child: _TopTrackRow(
+                track: track,
+                accentColor: accentColor,
+                isLast: i == tracks.length - 1,
+                // Dim if already selected
+                dimmed: alreadyPicked || picked.isNotEmpty,
+                isSelected: alreadyPicked,
+                onAdd: alreadyPicked
+                    ? null
+                    : () => _toggleTrackSelection(track),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildTrackListHeader({
+    required SpotifyArtistDetails artist,
+    required Color accentColor,
+    required int pageIndex,
+    required bool isSearchMode,
+    required int trackCount,
+  }) {
+    final isSecondArtist = pageIndex == 1;
+    final profile = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: accentColor.withOpacity(0.7), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 8),
+        ],
+      ),
+      child: ClipOval(
+        child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
+            ? Image.network(artist.imageUrl!, fit: BoxFit.cover)
+            : Container(
+                color: accentColor.withOpacity(0.3),
+                child: const Icon(Icons.person_rounded,
+                    color: Colors.white, size: 16),
+              ),
+      ),
+    );
+
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: accentColor.withOpacity(0.2),
+        border:
+            Border.all(color: accentColor.withOpacity(0.4), width: 0.8),
+      ),
+      child: Text(
+        isSearchMode ? 'SEARCH' : 'TOP TRACKS',
+        style: TextStyle(
+          color: accentColor.withOpacity(0.9),
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+
+    final nameWidget = Flexible(
+      child: Text(
+        artist.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: isSecondArtist ? TextAlign.right : TextAlign.left,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14, top: 4),
+      child: Row(
+        mainAxisAlignment:
+            isSecondArtist ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: isSecondArtist
+            ? [
+                badge,
+                const SizedBox(width: 8),
+                nameWidget,
+                const SizedBox(width: 10),
+                profile,
+              ]
+            : [
+                profile,
+                const SizedBox(width: 10),
+                nameWidget,
+                const SizedBox(width: 8),
+                badge,
+              ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel({
+    required IconData icon,
+    required String label,
+    required int count,
+    required Color accentColor,
+    bool dimmed = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 2),
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 13,
+              color: accentColor.withOpacity(dimmed ? 0.35 : 0.7)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(dimmed ? 0.3 : 0.5),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
             padding:
-                const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
-              color: accentColor.withOpacity(0.2),
-              border: Border.all(
-                  color: accentColor.withOpacity(0.4), width: 0.8),
+              color: accentColor.withOpacity(dimmed ? 0.1 : 0.2),
             ),
             child: Text(
-              isSearchMode ? 'SEARCH' : 'TOP TRACKS',
+              '$count',
               style: TextStyle(
-                color: accentColor.withOpacity(0.9),
+                color: accentColor.withOpacity(dimmed ? 0.4 : 0.9),
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
               ),
             ),
-          );
-
-          final nameWidget = Flexible(
-            child: Text(
-              artist.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign:
-                  isSecondArtist ? TextAlign.right : TextAlign.left,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-            ),
-          );
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 14, top: 4),
-            child: Row(
-              mainAxisAlignment: isSecondArtist
-                  ? MainAxisAlignment.end
-                  : MainAxisAlignment.start,
-              children: isSecondArtist
-                  ? [
-                      badge,
-                      const SizedBox(width: 8),
-                      nameWidget,
-                      const SizedBox(width: 10),
-                      profile,
-                    ]
-                  : [
-                      profile,
-                      const SizedBox(width: 10),
-                      nameWidget,
-                      const SizedBox(width: 8),
-                      badge,
-                    ],
-            ),
-          );
-        }
-
-        final trackIndex = index - 1;
-        final track = tracks[trackIndex];
-
-        return AnimatedBuilder(
-          animation: _slideAnim,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(
-              0,
-              20 *
-                  (1 - _slideAnim.value) *
-                  math.max(0, 1 - trackIndex * 0.06),
-            ),
-            child: Opacity(
-              opacity: _slideAnim.value.clamp(0.0, 1.0),
-              child: child,
-            ),
           ),
-          child: _TopTrackRow(
-            track: track,
-            accentColor: accentColor,
-            isLast: trackIndex == tracks.length - 1,
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -882,90 +1027,278 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
   }
 }
 
+// ── Selected Track Tile (appears above top tracks) ────────────────────────────
+class _SelectedTrackTile extends StatelessWidget {
+  final SpotifyTrack track;
+  final Color accentColor;
+  final VoidCallback onRemove;
+
+  const _SelectedTrackTile({
+    required this.track,
+    required this.accentColor,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: accentColor.withOpacity(0.18),
+              border: Border.all(
+                color: accentColor.withOpacity(0.45),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              child: Row(
+                children: [
+                  // Album art
+                  if (track.albumArtUrl != null &&
+                      track.albumArtUrl!.isNotEmpty)
+                    Container(
+                      width: 38,
+                      height: 38,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: accentColor.withOpacity(0.3), width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                              color: accentColor.withOpacity(0.2),
+                              blurRadius: 6),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
+                        child: Image.network(track.albumArtUrl!,
+                            fit: BoxFit.cover),
+                      ),
+                    ),
+                  // Track info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          track.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                        if (track.artistName.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            track.artistName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: accentColor.withOpacity(0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  // Remove button
+                  GestureDetector(
+                    onTap: onRemove,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accentColor.withOpacity(0.2),
+                        border: Border.all(
+                            color: accentColor.withOpacity(0.35), width: 0.8),
+                      ),
+                      child: Icon(
+                        Icons.remove_rounded,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Top Track Row ─────────────────────────────────────────────────────────────
 class _TopTrackRow extends StatelessWidget {
   final SpotifyTrack track;
   final Color accentColor;
   final bool isLast;
+  final bool dimmed;
+  final bool isSelected;
+  final VoidCallback? onAdd;
 
   const _TopTrackRow({
     required this.track,
     required this.accentColor,
     this.isLast = false,
+    this.dimmed = false,
+    this.isSelected = false,
+    this.onAdd,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              // Album art thumbnail
-              if (track.albumArtUrl != null && track.albumArtUrl!.isNotEmpty)
-                Container(
-                  width: 51,
-                  height: 51,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(7),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 6),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(7),
-                    child: Image.network(
-                      track.albumArtUrl!,
-                      fit: BoxFit.cover,
+    final contentOpacity = isSelected ? 0.35 : (dimmed ? 0.5 : 1.0);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: contentOpacity,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                // Album art thumbnail
+                if (track.albumArtUrl != null &&
+                    track.albumArtUrl!.isNotEmpty)
+                  Container(
+                    width: 46,
+                    height: 46,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(7),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 6),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: Image.network(track.albumArtUrl!,
+                          fit: BoxFit.cover),
                     ),
                   ),
-                ),
-              // Track info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                    if (track.artistName.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                // Track info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        track.artistName,
+                        track.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.1,
+                          decoration: isSelected
+                              ? TextDecoration.lineThrough
+                              : null,
+                          decorationColor:
+                              Colors.white.withOpacity(0.4),
                         ),
                       ),
+                      if (track.artistName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          track.artistName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.45),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                // Add button — shown only when not yet selected
+                if (!isSelected)
+                  GestureDetector(
+                    onTap: onAdd,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accentColor.withOpacity(0.22),
+                        border: Border.all(
+                          color: accentColor.withOpacity(0.55),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentColor.withOpacity(0.2),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: Colors.white.withOpacity(0.9),
+                        size: 16,
+                      ),
+                    ),
+                  )
+                else
+                  // Check badge when already selected
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accentColor.withOpacity(0.15),
+                      border: Border.all(
+                          color: accentColor.withOpacity(0.3), width: 0.8),
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: accentColor.withOpacity(0.5),
+                      size: 14,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-        if (!isLast)
-          Divider(
-            height: 0,
-            indent: 0,
-            color: Colors.white.withOpacity(0.06),
-          ),
-      ],
+          if (!isLast)
+            Divider(
+              height: 0,
+              indent: 0,
+              color: Colors.white.withOpacity(0.06),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1000,8 +1333,8 @@ class _ShimmerTrackRow extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 51,
-                height: 51,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(7),
                   gradient: shimmerGrad(0.12),
@@ -1029,6 +1362,15 @@ class _ShimmerTrackRow extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: shimmerGrad(0.10),
                 ),
               ),
             ],
@@ -1257,8 +1599,7 @@ class _ArtistCard extends StatelessWidget {
               color:
                   isSelected ? Colors.white : Colors.white.withOpacity(0.8),
               fontSize: 12,
-              fontWeight:
-                  isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               height: 1.3,
             ),
           ),
