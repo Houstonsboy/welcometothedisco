@@ -31,6 +31,49 @@ class FirebaseService {
     return getUserById(uid);
   }
 
+  // ── Live stream of current user's document ────────────────────────────────
+  /// Emits a new [UserModel] whenever the user's Firestore doc changes —
+  /// friends list, username, avatar, etc. update in real-time with no
+  /// extra fetch needed.
+  static Stream<UserModel?> getCurrentUserStream() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(null);
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((snap) {
+          if (!snap.exists || snap.data() == null) return null;
+          return UserModel.fromFirestore(snap.data()!, snap.id);
+        });
+  }
+
+  // ── Add a friend to the current user's friends array ─────────────────────
+  /// Appends `{ uid, username, avatar_path }` to the logged-in user's
+  /// [friends] array using [FieldValue.arrayUnion] — idempotent, so calling
+  /// it twice with the same UID will not create a duplicate entry.
+  static Future<void> addFriend({
+    required String friendUid,
+    required String friendUsername,
+    required String friendAvatarPath,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not logged in');
+    if (friendUid == uid) throw Exception('You cannot follow yourself');
+
+    await _firestore.collection('users').doc(uid).update({
+      'friends': FieldValue.arrayUnion([
+        {
+          'uid': friendUid,
+          'username': friendUsername,
+          'avatar_path': friendAvatarPath,
+        }
+      ]),
+    });
+
+    debugPrint('[FirebaseService] addFriend → followed $friendUid');
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // ALBUM VERSUS
   // ══════════════════════════════════════════════════════════════════════════
@@ -470,6 +513,80 @@ class FirebaseService {
     await _firestore.collection('versus').doc(documentId).delete();
   }
 
+  // ── Search users by username (prefix match, case-insensitive) ────────────
+  /// All usernames are stored lowercase, so lowercasing the query gives
+  /// case-insensitive prefix search with no extra Firestore index needed.
+  static Future<List<UserModel>> searchUsersByUsername(String query) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return [];
+
+    final currentUid = _auth.currentUser?.uid;
+
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .where('username', isGreaterThanOrEqualTo: q)
+          .where('username', isLessThan: '$q\uf8ff')
+          .limit(20)
+          .get();
+
+      return snapshot.docs
+          .where((doc) => doc.id != currentUid)
+          .map((doc) => UserModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('[FirebaseService] searchUsersByUsername("$q") failed: $e');
+      return [];
+    }
+  }
+
+  // ── Check if current user is admin ───────────────────────────────────────
+  static Future<bool> isCurrentUserAdmin() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return false;
+      return (doc.data()?['admin'] as bool?) == true;
+    } catch (e) {
+      debugPrint('[FirebaseService] isCurrentUserAdmin failed: $e');
+      return false;
+    }
+  }
+
+  // ── Backfill: add admin:false to all users missing the field ──────────────
+  /// One-time migration. Scans every doc in [users] and writes `admin: false`
+  /// to any doc that does not yet have the [admin] field.
+  /// Returns `{'scanned': N, 'updated': M}`.
+  /// Safe to re-run — skips docs that already have the field.
+  static Future<Map<String, int>> backfillAdminField() async {
+    final snapshot = await _firestore.collection('users').get();
+    final docs = snapshot.docs;
+
+    final toUpdate = docs
+        .where((doc) => !doc.data().containsKey('admin'))
+        .toList();
+
+    const chunkSize = 500;
+    for (var i = 0; i < toUpdate.length; i += chunkSize) {
+      final chunk = toUpdate.sublist(
+        i,
+        (i + chunkSize) > toUpdate.length ? toUpdate.length : i + chunkSize,
+      );
+      final batch = _firestore.batch();
+      for (final doc in chunk) {
+        batch.update(doc.reference, {'admin': false});
+      }
+      await batch.commit();
+    }
+
+    debugPrint(
+      '[FirebaseService] backfillAdminField → '
+      'scanned ${docs.length}, updated ${toUpdate.length}',
+    );
+    return {'scanned': docs.length, 'updated': toUpdate.length};
+  }
+
   // ── Create / update user profile ─────────────────────────────────────────
   static Future<void> createUserProfile({
     required String uid,
@@ -480,7 +597,7 @@ class FirebaseService {
   }) async {
     await _firestore.collection('users').doc(uid).set({
       'email': email,
-      'username': username,
+      'username': username.trim().toLowerCase(),
       'bio': bio,
       'avatar_path': avatarPath,
     }, SetOptions(merge: true));

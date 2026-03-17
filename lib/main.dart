@@ -12,6 +12,8 @@ import 'package:welcometothedisco/HomeScreen.dart';
 import 'package:welcometothedisco/Inbox.dart';
 import 'package:welcometothedisco/SpotifyAPIplayer.dart';
 import 'package:welcometothedisco/BottomNavBar.dart';
+import 'package:welcometothedisco/friends/friendrequest.dart';
+import 'package:welcometothedisco/dev.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
@@ -176,6 +178,8 @@ class _AppShellState extends State<_AppShell> {
               children: const [
                 HomeScreenContent(),
                 SpotifyAPIplayer(embedded: true),
+                FriendRequest(),
+                DevPage(),
               ],
             ),
             bottomNavigationBar: BottomNavBar(
@@ -219,6 +223,37 @@ class _AppShellState extends State<_AppShell> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Placeholder for nav tabs that haven't been built yet.
+class _ComingSoonPage extends StatelessWidget {
+  const _ComingSoonPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.sports_mma_rounded,
+            size: 52,
+            color: Colors.white.withOpacity(0.18),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'COMING SOON',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.35),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 3,
+            ),
+          ),
+        ],
       ),
     );
   }

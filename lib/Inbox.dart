@@ -19,15 +19,21 @@ class Inbox extends StatefulWidget {
   State<Inbox> createState() => _InboxState();
 }
 
-class _InboxState extends State<Inbox> with RouteAware {
+class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStateMixin {
   final SpotifyApi _spotifyApi = SpotifyApi();
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
 
   Future<List<InboxVersusEntry>>? _versusFuture;
+  bool _isRefreshing = false;
+  late final AnimationController _spinController;
 
   @override
   void initState() {
     super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
     _refresh();
   }
 
@@ -44,6 +50,7 @@ class _InboxState extends State<Inbox> with RouteAware {
   @override
   void dispose() {
     inboxRouteObserver.unsubscribe(this);
+    _spinController.dispose();
     super.dispose();
   }
 
@@ -61,8 +68,19 @@ class _InboxState extends State<Inbox> with RouteAware {
 
   // ── Token check + data load ────────────────────────────────────────────────
   void _refresh() {
+    if (_isRefreshing) return;
+    final future = _loadWithTokenRefresh();
+    future.whenComplete(() {
+      if (mounted) {
+        _spinController.stop();
+        _spinController.reset();
+        setState(() => _isRefreshing = false);
+      }
+    });
+    _spinController.repeat();
     setState(() {
-      _versusFuture = _loadWithTokenRefresh();
+      _isRefreshing = true;
+      _versusFuture = future;
     });
   }
 
@@ -133,7 +151,9 @@ class _InboxState extends State<Inbox> with RouteAware {
                 width: 0.8,
               ),
             ),
-            child: FutureBuilder<List<InboxVersusEntry>>(
+            child: Stack(
+              children: [
+                FutureBuilder<List<InboxVersusEntry>>(
               future: _versusFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -178,37 +198,13 @@ class _InboxState extends State<Inbox> with RouteAware {
                 if (entries.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.all(18),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'No versus entries yet.',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              await FirebaseService.backfillVersusType();
-                              if (context.mounted) _refresh();
-                            } catch (e) {
-                              debugPrint('[Inbox] backfillVersusType failed: $e');
-                            }
-                          },
-                          child: Text(
-                            'Run backfill (add type to old docs)',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 11,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      'No versus entries yet.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   );
                 }
@@ -228,6 +224,60 @@ class _InboxState extends State<Inbox> with RouteAware {
                   },
                 );
               },
+            ),
+            // ── Manual refresh button ──────────────────────────────────────
+            Positioned(
+              top: 6,
+              right: 8,
+              child: _InboxRefreshButton(
+                isRefreshing: _isRefreshing,
+                spinController: _spinController,
+                onTap: _refresh,
+              ),
+            ),
+          ],
+        ),
+        ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small sleek refresh icon that spins while a reload is in progress.
+class _InboxRefreshButton extends StatelessWidget {
+  final bool isRefreshing;
+  final AnimationController spinController;
+  final VoidCallback onTap;
+
+  const _InboxRefreshButton({
+    required this.isRefreshing,
+    required this.spinController,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isRefreshing ? null : onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(isRefreshing ? 0.06 : 0.10),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.18),
+            width: 0.7,
+          ),
+        ),
+        child: Center(
+          child: RotationTransition(
+            turns: spinController,
+            child: Icon(
+              Icons.refresh_rounded,
+              size: 15,
+              color: Colors.white.withOpacity(isRefreshing ? 0.45 : 0.70),
             ),
           ),
         ),

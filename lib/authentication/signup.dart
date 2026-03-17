@@ -1,8 +1,20 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+
+// Forces all typed characters to lowercase in real-time.
+class _LowercaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(text: newValue.text.toLowerCase());
+  }
+}
 
 // All avatar filenames that live in assets/images/
 const _kAvatars = [
@@ -176,12 +188,14 @@ class _SignupScreenState extends State<SignupScreen> {
     bool obscure = false,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      inputFormatters: inputFormatters,
       style: TextStyle(color: Colors.white.withOpacity(0.95)),
       decoration: InputDecoration(
         labelText: label,
@@ -347,6 +361,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       _glassTextField(
                         controller: _usernameController,
                         label: 'Username',
+                        inputFormatters: [_LowercaseFormatter()],
                       ),
                       const SizedBox(height: 16),
                       _glassTextField(
