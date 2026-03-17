@@ -49,11 +49,16 @@ class AuthService {
     }
   }
 
-  // Sign out
+  // Sign out (Firebase only — Spotify tokens are intentionally kept so the
+  // user doesn't have to re-authenticate with Spotify on every login).
   Future<void> signOut() async {
-    await TokenStorageService.clearTokens();
     await _googleSignIn.signOut();
     await _auth.signOut();
+  }
+
+  // Call this only when the user explicitly wants to disconnect Spotify.
+  Future<void> disconnectSpotify() async {
+    await TokenStorageService.clearTokens();
   }
 
   // Current user

@@ -602,4 +602,20 @@ class FirebaseService {
       'avatar_path': avatarPath,
     }, SetOptions(merge: true));
   }
+
+  // ── Update current user's editable profile fields ─────────────────────────
+  static Future<void> updateCurrentUserProfile({
+    required String username,
+    required String bio,
+    required String avatarPath,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not logged in');
+
+    await _firestore.collection('users').doc(uid).set({
+      'username': username.trim().toLowerCase(),
+      'bio': bio.trim(),
+      'avatar_path': avatarPath.trim(),
+    }, SetOptions(merge: true));
+  }
 }

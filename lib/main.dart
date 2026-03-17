@@ -14,6 +14,7 @@ import 'package:welcometothedisco/SpotifyAPIplayer.dart';
 import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/friends/friendrequest.dart';
 import 'package:welcometothedisco/dev.dart';
+import 'package:welcometothedisco/userprofile.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
@@ -169,7 +170,14 @@ class _AppShellState extends State<_AppShell> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: _FirebaseHeader(compact: true),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const UserProfilePage(),
+                      ),
+                    ),
+                    child: _FirebaseHeader(compact: true),
+                  ),
                 ),
               ],
             ),

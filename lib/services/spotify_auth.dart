@@ -115,6 +115,10 @@ class SpotifyAuth {
             _pendingCallback != null &&
             !_pendingCallback!.isCompleted) {
           _pendingCallback!.complete(uri);
+          // Cancel immediately so a second delivery of the same URI
+          // (common on Android) doesn't attempt a second token exchange.
+          _linkSub?.cancel();
+          _linkSub = null;
         }
       },
       onError: (e) {

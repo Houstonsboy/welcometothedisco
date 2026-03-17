@@ -48,8 +48,27 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading    = false;
   String _errorMessage = '';
 
+  bool get _hasAvatar => _selectedAvatar != null;
+  bool get _hasUsername => _usernameController.text.trim().isNotEmpty;
+  bool get _hasBio => _bioController.text.trim().isNotEmpty;
+  bool get _isProfileComplete => _hasAvatar && _hasUsername && _hasBio;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_onProfileFieldChanged);
+    _bioController.addListener(_onProfileFieldChanged);
+  }
+
+  void _onProfileFieldChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _usernameController.removeListener(_onProfileFieldChanged);
+    _bioController.removeListener(_onProfileFieldChanged);
     _emailController.dispose();
     _passwordController.dispose();
     _usernameController.dispose();
@@ -292,11 +311,41 @@ class _SignupScreenState extends State<SignupScreen> {
             child: Text(
               'Select a picture above',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: _errorMessage.isNotEmpty
+                    ? Colors.red.shade200
+                    : Colors.white.withOpacity(0.4),
                 fontSize: 11,
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _requirementRow({
+    required String label,
+    required bool done,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          done ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+          size: 14,
+          color: done
+              ? const Color.fromARGB(255, 159, 181, 63)
+              : Colors.white.withOpacity(0.35),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: done
+                ? Colors.white.withOpacity(0.85)
+                : Colors.white.withOpacity(0.45),
+            fontSize: 11,
+            fontWeight: done ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
       ],
     );
   }
@@ -369,6 +418,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         label: 'Bio',
                         maxLines: 2,
                       ),
+                      const SizedBox(height: 10),
+                      _requirementRow(label: 'Avatar selected', done: _hasAvatar),
+                      const SizedBox(height: 4),
+                      _requirementRow(label: 'Username added', done: _hasUsername),
+                      const SizedBox(height: 4),
+                      _requirementRow(label: 'Bio added', done: _hasBio),
                       const SizedBox(height: 16),
 
                       // ── Email / password ──────────────────────────────────
@@ -474,7 +529,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _handleGoogleSignIn,
+                          onPressed: (_isLoading || !_isProfileComplete)
+                              ? null
+                              : _handleGoogleSignIn,
                           icon: Icon(
                             Icons.g_mobiledata_rounded,
                             color: Colors.white.withOpacity(0.9),
@@ -498,7 +555,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Text(
                           'Fill in avatar, username & bio before using Google',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.35),
+                            color: _isProfileComplete
+                                ? Colors.white.withOpacity(0.35)
+                                : Colors.red.shade200.withOpacity(0.9),
                             fontSize: 10,
                           ),
                         ),
