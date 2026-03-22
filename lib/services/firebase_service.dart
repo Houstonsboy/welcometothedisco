@@ -52,6 +52,7 @@ class FirebaseService {
   /// Appends `{ uid, username, avatar_path }` to the logged-in user's
   /// [friends] array using [FieldValue.arrayUnion] — idempotent, so calling
   /// it twice with the same UID will not create a duplicate entry.
+  /// Also writes a follow notification doc to the followed user's subcollection.
   static Future<void> addFriend({
     required String friendUid,
     required String friendUsername,
@@ -71,7 +72,96 @@ class FirebaseService {
       ]),
     });
 
+    // Best-effort: send follow notification. Does not fail the follow action.
+    try {
+      await _sendFollowNotification(
+        recipientUid: friendUid,
+        followerUid: uid,
+      );
+    } catch (e) {
+      debugPrint('[FirebaseService] addFriend → notification write failed: $e');
+    }
+
     debugPrint('[FirebaseService] addFriend → followed $friendUid');
+  }
+
+  // ── Write a follow notification to the followed user's subcollection ───────
+  /// Uses the follower's UID as the doc ID so one follower can only ever
+  /// produce a single notification doc per recipient (no duplicates).
+  static Future<void> _sendFollowNotification({
+    required String recipientUid,
+    required String followerUid,
+  }) async {
+    final follower = await getUserById(followerUid);
+    if (follower == null) return;
+
+    await _firestore
+        .collection('users')
+        .doc(recipientUid)
+        .collection('notifications')
+        .doc(followerUid)
+        .set({
+      'followerID': followerUid,
+      'follower_username': follower.username,
+      'follower_avatar': follower.avatarPath,
+      'follower_bio': follower.bio,
+      'timestamp': FieldValue.serverTimestamp(),
+      'read': false,
+    });
+
+    debugPrint(
+        '[FirebaseService] _sendFollowNotification → $followerUid → $recipientUid');
+  }
+
+  // ── Real-time stream: true if current user has any unread notifications ────
+  static Stream<bool> hasUnreadNotificationsStream() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(false);
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .map((snap) => snap.docs.isNotEmpty);
+  }
+
+  // ── Real-time stream: all notifications for current user ──────────────────
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getNotificationsStream() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return const Stream.empty();
+    }
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
+
+  // ── Mark all unread notifications as read ─────────────────────────────────
+  static Future<void> markAllNotificationsRead() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final snap = await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .where('read', isEqualTo: false)
+          .get();
+      if (snap.docs.isEmpty) return;
+      final batch = _firestore.batch();
+      for (final doc in snap.docs) {
+        batch.update(doc.reference, {'read': true});
+      }
+      await batch.commit();
+      debugPrint(
+          '[FirebaseService] markAllNotificationsRead → ${snap.docs.length} marked');
+    } catch (e) {
+      debugPrint('[FirebaseService] markAllNotificationsRead failed: $e');
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

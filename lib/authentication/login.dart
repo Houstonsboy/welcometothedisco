@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup.dart';
@@ -51,13 +52,28 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
+
     try {
       await _authService.signInWithGoogle();
     } catch (e) {
-      setState(() {
-        _errorMessage = e is String ? e : e.toString();
-      });
-    } finally {
+      // Only show an error if the sign-in genuinely failed (user is still logged out).
+      if (mounted && FirebaseAuth.instance.currentUser == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e is String ? e : e.toString();
+        });
+      }
+      return;
+    }
+
+    // Check currentUser directly — it is set synchronously by signInWithCredential
+    // regardless of what the Future return value looks like (covers Android edge cases).
+    if (!mounted) return;
+    if (FirebaseAuth.instance.currentUser != null) {
+      // Re-push '/' so _AuthGateState.initState() reads currentUser synchronously
+      // without relying on authStateChanges() emitting (known Android timing issue).
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } else {
       setState(() => _isLoading = false);
     }
   }

@@ -6,6 +6,23 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null && request.auth.uid == userId;
+
+      // Follow notifications subcollection
+      // Doc ID = followerUID so one follower can only ever create one doc per recipient.
+      match /notifications/{notifId} {
+        // Only the recipient reads their own notifications
+        allow read: if request.auth != null && request.auth.uid == userId;
+
+        // Any authenticated user can create a notification as long as
+        // their UID matches the followerID field they are writing
+        allow create: if request.auth != null
+          && request.resource.data.followerID == request.auth.uid;
+
+        // Only the recipient can update — restricted to marking as read only
+        allow update: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      }
     }
 
     // Versus: read for listing; create for authenticated; update only to add 'type' (backfill) or by author

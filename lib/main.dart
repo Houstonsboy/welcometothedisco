@@ -1,6 +1,8 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:app_links/app_links.dart';
@@ -15,6 +17,7 @@ import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/friends/friendrequest.dart';
 import 'package:welcometothedisco/dev.dart';
 import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/notification/notification.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
@@ -64,25 +67,59 @@ class MyApp extends StatelessWidget {
 }
 
 /// Shows loading, then app shell (with top bar) if logged in, else LoginScreen.
-class _AuthGate extends StatelessWidget {
+///
+/// Uses a StatefulWidget + manual stream subscription so that:
+///   (a) currentUser is checked synchronously on initState — meaning a
+///       Navigator.pushNamedAndRemoveUntil('/') from the login screen
+///       immediately finds the already-signed-in user without waiting for the
+///       stream to emit.
+///   (b) Future sign-in/sign-out events (authStateChanges) still update the UI.
+class _AuthGate extends StatefulWidget {
   const _AuthGate();
 
   @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  User? _user;
+  bool _initializing = true;
+  late final StreamSubscription<User?> _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Synchronous read — available immediately after signInWithCredential.
+    final current = FirebaseAuth.instance.currentUser;
+    if (current != null) {
+      _user = current;
+      _initializing = false;
+    }
+    // Stream handles future sign-in / sign-out events.
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _initializing = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasData) {
-          return const _AppShell();
-        }
-        return const LoginScreen();
-      },
-    );
+    if (_initializing) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _user != null ? const _AppShell() : const LoginScreen();
   }
 }
 
@@ -170,13 +207,20 @@ class _AppShellState extends State<_AppShell> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const UserProfilePage(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _NotificationBell(),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const UserProfilePage(),
+                          ),
+                        ),
+                        child: _FirebaseHeader(compact: true),
                       ),
-                    ),
-                    child: _FirebaseHeader(compact: true),
+                    ],
                   ),
                 ),
               ],
@@ -262,6 +306,51 @@ class _ComingSoonPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Bell icon that shows a pink dot when there are unread follow notifications ─
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      ),
+      child: StreamBuilder<bool>(
+        stream: FirebaseService.hasUnreadNotificationsStream(),
+        builder: (context, snapshot) {
+          final hasUnread = snapshot.data ?? false;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                hasUnread
+                    ? Icons.notifications_rounded
+                    : Icons.notifications_outlined,
+                color: Colors.white.withOpacity(hasUnread ? 1.0 : 0.65),
+                size: 24,
+              ),
+              if (hasUnread)
+                Positioned(
+                  top: -1,
+                  right: -1,
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFf85187),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
