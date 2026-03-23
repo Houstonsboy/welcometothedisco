@@ -9,6 +9,7 @@ import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/versus/artistlockeroom.dart';
+import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
 import 'package:welcometothedisco/versus/lockeroom.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -525,6 +526,14 @@ class _CreateButton extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const ArtistLockeroom()),
           );
         },
+        onCollaborateFriend: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const CollaboratorLockeroomGate(),
+            ),
+          );
+        },
       ),
     );
   }
@@ -586,14 +595,17 @@ class _CreateButton extends StatelessWidget {
 class _CreateOptionsPopup extends StatelessWidget {
   final VoidCallback onAlbumVs;
   final VoidCallback onArtistVs;
+  final VoidCallback onCollaborateFriend;
 
   const _CreateOptionsPopup({
     required this.onAlbumVs,
     required this.onArtistVs,
+    required this.onCollaborateFriend,
   });
 
   static const _purple = Color(0xFF1E3DE1);
   static const _pink = Color(0xFFf85187);
+  static const _green = Color.fromARGB(255, 30, 222, 37);
 
   @override
   Widget build(BuildContext context) {
@@ -716,6 +728,13 @@ class _CreateOptionsPopup extends StatelessWidget {
                         icon: Icons.person_rounded,
                         glowColor: _pink,
                         onTap: onArtistVs,
+                      ),
+                      const SizedBox(height: 8),
+                      _GlowOptionTile(
+                        label: 'Collaborate',
+                        icon: Icons.group_rounded,
+                        glowColor: _green,
+                        onTap: onCollaborateFriend,
                       ),
                     ],
                   ),

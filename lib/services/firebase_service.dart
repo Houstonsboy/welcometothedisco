@@ -422,10 +422,12 @@ class FirebaseService {
     required String artist2ID,
     required String artist2Name,
     required List<String> artist2TrackIDs,
+    String? authorComment,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
 
+    final comment = authorComment?.trim();
     // Build the model — toFirestore() ensures only safe fields are written
     final model = ArtistVersusModel(
       id: '', // assigned by Firestore on add
@@ -437,6 +439,7 @@ class FirebaseService {
       artist2TrackIDs: artist2TrackIDs.map((e) => e.trim()).toList(),
       authorID: uid,
       status: 'open',
+      authorComment: (comment == null || comment.isEmpty) ? null : comment,
     );
 
     final ref =
@@ -444,6 +447,28 @@ class FirebaseService {
 
     debugPrint('[FirebaseService] createArtistVersus → doc: ${ref.id}');
     return ref.id;
+  }
+
+  /// Collaborator invite flow: same as [createArtistVersus] but [artist2TrackIDs]
+  /// is empty — the joining collaborator fills their tracks later.
+  static Future<String> createCollaboratorVersus({
+    required String artist1ID,
+    required String artist1Name,
+    required List<String> artist1TrackIDs,
+    required String artist2ID,
+    required String artist2Name,
+    required List<String> artist2TrackIDs,
+    String? authorComment,
+  }) {
+    return createArtistVersus(
+      artist1ID: artist1ID,
+      artist1Name: artist1Name,
+      artist1TrackIDs: artist1TrackIDs,
+      artist2ID: artist2ID,
+      artist2Name: artist2Name,
+      artist2TrackIDs: artist2TrackIDs,
+      authorComment: authorComment,
+    );
   }
 
   // ── Fetch single artist versus by doc ID ──────────────────────────────────

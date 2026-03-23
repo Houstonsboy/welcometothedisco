@@ -16,6 +16,7 @@ import 'package:welcometothedisco/models/users_model.dart';
 ///   collaboratorID:   null | "firebase_uid",
 ///   status:           "open" | "active" | "completed",
 ///   timestamp:        Timestamp,
+///   authorComment:     optional note from author (e.g. collaborator invite),
 /// }
 class ArtistVersusModel {
   // ── Firestore identity ────────────────────────────────────────────────────
@@ -41,6 +42,9 @@ class ArtistVersusModel {
   /// "completed" — voting/session is finished
   final String status;
   final Timestamp? timestamp;
+
+  /// Optional message from the author (e.g. collab lockeroom note).
+  final String? authorComment;
 
   // ── Runtime-hydrated: users collection ───────────────────────────────────
   UserModel? author;
@@ -68,6 +72,7 @@ class ArtistVersusModel {
     this.collaboratorID,
     this.status = 'open',
     this.timestamp,
+    this.authorComment,
     this.author,
     this.collaborator,
     this.artist1ImageUrl,
@@ -91,6 +96,7 @@ class ArtistVersusModel {
       collaboratorID: (data['collaboratorID'] as String?)?.trim(),
       status: (data['status'] as String?)?.trim() ?? 'open',
       timestamp: data['timestamp'] as Timestamp?,
+      authorComment: (data['authorComment'] as String?)?.trim(),
     );
   }
 
@@ -110,6 +116,8 @@ class ArtistVersusModel {
       'collaboratorID': collaboratorID,
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
+      if (authorComment != null && authorComment!.trim().isNotEmpty)
+        'authorComment': authorComment!.trim(),
     };
   }
 

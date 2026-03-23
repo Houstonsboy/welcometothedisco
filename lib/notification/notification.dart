@@ -8,6 +8,7 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
 const _kPink = Color(0xFFf85187);
+const _kGreen = Color(0xFF22C55E);
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<FollowNotification> _notifications = [];
   Set<String> _followedUids = {};
   bool _loading = true;
+  bool _markedReadAfterRender = false;
 
   @override
   void initState() {
@@ -73,6 +75,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
             snap.docs.map((d) => FollowNotification.fromDoc(d)).toList();
         _loading = false;
       });
+
+      // Once notifications are visible in UI, mark unread items as read.
+      if (!_markedReadAfterRender) {
+        _markedReadAfterRender = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          FirebaseService.markAllNotificationsRead();
+        });
+      }
     });
 
     _userSub = FirebaseService.getCurrentUserStream().listen((user) {
@@ -84,8 +95,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
     });
 
-    // Mark all notifications as read when this page is opened.
-    FirebaseService.markAllNotificationsRead();
   }
 
   @override
@@ -309,8 +318,17 @@ class _NotificationRowState extends State<_NotificationRow> {
     final n = widget.notification;
     final isUnread = !n.read;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: isUnread ? _kGreen.withOpacity(0.13) : Colors.transparent,
+        border: isUnread
+            ? Border.all(color: _kGreen.withOpacity(0.28), width: 1)
+            : null,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -347,7 +365,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                         width: 7,
                         height: 7,
                         decoration: const BoxDecoration(
-                          color: _kPink,
+                          color: _kGreen,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -438,7 +456,7 @@ class _NotificationRowState extends State<_NotificationRow> {
           ),
         ],
       ),
-    );
+    ); // AnimatedContainer
   }
 }
 
@@ -459,7 +477,7 @@ class _NotifAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: isUnread
             ? const LinearGradient(
-                colors: [_kPurple, _kPink],
+                colors: [Color(0xFF16A34A), _kGreen],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
