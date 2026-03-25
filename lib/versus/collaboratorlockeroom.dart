@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/versus/collaboratorinvitebanner.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
 const _kPink   = Color(0xFFf85187);
@@ -32,14 +33,12 @@ class CollaboratorLockeroom extends StatelessWidget {
       onCreateVersus:
           (artist1, artist2, selectedTracks1, authorComment) async {
         try {
-          // TODO: persist draft versus + invite link / collaborator lookup.
-          // artist2TrackIDs will be populated later by the collaborator.
           await FirebaseService.createCollaboratorVersus(
             artist1ID:       artist1.id,
             artist1Name:     artist1.name,
             artist1TrackIDs: selectedTracks1.map((t) => t.id).toList(),
-            artist2ID:       artist2.id,
-            artist2Name:     artist2.name,
+            artist2ID:       artist2?.id ?? '',
+            artist2Name:     artist2?.name ?? '',
             artist2TrackIDs: [],   // collaborator fills this in later
             authorComment:   authorComment,
           );
@@ -62,10 +61,10 @@ class CollaboratorSearchScreen extends StatefulWidget {
   final String? authorAvatarPath;
 
   final Future<void> Function(
-    SpotifyArtistDetails artist1,
-    SpotifyArtistDetails artist2,
-    List<SpotifyTrack>   selectedTracks1,
-    String               authorComment,
+    SpotifyArtistDetails  artist1,
+    SpotifyArtistDetails? artist2,      // nullable — artist2 optional
+    List<SpotifyTrack>    selectedTracks1,
+    String                authorComment,
   ) onCreateVersus;
 
   const CollaboratorSearchScreen({
@@ -105,12 +104,11 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   // ── Firebase submission state ──────────────────────────────────────────────
   bool _isSubmitting = false;
 
-  // ── Author comment (collab note, max 30 words → Firestore authorComment) ───
+  // ── Author comment ─────────────────────────────────────────────────────────
   final TextEditingController _authorCommentController =
       TextEditingController();
   static const int _authorCommentMaxWords = 30;
 
-  /// Note from the author; persisted with the versus document.
   String get authorComment => _authorCommentController.text.trim();
 
   int get _authorCommentWordCount {
@@ -173,10 +171,19 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   }
 
   // ── Validation ─────────────────────────────────────────────────────────────
-  bool get _canCreate  => _selected[0] != null && _selected[1] != null;
-  bool get _canSubmit  => _selectedTracks1.isNotEmpty;
 
-  /// Display name for header / strips — matches app bar profile (no @ prefix).
+  /// Artist 1 selected — enough to enter track selection mode.
+  bool get _artist1Selected  => _selected[0] != null;
+
+  /// Both artists selected — enables the collaborator page tab.
+  bool get _canCreate        => _selected[0] != null && _selected[1] != null;
+
+  /// Tracks selected for artist 1 — enables submit.
+  bool get _canSubmit        => _artist1Selected && _selectedTracks1.isNotEmpty;
+
+  /// True once collaborator's artist (slot 1) is chosen.
+  bool get _artist2Locked    => _selected[1] != null;
+
   String get _displayAuthorName {
     var s = widget.authorUsername.trim();
     if (s.startsWith('@')) s = s.substring(1);
@@ -232,7 +239,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   }
 
   String? get _submitHint {
-    if (!_canCreate) return null;
+    if (!_artist1Selected) return null;
     if (_selectedTracks1.isEmpty) {
       return 'Select at least one track for ${_selected[0]?.name ?? 'your artist'}';
     }
@@ -257,18 +264,14 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     });
   }
 
-  /// True once collaborator's artist (slot 1) is chosen — locked; only
-  /// artist1 can be changed from search after that.
-  bool get _artist2Locked => _selected[1] != null;
-
   void _onArtistTap(SpotifyArtistDetails artist) {
     setState(() {
       if (_selected[0]?.id == artist.id) {
+        // Tapping the already-selected artist1 deselects it and resets everything.
         _selected[0] = null;
         _topTracks[0] = [];
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
-        // Reset collaborator side if clearing your artist (clean state).
         if (_selected[1] != null) {
           _selected[1] = null;
           _topTracks[1] = [];
@@ -280,8 +283,10 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         return;
       }
       if (_selected[0] == null) {
+        // First artist slot is empty — fill it and immediately enter track mode.
         _selected[0] = artist;
       } else if (_selected[1] == null) {
+        // Artist1 already picked, now picking artist2.
         _selected[1] = artist;
       } else {
         // Both filled: only replace artist1; artist2 stays locked.
@@ -290,6 +295,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
       }
+
+      // Close the artist search overlay after a selection.
+      _searchController.clear();
+      _results = [];
+      _isSearching = false;
+      _lastQuery = '';
     });
     _maybeFetchTopTracks();
   }
@@ -301,22 +312,37 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   }
 
   // ── Top tracks fetch ───────────────────────────────────────────────────────
+  /// Fetches top tracks as soon as artist1 is set.
+  /// If artist2 is also set, fetches both together (1 extra call saved vs 2 separate).
   Future<void> _maybeFetchTopTracks() async {
     final a1 = _selected[0];
-    final a2 = _selected[1];
-    if (a1 == null || a2 == null) return;
+    if (a1 == null) return;
     if (_isLoadingTracks) return;
 
     setState(() => _isLoadingTracks = true);
     try {
-      final both = await _api.getBothArtistsTopTracks(a1.id, a2.id);
-      if (!mounted) return;
-      setState(() {
-        _topTracks = [both[0], both[1]];
-        _trackSearchResults1 = null;
-        _trackFilterController.clear();
-        _trackFilterQuery = '';
-      });
+      final a2 = _selected[1];
+      if (a2 != null) {
+        // Both selected — batch fetch.
+        final both = await _api.getBothArtistsTopTracks(a1.id, a2.id);
+        if (!mounted) return;
+        setState(() {
+          _topTracks = [both[0], both[1]];
+          _trackSearchResults1 = null;
+          _trackFilterController.clear();
+          _trackFilterQuery = '';
+        });
+      } else {
+        // Only artist1 — fetch just their tracks.
+        final tracks = await _api.getArtistTopTracks(a1.id);
+        if (!mounted) return;
+        setState(() {
+          _topTracks = [tracks, []];
+          _trackSearchResults1 = null;
+          _trackFilterController.clear();
+          _trackFilterQuery = '';
+        });
+      }
       _slideController.forward(from: 0);
     } finally {
       if (mounted) setState(() => _isLoadingTracks = false);
@@ -341,7 +367,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
       final a1 = _selected[0];
       if (a1 == null || !mounted) return;
 
-      // Search only for artist1 tracks
       final results = await _api.searchTracksByArtists(
         q,
         artist1Id: a1.id, artist1Name: a1.name,
@@ -380,7 +405,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     try {
       await widget.onCreateVersus(
         _selected[0]!,
-        _selected[1]!,
+        _selected[1],         // may be null — that's fine
         _selectedTracks1,
         authorComment,
       );
@@ -391,7 +416,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 
   // ── Track list for page ────────────────────────────────────────────────────
   List<SpotifyTrack> _tracksForPage(int pageIndex) {
-    if (pageIndex == 1) return _topTracks[1]; // never used for selection
+    if (pageIndex == 1) return _topTracks[1];
     final a1 = _selected[0];
     if (a1 == null) return [];
     if (_trackFilterQuery.isNotEmpty && _trackSearchResults1 != null) {
@@ -420,9 +445,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (_canCreate &&
+    final showArtistResultsOverlay =
+        _searchController.text.trim().isNotEmpty || _isSearching;
+
+    // Trigger track fetch when artist1 is selected and tracks haven't loaded yet.
+    if (_artist1Selected &&
         _topTracks[0].isEmpty &&
-        _topTracks[1].isEmpty &&
         !_isLoadingTracks) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _maybeFetchTopTracks());
@@ -441,13 +469,35 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         body: Column(
           children: [
             _buildHeader(context),
+            // Show artist search bar when we haven't entered track mode yet,
+            // OR when we're in track mode but artist2 is not yet picked
+            // (so user can still add the second artist).
             _buildArtistSearchBar(),
             _buildSelectedSlots(),
-            if (_canCreate) ...[
+            if (_artist1Selected) ...[
               // Track search bar only relevant for page 0 (author's artist)
               if (_selectedArtistPage == 0) _buildTrackSearchBar(),
-              _buildSliderDots(),
-              Expanded(child: _buildArtistSlider()),
+              if (_canCreate) _buildSliderDots(),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildArtistSlider(),
+                    if (showArtistResultsOverlay)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+                            ),
+                          ),
+                          child: _buildResults(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               _buildSubmitBar(),
             ] else
               Expanded(child: _buildResults()),
@@ -459,6 +509,16 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 
   // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
+    // Subtitle adapts to current state.
+    String subtitle;
+    if (!_artist1Selected) {
+      subtitle = 'search and pick your artist first';
+    } else if (!_artist2Locked) {
+      subtitle = 'search to add your friend\'s artist (optional)';
+    } else {
+      subtitle = 'friend\'s artist is set — select your tracks';
+    }
+
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 14,
@@ -491,9 +551,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                   fontWeight: FontWeight.w900, letterSpacing: 3.5,
                 )),
                 Text(
-                  _artist2Locked
-                      ? 'friend\'s artist is set — search to change yours'
-                      : 'pick your artist, then your friend\'s',
+                  subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -507,14 +565,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // Compact glass profile — same as app bar (_FirebaseHeader compact).
           _buildAuthorChip(),
         ],
       ),
     );
   }
 
-  /// Compact glass profile pill — matches main app bar (_FirebaseHeader compact).
   Widget _buildAuthorChip() {
     const size = 32.0;
     return ClipRRect(
@@ -577,6 +633,11 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   // ── Submit bar ─────────────────────────────────────────────────────────────
   Widget _buildSubmitBar() {
     final hint = _submitHint;
+    // Label changes based on whether artist2 is set.
+    final buttonLabel = _canSubmit
+        ? (_canCreate ? 'SEND INVITE & CREATE' : 'CREATE — ADD COLLAB LATER')
+        : 'SELECT YOUR TRACKS FIRST';
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -653,9 +714,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _canSubmit
-                                  ? 'SEND INVITE & CREATE'
-                                  : 'SELECT YOUR TRACKS FIRST',
+                              buttonLabel,
                               style: TextStyle(
                                 color: _canSubmit
                                     ? Colors.white
@@ -677,9 +736,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 
   // ── Artist search bar ──────────────────────────────────────────────────────
   Widget _buildArtistSearchBar() {
-    if (_canCreate && !_isLoadingTracks && _topTracks.any((l) => l.isNotEmpty)) {
-      return const SizedBox.shrink();
-    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: ClipRRect(
@@ -697,12 +753,14 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
               controller: _searchController,
               focusNode: _focusNode,
               onChanged: _onSearchChanged,
-              autofocus: true,
+              autofocus: !_artist1Selected, // only autofocus before artist1 picked
               style: const TextStyle(
                   color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
               cursorColor: _kPink,
               decoration: InputDecoration(
-                hintText: 'Search artists...',
+                hintText: _artist1Selected
+                    ? 'Search your friend\'s artist...'
+                    : 'Search artists...',
                 hintStyle: TextStyle(
                     color: Colors.white.withOpacity(0.35), fontSize: 15),
                 prefixIcon: Icon(Icons.search_rounded,
@@ -811,7 +869,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Row(
                 children: [
-                  // ── Slot 0: author's artist ──────────────────────────────
                   Expanded(
                     child: _SelectedSlot(
                       artist: _selected[0],
@@ -833,14 +890,16 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                       fontWeight: FontWeight.w900, letterSpacing: 2,
                     )),
                   ),
-                  // ── Slot 1: collaborator's artist ────────────────────────
                   Expanded(
                     child: _SelectedSlot(
                       artist: _selected[1],
-                      label: "COLLAB'S ",
+                      label: "",
                       accentColor: _kPink,
-                      trackCount: 0,  // collaborator fills tracks later
+                      trackCount: 0,
                       showTrackCount: false,
+                      trailingWidgets: [
+                        _buildInvitePill(),
+                      ],
                       onRemove: () => setState(() {
                         _selected[1] = null;
                         _topTracks[1] = [];
@@ -854,7 +913,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     );
   }
 
-  // ── Slider dots ────────────────────────────────────────────────────────────
+  // ── Slider dots — only shown when both artists are selected ────────────────
   Widget _buildSliderDots() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -877,6 +936,10 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 
   // ── Artist track slider ────────────────────────────────────────────────────
   Widget _buildArtistSlider() {
+    // When only artist1 is selected, just show their track list (no page view).
+    if (!_canCreate) {
+      return _buildAuthorTrackList();
+    }
     return PageView(
       controller: _pageController,
       onPageChanged: _onArtistPageChanged,
@@ -923,11 +986,9 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
           isSecondArtist: false, isSearchMode: isSearchMode,
         ),
 
-        // ── Author identity micro-strip ──────────────────────────────────
         _buildAuthorCommentStrip(),
         const SizedBox(height: 10),
 
-        // ── Selected tracks ──────────────────────────────────────────────
         if (picked.isNotEmpty) ...[
           _buildSectionLabel(
             icon: Icons.playlist_add_check_rounded,
@@ -960,7 +1021,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
           const SizedBox(height: 10),
         ],
 
-        // ── Top / search results ─────────────────────────────────────────
         if (tracks.isNotEmpty)
           _buildSectionLabel(
             icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
@@ -1018,7 +1078,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     );
   }
 
-  // ── Author identity micro-strip (inline with track list) ──────────────────
+  // ── Author identity micro-strip ────────────────────────────────────────────
   Widget _buildAuthorCommentStrip() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1092,7 +1152,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
           Padding(
             padding: const EdgeInsets.only(left: 32, top: 4),
             child: Text(
-              '${_authorCommentWordCount} / $_authorCommentMaxWords words',
+              '$_authorCommentWordCount / $_authorCommentMaxWords words',
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.32),
@@ -1120,12 +1180,11 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
             isSecondArtist: true, isSearchMode: false,
           ),
 
-        // ── Collaborator pending strip ───────────────────────────────────
-        _buildCollaboratorInviteCard(),
+        if (artist != null) ...[
+          _buildCollaboratorInviteCard(),
+          const SizedBox(height: 16),
+        ],
 
-        const SizedBox(height: 16),
-
-        // ── "collaborator will add" ghost track rows ─────────────────────
         if (artist != null) ...[
           _buildSectionLabel(
             icon: Icons.lock_rounded,
@@ -1140,7 +1199,64 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     );
   }
 
-  /// Ghost locked rows with "collaborator will add" label on the first one.
+  void _showCollaboratorInviteBanner() {
+    final artist2 = _selected[1]; // the collaborator's artist
+    CollaboratorInviteBanner.show(
+      context,
+      artistName: artist2?.name ?? 'this artist',
+      artistImageUrl: artist2?.imageUrl,
+      onInviteSent: () {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Invite sent!'),
+              backgroundColor: _kPink.withOpacity(0.85),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildInvitePill() {
+    return GestureDetector(
+      onTap: _showCollaboratorInviteBanner,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          color: _kPink.withOpacity(0.22),
+          border: Border.all(color: _kPink.withOpacity(0.55), width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: _kPink.withOpacity(0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.person_add_alt_1_rounded, color: _kPink, size: 12),
+          const SizedBox(width: 4),
+          const Text(
+            'INVITE',
+            style: TextStyle(
+              color: _kPink,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
   List<Widget> _buildGhostTrackRows(int count) {
     return List.generate(count, (i) {
       final isFirst = i == 0;
@@ -1152,7 +1268,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(children: [
-                // Placeholder art
                 Container(
                   width: 46, height: 46,
                   margin: const EdgeInsets.only(right: 10),
@@ -1200,7 +1315,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                     ),
                   ],
                 )),
-                // Locked add button
                 Container(
                   width: 30, height: 30,
                   decoration: BoxDecoration(
@@ -1222,7 +1336,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     });
   }
 
-  /// Invite card shown on the collaborator side.
   Widget _buildCollaboratorInviteCard() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -1238,7 +1351,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
           ),
           child: Row(
             children: [
-              // Avatar placeholder for collaborator
               Container(
                 width: 36, height: 36,
                 decoration: BoxDecoration(
@@ -1255,7 +1367,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Role pill + label
                     Row(children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -1289,12 +1400,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                 ),
               ),
               const SizedBox(width: 10),
-              // Invite button
               GestureDetector(
-                onTap: () {
-                  // TODO: trigger collaborator invite flow
-                  // e.g., show a bottom sheet to search users or share link
-                },
+                onTap: _showCollaboratorInviteBanner,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 11, vertical: 7),
@@ -1477,7 +1584,6 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 // Shared sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Comment Avatar ────────────────────────────────────────────────────────────
 class _CommentAvatar extends StatelessWidget {
   final String? avatarPath;
   final Color   accentColor;
@@ -1520,7 +1626,6 @@ class _CommentAvatar extends StatelessWidget {
   );
 }
 
-// ── Selected Track Tile ───────────────────────────────────────────────────────
 class _SelectedTrackTile extends StatelessWidget {
   final SpotifyTrack track;
   final Color        accentColor;
@@ -1612,7 +1717,6 @@ class _SelectedTrackTile extends StatelessWidget {
   }
 }
 
-// ── Top Track Row ─────────────────────────────────────────────────────────────
 class _TopTrackRow extends StatelessWidget {
   final SpotifyTrack track;
   final Color        accentColor;
@@ -1716,7 +1820,6 @@ class _TopTrackRow extends StatelessWidget {
   }
 }
 
-// ── Shimmer track row ─────────────────────────────────────────────────────────
 class _ShimmerTrackRow extends StatelessWidget {
   final AnimationController shimmerController;
   final Color               accentColor;
@@ -1772,15 +1875,14 @@ class _ShimmerTrackRow extends StatelessWidget {
   }
 }
 
-// ── Selected Slot ─────────────────────────────────────────────────────────────
 class _SelectedSlot extends StatelessWidget {
   final SpotifyArtistDetails? artist;
   final String       label;
   final Color        accentColor;
   final int          trackCount;
   final bool         showTrackCount;
-  /// When true, artist cannot be cleared (collaborator side stays set).
   final bool         locked;
+  final List<Widget> trailingWidgets;
   final VoidCallback onRemove;
 
   const _SelectedSlot({
@@ -1791,6 +1893,7 @@ class _SelectedSlot extends StatelessWidget {
     required this.onRemove,
     this.showTrackCount = true,
     this.locked = false,
+    this.trailingWidgets = const [],
   });
 
   @override
@@ -1824,10 +1927,16 @@ class _SelectedSlot extends StatelessWidget {
                         color: Colors.white.withOpacity(0.25), size: 14),
                   ),
                   const SizedBox(width: 8),
-                  Text(label, style: TextStyle(
-                    color: Colors.white.withOpacity(0.3), fontSize: 11,
-                    fontWeight: FontWeight.w700, letterSpacing: 1.2,
-                  )),
+                  Expanded(
+                    child: Text(label, style: TextStyle(
+                      color: Colors.white.withOpacity(0.3), fontSize: 11,
+                      fontWeight: FontWeight.w700, letterSpacing: 1.2,
+                    )),
+                  ),
+                  if (trailingWidgets.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    ...trailingWidgets,
+                  ],
                 ])
               : Row(children: [
                   Container(width: 28, height: 28,
@@ -1865,6 +1974,11 @@ class _SelectedSlot extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                   ],
+                  if (trailingWidgets.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    ...trailingWidgets,
+                    const SizedBox(width: 4),
+                  ],
                   if (locked)
                     Icon(Icons.lock_rounded,
                         color: accentColor.withOpacity(0.75), size: 14)
@@ -1881,7 +1995,6 @@ class _SelectedSlot extends StatelessWidget {
   }
 }
 
-// ── Artist Card ───────────────────────────────────────────────────────────────
 class _ArtistCard extends StatelessWidget {
   final SpotifyArtistDetails artist;
   final int?         selectedSlot;
@@ -1972,7 +2085,6 @@ class _ArtistCard extends StatelessWidget {
   );
 }
 
-// ── Shimmer artist card ───────────────────────────────────────────────────────
 class _ShimmerArtistCard extends StatelessWidget {
   final AnimationController shimmerController;
   const _ShimmerArtistCard({required this.shimmerController});
@@ -2004,7 +2116,6 @@ class _ShimmerArtistCard extends StatelessWidget {
   }
 }
 
-// ── Swipe dot ─────────────────────────────────────────────────────────────────
 class _SwipeDot extends StatelessWidget {
   final bool  isActive;
   final Color color;
@@ -2024,33 +2135,7 @@ class _SwipeDot extends StatelessWidget {
   }
 }
 
-// ── Entry from HomeScreen: load Firebase profile then open collab lockeroom ───
-
-/// Loads the logged-in user's Firestore profile for the author chip, then shows
-/// [CollaboratorLockeroom].
-/// Limits input to [maxWords] words (whitespace-separated).
-class _MaxWordsInputFormatter extends TextInputFormatter {
-  _MaxWordsInputFormatter(this.maxWords);
-  final int maxWords;
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text;
-    if (text.isEmpty) return newValue;
-    final words =
-        text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    if (words.length <= maxWords) return newValue;
-    final clamped = words.take(maxWords).join(' ');
-    return TextEditingValue(
-      text: clamped,
-      selection: TextSelection.collapsed(offset: clamped.length),
-    );
-  }
-}
-
+// ── Gate widget ───────────────────────────────────────────────────────────────
 class CollaboratorLockeroomGate extends StatelessWidget {
   const CollaboratorLockeroomGate({super.key});
 
@@ -2120,6 +2205,28 @@ class CollaboratorLockeroomGate extends StatelessWidget {
           authorAvatarPath: user.avatarPath,
         );
       },
+    );
+  }
+}
+
+class _MaxWordsInputFormatter extends TextInputFormatter {
+  _MaxWordsInputFormatter(this.maxWords);
+  final int maxWords;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+    final words =
+        text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (words.length <= maxWords) return newValue;
+    final clamped = words.take(maxWords).join(' ');
+    return TextEditingValue(
+      text: clamped,
+      selection: TextSelection.collapsed(offset: clamped.length),
     );
   }
 }

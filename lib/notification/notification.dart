@@ -189,9 +189,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (_notifications.isEmpty) {
       return Center(
-        child: Column(
+            child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
+              children: [
             Container(
               width: 80,
               height: 80,
@@ -221,15 +221,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
             const SizedBox(height: 6),
             Text(
               'When someone follows you, they\'ll appear here',
-              style: TextStyle(
+                  style: TextStyle(
                 color: Colors.white.withOpacity(0.45),
-                fontSize: 12,
+                    fontSize: 12,
               ),
             ),
-          ],
-        ),
-      );
-    }
+        ],
+      ),
+    );
+  }
 
     return ClipRRect(
       child: BackdropFilter(
@@ -322,76 +322,76 @@ class _NotificationRowState extends State<_NotificationRow> {
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: isUnread ? _kGreen.withOpacity(0.13) : Colors.transparent,
         border: isUnread
             ? Border.all(color: _kGreen.withOpacity(0.28), width: 1)
             : null,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
           // ── Avatar ──────────────────────────────────────────────────────
           _NotifAvatar(assetPath: widget.assetPath, isUnread: isUnread),
           const SizedBox(width: 12),
 
           // ── Info ─────────────────────────────────────────────────────────
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
                         n.followerUsername.isNotEmpty
                             ? n.followerUsername
                             : 'Unknown',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                              style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w700,
                           letterSpacing: -0.1,
-                        ),
-                      ),
-                    ),
-                    if (isUnread) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
+                              ),
+                            ),
+                          ),
+                          if (isUnread) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
                           color: _kGreen,
-                          shape: BoxShape.circle,
-                        ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
                 if (n.followerBio.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
+                      const SizedBox(height: 2),
+                      Text(
                     n.followerBio,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                        style: TextStyle(
                       color: Colors.white.withOpacity(0.42),
-                      fontSize: 12,
+                          fontSize: 12,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 2),
-                Text(
+                        ),
+                      ],
+                      const SizedBox(height: 2),
+                      Text(
                   'started following you · ${_formatTime(n.timestamp)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                        style: TextStyle(
                     color: Colors.white.withOpacity(0.32),
-                    fontSize: 11,
+                          fontSize: 11,
                   ),
                 ),
               ],
@@ -406,19 +406,19 @@ class _NotificationRowState extends State<_NotificationRow> {
               duration: const Duration(milliseconds: 200),
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
+          decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 gradient: _isFollowing
-                    ? const LinearGradient(
+                ? const LinearGradient(
                         colors: [_kPurple, _kPink],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
                 color: _isFollowing || _loading
-                    ? null
+                ? null
                     : Colors.white.withOpacity(0.15),
-                border: Border.all(
+        border: Border.all(
                   color: _isFollowing
                       ? Colors.transparent
                       : Colors.white.withOpacity(0.3),
@@ -445,15 +445,15 @@ class _NotificationRowState extends State<_NotificationRow> {
                     )
                   : Text(
                       _isFollowing ? 'Following' : 'Follow Back',
-                      style: TextStyle(
+                        style: TextStyle(
                         color: Colors.white
                             .withOpacity(_isFollowing ? 1.0 : 0.9),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+              ),
             ),
-          ),
         ],
       ),
     ); // AnimatedContainer
