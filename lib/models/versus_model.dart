@@ -13,6 +13,9 @@ class VersusModel {
   final String album2Name;
   final Timestamp? timestamp;
 
+  /// Inbox requires Firestore `status: "open"` (see [isEligibleForInboxDisplay]).
+  final String? status;
+
   // populated after fetching from users collection
   UserModel? author;
 
@@ -33,6 +36,7 @@ class VersusModel {
     required this.album2ID,
     required this.album2Name,
     this.timestamp,
+    this.status,
     this.author,
     this.album1Title,
     this.album1ArtistName,
@@ -56,6 +60,9 @@ class VersusModel {
       album2ID: data['album2ID'] ?? '',
       album2Name: data['album2Name'] ?? '',
       timestamp: (data['createdAt'] ?? data['timestamp']) as Timestamp?,
+      status: (data['status'] as String?)?.trim(),
     );
   }
+
+  bool get isEligibleForInboxDisplay => status?.trim() == 'open';
 }

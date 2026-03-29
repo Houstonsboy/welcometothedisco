@@ -20,4 +20,17 @@ class InboxVersusEntry {
 
   bool get isAlbum => type == 'album';
   bool get isArtist => type == 'artist';
+
+  /// Versus docs with `status: incomplete` (and non-open states) stay out of the inbox UI.
+  bool get isEligibleForInboxDisplay {
+    if (isAlbum) {
+      final v = albumVersus;
+      return v != null && v.isEligibleForInboxDisplay;
+    }
+    if (isArtist) {
+      final v = artistVersus;
+      return v != null && v.isEligibleForInboxDisplay;
+    }
+    return false;
+  }
 }

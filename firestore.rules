@@ -13,10 +13,15 @@ service cloud.firestore {
         // Only the recipient reads their own notifications
         allow read: if request.auth != null && request.auth.uid == userId;
 
-        // Any authenticated user can create a notification as long as
-        // their UID matches the followerID field they are writing
-        allow create: if request.auth != null
-          && request.resource.data.followerID == request.auth.uid;
+        // Follow: sender is the follower — must match followerID.
+        // Invite: sender is author — must match authorID; written under recipient userId.
+        allow create: if request.auth != null && (
+          request.resource.data.type == 'follow'
+            && request.resource.data.followerID == request.auth.uid
+          || request.resource.data.type == 'invite'
+            && request.resource.data.authorID == request.auth.uid
+            && userId != request.auth.uid
+        );
 
         // Only the recipient can update — restricted to marking as read only
         allow update: if request.auth != null

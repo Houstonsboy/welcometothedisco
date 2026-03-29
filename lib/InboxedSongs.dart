@@ -15,6 +15,9 @@ class InboxedSongs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!entry.isEligibleForInboxDisplay) {
+      return const SizedBox.shrink();
+    }
     if (entry.isAlbum && entry.albumVersus != null) {
       return _AlbumInboxTile(versus: entry.albumVersus!);
     }

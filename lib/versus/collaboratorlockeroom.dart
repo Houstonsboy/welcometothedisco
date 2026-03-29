@@ -11,6 +11,7 @@ import 'package:welcometothedisco/versus/collaboratorinvitebanner.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
 const _kPink   = Color(0xFFf85187);
+const _kSuccessGreen = Color(0xFF22C55E);
 
 /// Entry point for Collaborator VS — author picks both artists, selects tracks
 /// only for artist1, then invites a collaborator to handle artist2.
@@ -104,6 +105,14 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   // ── Firebase submission state ──────────────────────────────────────────────
   bool _isSubmitting = false;
 
+  /// Set to true once [FirebaseService.createCollaborationInvite] succeeds.
+  /// Cleared only when the artist selection changes (not on track changes).
+  bool _collaborationInviteSent = false;
+
+  /// The Firestore doc ID returned by [FirebaseService.createCollaborationInvite].
+  /// On CREATE, this doc is updated (tracks + status: open) instead of a new one being made.
+  String? _collaborationVersusID;
+
   // ── Author comment ─────────────────────────────────────────────────────────
   final TextEditingController _authorCommentController =
       TextEditingController();
@@ -178,8 +187,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   /// Both artists selected — enables the collaborator page tab.
   bool get _canCreate        => _selected[0] != null && _selected[1] != null;
 
-  /// Tracks selected for artist 1 — enables submit.
-  bool get _canSubmit        => _artist1Selected && _selectedTracks1.isNotEmpty;
+  /// Tracks + successful collaborator invite (with or without artist2 yet).
+  bool get _canSubmit {
+    if (!_artist1Selected || _selectedTracks1.isEmpty) return false;
+    if (!_collaborationInviteSent) return false;
+    return true;
+  }
 
   /// True once collaborator's artist (slot 1) is chosen.
   bool get _artist2Locked    => _selected[1] != null;
@@ -243,7 +256,23 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     if (_selectedTracks1.isEmpty) {
       return 'Select at least one track for ${_selected[0]?.name ?? 'your artist'}';
     }
+    if (!_collaborationInviteSent) {
+      return 'Use Invite on the friend\'s artist slot or collab card before you can create';
+    }
     return null;
+  }
+
+  String get _submitBarButtonLabel {
+    if (_canSubmit) {
+      return _canCreate ? 'CREATE VERSUS' : 'CREATE — ADD COLLAB LATER';
+    }
+    if (!_artist1Selected || _selectedTracks1.isEmpty) {
+      return 'SELECT YOUR TRACKS FIRST';
+    }
+    if (!_collaborationInviteSent) {
+      return 'SEND INVITE FIRST';
+    }
+    return 'SELECT YOUR TRACKS FIRST';
   }
 
   // ── Artist search ──────────────────────────────────────────────────────────
@@ -272,6 +301,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         _topTracks[0] = [];
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
+        _collaborationInviteSent = false;
+        _collaborationVersusID = null;
         if (_selected[1] != null) {
           _selected[1] = null;
           _topTracks[1] = [];
@@ -288,12 +319,16 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
       } else if (_selected[1] == null) {
         // Artist1 already picked, now picking artist2.
         _selected[1] = artist;
+        _collaborationInviteSent = false;
+        _collaborationVersusID = null;
       } else {
         // Both filled: only replace artist1; artist2 stays locked.
         _selected[0] = artist;
         _topTracks[0] = [];
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
+        _collaborationInviteSent = false;
+        _collaborationVersusID = null;
       }
 
       // Close the artist search overlay after a selection.
@@ -403,12 +438,35 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     if (!_canSubmit || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
-      await widget.onCreateVersus(
-        _selected[0]!,
-        _selected[1],         // may be null — that's fine
-        _selectedTracks1,
-        authorComment,
-      );
+      final existingID = _collaborationVersusID;
+      if (existingID != null) {
+        // Promote the existing incomplete doc to open with the final track list.
+        await FirebaseService.openCollaborationVersus(
+          versusID: existingID,
+          artist1TrackIDs: _selectedTracks1.map((t) => t.id).toList(),
+          artist2ID: _selected[1]?.id,
+          artist2Name: _selected[1]?.name,
+          authorComment: authorComment,
+        );
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        // Fallback: create a fresh doc (no prior invite doc to upgrade).
+        await widget.onCreateVersus(
+          _selected[0]!,
+          _selected[1],
+          _selectedTracks1,
+          authorComment,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to create versus: $e'),
+          backgroundColor: Colors.red.withOpacity(0.85),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -633,10 +691,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   // ── Submit bar ─────────────────────────────────────────────────────────────
   Widget _buildSubmitBar() {
     final hint = _submitHint;
-    // Label changes based on whether artist2 is set.
-    final buttonLabel = _canSubmit
-        ? (_canCreate ? 'SEND INVITE & CREATE' : 'CREATE — ADD COLLAB LATER')
-        : 'SELECT YOUR TRACKS FIRST';
+    final buttonLabel = _submitBarButtonLabel;
 
     return SafeArea(
       top: false,
@@ -880,6 +935,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                         _topTracks[0] = [];
                         _selectedTracks1.clear();
                         _trackSearchResults1 = null;
+                        _collaborationInviteSent = false;
+                        _collaborationVersusID = null;
                       }),
                     ),
                   ),
@@ -903,6 +960,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                       onRemove: () => setState(() {
                         _selected[1] = null;
                         _topTracks[1] = [];
+                        _collaborationInviteSent = false;
+                        _collaborationVersusID = null;
                       }),
                     ),
                   ),
@@ -1200,25 +1259,54 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   }
 
   void _showCollaboratorInviteBanner() {
-    final artist2 = _selected[1]; // the collaborator's artist
+    final artist1 = _selected[0];
+    if (artist1 == null) return;
+
+    final artist2 = _selected[1];
     CollaboratorInviteBanner.show(
       context,
       artistName: artist2?.name ?? 'this artist',
       artistImageUrl: artist2?.imageUrl,
-      onInviteSent: () {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Invite sent!'),
-              backgroundColor: _kPink.withOpacity(0.85),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              duration: const Duration(seconds: 2),
-            ),
+      onInviteSent: (FriendEntry? selectedFriend) async {
+        String? versusID;
+        try {
+          versusID = await FirebaseService.createCollaborationInvite(
+            artist1ID: artist1.id,
+            artist1Name: artist1.name,
+            artist1TrackIDs: _selectedTracks1.map((t) => t.id).toList(),
+            artist2ID: artist2?.id,
+            artist2Name: artist2?.name,
+            authorComment: authorComment,
+            collaboratorUID: selectedFriend?.uid,
+            collaboratorUsername: selectedFriend?.username,
+            collaboratorAvatarPath: selectedFriend?.avatarPath,
           );
+        } catch (e) {
+          debugPrint(
+              '[CollaboratorLockeroom] createCollaborationInvite failed: $e');
         }
+
+        if (!context.mounted) return;
+        final ok = versusID != null;
+        if (ok) {
+          setState(() {
+            _collaborationInviteSent = true;
+            _collaborationVersusID = versusID;
+          });
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ok ? 'Invite sent!' : 'Invite sent (offline)'),
+            backgroundColor: ok
+                ? _kSuccessGreen.withOpacity(0.92)
+                : const Color(0xFFD97706).withOpacity(0.92),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       },
     );
   }

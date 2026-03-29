@@ -194,7 +194,9 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                   );
                 }
 
-                final entries = snapshot.data ?? [];
+                final entries = (snapshot.data ?? [])
+                    .where((e) => e.isEligibleForInboxDisplay)
+                    .toList();
                 if (entries.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.all(18),

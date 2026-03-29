@@ -8,13 +8,18 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
 const _kPink   = Color(0xFFf85187);
+/// Success state for “invite sent” — reads clearly positive (not pink/red).
+const _kInviteSentGreen = Color(0xFF22C55E);
+const _kInviteSentGreenDeep = Color(0xFF15803D);
 
 class CollaboratorInviteBanner {
   static Future<void> show(
     BuildContext context, {
     required String artistName,
     String? artistImageUrl,
-    VoidCallback? onInviteSent,
+    /// Called after a successful send with the resolved recipient [FriendEntry].
+    /// Typed usernames are resolved to a user via search (exact username match).
+    void Function(FriendEntry? selectedFriend)? onInviteSent,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -35,7 +40,7 @@ class CollaboratorInviteBanner {
 class _InviteBannerSheet extends StatefulWidget {
   final String  artistName;
   final String? artistImageUrl;
-  final VoidCallback? onInviteSent;
+  final void Function(FriendEntry? selectedFriend)? onInviteSent;
 
   const _InviteBannerSheet({
     required this.artistName,
@@ -161,8 +166,68 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
   }
 
   Future<void> _handleSend() async {
-    final manual = _usernameCtrl.text.trim();
+    final rawManual = _usernameCtrl.text.trim();
+    final manual =
+        rawManual.replaceFirst(RegExp(r'^@+'), '').trim();
     if (_selectedFriend == null && manual.isEmpty) return;
+
+    FriendEntry? recipient = _selectedFriend;
+
+    // Search path: SEND is allowed with only typed text, but Firestore needs a UID.
+    // Previously we passed null here, so [createCollaborationInvite] skipped
+    // `users/{id}/notifications` entirely.
+    if (recipient == null && manual.isNotEmpty) {
+      setState(() => _isSending = true);
+      try {
+        final users = await FirebaseService.searchUsersByUsername(manual);
+        final lower = manual.toLowerCase();
+        final exact =
+            users.where((u) => u.username.toLowerCase() == lower).toList();
+        if (!mounted) return;
+        setState(() => _isSending = false);
+        if (exact.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'No account with that exact username. Pick someone from search results.',
+                style: TextStyle(fontSize: 13),
+              ),
+              backgroundColor: Colors.black.withOpacity(0.78),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            ),
+          );
+          return;
+        }
+        final u = exact.first;
+        recipient = FriendEntry(
+          uid: u.id,
+          username: u.username,
+          avatarPath: u.avatarPath,
+        );
+      } catch (e) {
+        if (mounted) setState(() => _isSending = false);
+        debugPrint('[CollaboratorInviteBanner] username resolve failed: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not look up user: $e',
+                  style: const TextStyle(fontSize: 13)),
+              backgroundColor: Colors.black.withOpacity(0.78),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (recipient == null) return;
 
     HapticFeedback.mediumImpact();
     setState(() => _isSending = true);
@@ -172,7 +237,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
     HapticFeedback.lightImpact();
     await Future.delayed(const Duration(milliseconds: 1200));
     if (mounted) {
-      widget.onInviteSent?.call();
+      widget.onInviteSent?.call(recipient);
       Navigator.of(context).pop();
     }
   }
@@ -578,19 +643,32 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                     end: Alignment.centerRight,
                   )
                 : _sent
-                    ? LinearGradient(colors: [
-                        const Color(0xFF00C9A7).withOpacity(0.7),
-                        const Color(0xFF00C9A7).withOpacity(0.5),
-                      ])
+                    ? const LinearGradient(
+                        colors: [_kInviteSentGreenDeep, _kInviteSentGreen],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
                     : null,
             color: (!hasTarget && !_sent) ? Colors.white.withOpacity(0.07) : null,
             border: Border.all(
-              color: hasTarget ? Colors.transparent : Colors.white.withOpacity(0.10),
+              color: _sent
+                  ? Colors.white.withOpacity(0.4)
+                  : hasTarget
+                      ? Colors.transparent
+                      : Colors.white.withOpacity(0.10),
               width: 0.8,
             ),
             boxShadow: hasTarget && !_sent
                 ? [BoxShadow(color: _kPink.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 5))]
-                : [],
+                : _sent
+                    ? [
+                        BoxShadow(
+                          color: _kInviteSentGreen.withOpacity(0.5),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : [],
           ),
           child: Center(
             child: _isSending
@@ -601,7 +679,9 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                     child: Text(label,
                       key: ValueKey(label),
                       style: TextStyle(
-                        color: hasTarget ? Colors.white : Colors.white.withOpacity(0.25),
+                        color: _sent || hasTarget
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.25),
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.6,

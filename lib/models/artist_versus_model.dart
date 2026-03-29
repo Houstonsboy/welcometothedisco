@@ -94,7 +94,7 @@ class ArtistVersusModel {
       artist2TrackIDs: _parseStringList(data['artist2TrackIDs']),
       authorID: (data['authorID'] as String?)?.trim() ?? '',
       collaboratorID: (data['collaboratorID'] as String?)?.trim(),
-      status: (data['status'] as String?)?.trim() ?? 'open',
+      status: (data['status'] as String?)?.trim() ?? 'incomplete',
       timestamp: data['timestamp'] as Timestamp?,
       authorComment: (data['authorComment'] as String?)?.trim(),
     );
@@ -125,7 +125,11 @@ class ArtistVersusModel {
   bool get isOpen => status == 'open';
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
-  bool get hasCollaborator => collaboratorID != null && collaboratorID!.isNotEmpty;
+
+  /// Inbox lists only [status] == `open` (excludes incomplete / active / completed).
+bool get isEligibleForInboxDisplay =>
+    status.trim() == 'open' && artist1ID.isNotEmpty && artist2ID.isNotEmpty;
+bool get hasCollaborator => collaboratorID != null && collaboratorID!.isNotEmpty;
 
   int get totalSelectedTracks =>
       artist1TrackIDs.length + artist2TrackIDs.length;

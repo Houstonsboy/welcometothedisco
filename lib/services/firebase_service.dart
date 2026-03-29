@@ -106,6 +106,7 @@ class FirebaseService {
       'follower_avatar': follower.avatarPath,
       'follower_bio': follower.bio,
       'timestamp': FieldValue.serverTimestamp(),
+      'type': 'follow',
       'read': false,
     });
 
@@ -240,56 +241,67 @@ class FirebaseService {
     return _enrichArtistVersusWithUsers(list);
   }
 
-  /// Inbox list: optional [typeFilter] 'album' | 'artist' | null (both).
-  /// When null, returns both types merged and ordered by [timestamp] descending.
+  /// Inbox: all [versus] docs with `status == "open"` (album, artist, collaboration).
+  /// Collaboration rows use the artist inbox tile; [typeFilter] `artist` includes them.
+  /// Optional [typeFilter] 'album' | 'artist' | null (all).
   static Future<List<InboxVersusEntry>> getInboxVersusList({
     String? typeFilter,
   }) async {
-    if (typeFilter == 'album') {
-      final list = await getVersusList();
-      return list
-          .map((v) => InboxVersusEntry(
-                type: 'album',
-                timestamp: v.timestamp,
-                albumVersus: v,
-              ))
-          .toList();
+    // No orderBy here — avoids the composite index requirement.
+    // Docs are sorted client-side after enrichment.
+    final snapshot = await _firestore
+        .collection('versus')
+        .where('status', isEqualTo: 'open')
+        .get();
+
+    final albums = <VersusModel>[];
+    final artists = <ArtistVersusModel>[];
+    final entries = <InboxVersusEntry>[];
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final type = (data['type'] as String?)?.trim() ?? 'album';
+
+      if (type == 'album') {
+        final v = VersusModel.fromFirestore(data, doc.id);
+        if (!v.isEligibleForInboxDisplay) continue;
+        albums.add(v);
+        entries.add(InboxVersusEntry(
+          type: 'album',
+          timestamp: v.timestamp,
+          albumVersus: v,
+        ));
+      } else if (type == 'artist' || type == 'collaboration') {
+        final v = ArtistVersusModel.fromFirestore(data, doc.id);
+        if (!v.isEligibleForInboxDisplay) continue;
+        artists.add(v);
+        entries.add(InboxVersusEntry(
+          type: 'artist',
+          timestamp: v.timestamp,
+          artistVersus: v,
+        ));
+      }
     }
-    if (typeFilter == 'artist') {
-      final list = await getArtistVersusList();
-      return list
-          .map((v) => InboxVersusEntry(
-                type: 'artist',
-                timestamp: v.timestamp,
-                artistVersus: v,
-              ))
-          .toList();
-    }
-    // Both: fetch in parallel, merge by timestamp desc
-    final results = await Future.wait([
-      getVersusList(),
-      getArtistVersusList(),
+
+    await Future.wait([
+      if (albums.isNotEmpty) _enrichWithAuthors(albums),
+      if (artists.isNotEmpty) _enrichArtistVersusWithUsers(artists),
     ]);
-    final albums = results[0] as List<VersusModel>;
-    final artists = results[1] as List<ArtistVersusModel>;
-    final List<InboxVersusEntry> merged = [
-      ...albums.map((v) => InboxVersusEntry(
-            type: 'album',
-            timestamp: v.timestamp,
-            albumVersus: v,
-          )),
-      ...artists.map((v) => InboxVersusEntry(
-            type: 'artist',
-            timestamp: v.timestamp,
-            artistVersus: v,
-          )),
-    ];
-    merged.sort((a, b) {
+
+    // Sort by timestamp descending (newest first) after enrichment.
+    entries.sort((a, b) {
       final ta = a.timestamp?.millisecondsSinceEpoch ?? 0;
       final tb = b.timestamp?.millisecondsSinceEpoch ?? 0;
       return tb.compareTo(ta);
     });
-    return merged;
+
+    if (typeFilter == 'album') {
+      return entries.where((e) => e.isAlbum).toList();
+    }
+    if (typeFilter == 'artist') {
+      return entries.where((e) => e.isArtist).toList();
+    }
+    return entries;
   }
 
   /// One-time migration — adds type: "album" to all versus docs missing the field.
@@ -330,6 +342,7 @@ class FirebaseService {
 
     await _firestore.collection('versus').add({
       'type': type,
+      'status': 'open',
       'Author': uid,
       'album1ID': album1ID,
       'album1Name': album1Name,
@@ -471,6 +484,103 @@ class FirebaseService {
     );
   }
 
+  // ── Create collaboration invite versus (status: incomplete) ──────────────
+  /// Creates the versus document for the collab-lockeroom flow then, if a
+  /// collaborator was chosen, drops an invite notification in their
+  /// `users/{collaboratorUID}/notifications` subcollection.
+  ///
+  /// Returns the new versus doc ID.
+  static Future<String> createCollaborationInvite({
+    // Author's Spotify artist
+    required String artist1ID,
+    required String artist1Name,
+    required List<String> artist1TrackIDs,
+    // Collaborator's artist (nullable — may not be chosen yet)
+    String? artist2ID,
+    String? artist2Name,
+    // Author note from the comment strip
+    String? authorComment,
+    // Selected recipient from invite banner (nullable)
+    String? collaboratorUID,
+    String? collaboratorUsername,
+    String? collaboratorAvatarPath,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not logged in');
+
+    final author = await getUserById(uid);
+    final comment = authorComment?.trim();
+
+    // ── 1. Build Firestore doc ────────────────────────────────────────────────
+    final Map<String, dynamic> versusData = {
+      'type':   'collaboration',
+      'status': 'incomplete',
+      'timestamp': FieldValue.serverTimestamp(),
+
+      // Author details
+      'authorID':       uid,
+      'author_username': author?.username ?? '',
+      'author_avatar':  author?.avatarPath ?? '',
+
+      // Artist 1 (author's pick)
+      'artist1ID':       artist1ID.trim(),
+      'artist1Name':     artist1Name.trim(),
+      'artist1TrackIDs': artist1TrackIDs.map((e) => e.trim()).toList(),
+
+      // Artist 2 (collaborator's pick — may be null)
+      if (artist2ID != null && artist2ID.trim().isNotEmpty)
+        'artist2ID': artist2ID.trim(),
+      if (artist2Name != null && artist2Name.trim().isNotEmpty)
+        'artist2Name': artist2Name.trim(),
+      'artist2TrackIDs': [],
+
+      // Optional author note
+      if (comment != null && comment.isNotEmpty)
+        'authorComment': comment,
+
+      // Collaborator slot (filled when the recipient accepts)
+      'collaboratorComment': null,
+
+      // Invited collaborator — filled if recipient was chosen from the banner
+      if (collaboratorUID != null && collaboratorUID.trim().isNotEmpty)
+        'collaboratorID': collaboratorUID.trim(),
+    };
+
+    final ref = await _firestore.collection('versus').add(versusData);
+    final versusID = ref.id;
+    debugPrint('[FirebaseService] createCollaborationInvite → doc: $versusID');
+
+    // ── 2. Send invite notification if a recipient was chosen ─────────────────
+    if (collaboratorUID != null && collaboratorUID.trim().isNotEmpty) {
+      try {
+        await _firestore
+            .collection('users')
+            .doc(collaboratorUID.trim())
+            .collection('notifications')
+            .add({
+          'type':        'invite',
+          'read':        false,
+          'timestamp':   FieldValue.serverTimestamp(),
+          // Who sent the invite
+          'authorID':      uid,
+          'authorName':    author?.username ?? '',
+          'author_avatar': author?.avatarPath ?? '',
+          // The versus that was just created
+          'versusID':    versusID,
+          'artist1Name': artist1Name.trim(),
+          'artist2Name': artist2Name?.trim() ?? '',
+        });
+        debugPrint(
+            '[FirebaseService] createCollaborationInvite → invite sent to $collaboratorUID');
+      } catch (e) {
+        debugPrint(
+            '[FirebaseService] createCollaborationInvite → notification failed: $e');
+      }
+    }
+
+    return versusID;
+  }
+
   // ── Fetch single artist versus by doc ID ──────────────────────────────────
   static Future<ArtistVersusModel?> getArtistVersusById(
       String documentId) async {
@@ -602,6 +712,36 @@ class FirebaseService {
 
     debugPrint(
         '[FirebaseService] joinArtistVersus → $documentId claimed by $uid');
+  }
+
+  // ── Promote collaboration draft → open ────────────────────────────────────
+  /// Called when the author clicks CREATE after having already sent an invite.
+  /// Updates the existing `status: incomplete` collaboration doc with the
+  /// final artist1 track list (and optionally artist2 details) then flips
+  /// status to `open` so it becomes visible in the inbox.
+  static Future<void> openCollaborationVersus({
+    required String versusID,
+    required List<String> artist1TrackIDs,
+    String? artist2ID,
+    String? artist2Name,
+    String? authorComment,
+  }) async {
+    final data = <String, dynamic>{
+      'status': 'incomplete',
+      'artist1TrackIDs': artist1TrackIDs.map((e) => e.trim()).toList(),
+    };
+    if (artist2ID != null && artist2ID.trim().isNotEmpty) {
+      data['artist2ID'] = artist2ID.trim();
+    }
+    if (artist2Name != null && artist2Name.trim().isNotEmpty) {
+      data['artist2Name'] = artist2Name.trim();
+    }
+    final comment = authorComment?.trim();
+    if (comment != null && comment.isNotEmpty) {
+      data['authorComment'] = comment;
+    }
+    await _firestore.collection('versus').doc(versusID).update(data);
+    debugPrint('[FirebaseService] openCollaborationVersus → $versusID set to open');
   }
 
   // ── Update status ─────────────────────────────────────────────────────────
