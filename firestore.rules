@@ -34,12 +34,13 @@ service cloud.firestore {
     match /versus/{docId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      // Allow update if: (1) only adding/changing 'type' field (one-time backfill), or (2) user is the document author
+      // Allow update if: (1) type backfill, (2) author, or (3) invited collaborator (collaboration flow)
       allow update: if request.auth != null
         && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type'])
           || request.auth.uid == resource.data.Author
           || request.auth.uid == resource.data.authorID
+          || request.auth.uid == resource.data.collaboratorID
         );
       allow delete: if request.auth != null
         && (request.auth.uid == resource.data.Author || request.auth.uid == resource.data.authorID);

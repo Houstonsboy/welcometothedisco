@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
-import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/spotify_service.dart';
 
 const _kPurple       = Color(0xFF1E3DE1);
 const _kPink         = Color(0xFFf85187);
@@ -22,7 +22,7 @@ const _kSpotifyGreen = Color(0xFF17B560);
 ///
 /// ```dart
 /// Navigator.of(context).push(MaterialPageRoute(
-///   builder: (_) => CollaboratorAcceptGate(versusID: notification.versusID),
+///   builder: (_) => CollaboratorBackroom(versusID: notification.versusID),
 /// ));
 /// ```
 class CollaboratorAcceptGate extends StatelessWidget {
@@ -40,11 +40,45 @@ class CollaboratorAcceptGate extends StatelessWidget {
           );
         }
         final result = snap.data;
-        if (result == null || result.currentUser == null) {
+        if (result == null) {
           return _gradientScaffold(
             Center(
               child: Text(
-                result == null ? 'Failed to load versus.' : 'Sign in to collaborate.',
+                'Failed to load versus.',
+                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+              ),
+            ),
+          );
+        }
+        if (result.errorMessage != null) {
+          return _gradientScaffold(
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  result.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14),
+                ),
+              ),
+            ),
+          );
+        }
+        if (result.currentUser == null) {
+          return _gradientScaffold(
+            Center(
+              child: Text(
+                'Sign in to collaborate.',
+                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+              ),
+            ),
+          );
+        }
+        if (result.versus == null) {
+          return _gradientScaffold(
+            Center(
+              child: Text(
+                'Versus not found.',
                 style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
               ),
             ),
@@ -63,10 +97,43 @@ class CollaboratorAcceptGate extends StatelessWidget {
       FirebaseService.getArtistVersusById(versusID),
       FirebaseService.getCurrentUser(),
     ]);
-    return _GateResult(
-      versus:      results[0] as ArtistVersusModel?,
-      currentUser: results[1] as UserModel?,
-    );
+    final versus = results[0] as ArtistVersusModel?;
+    final currentUser = results[1] as UserModel?;
+
+    if (versus == null) {
+      return _GateResult(versus: null, currentUser: currentUser, errorMessage: null);
+    }
+    if (currentUser == null) {
+      return _GateResult(versus: null, currentUser: null, errorMessage: null);
+    }
+
+    final uid = currentUser.id;
+    if (versus.authorID == uid) {
+      return _GateResult(
+        versus: null,
+        currentUser: currentUser,
+        errorMessage:
+            'You created this versus. Your collaborator opens it from their notification.',
+      );
+    }
+
+    final invited = versus.collaboratorID?.trim() ?? '';
+    if (invited.isEmpty) {
+      return _GateResult(
+        versus: null,
+        currentUser: currentUser,
+        errorMessage: 'This collaboration is not linked to an invited account yet.',
+      );
+    }
+    if (invited != uid) {
+      return _GateResult(
+        versus: null,
+        currentUser: currentUser,
+        errorMessage: 'This invite is for another account.',
+      );
+    }
+
+    return _GateResult(versus: versus, currentUser: currentUser, errorMessage: null);
   }
 
   Widget _gradientScaffold(Widget body) => Container(
@@ -84,7 +151,19 @@ class CollaboratorAcceptGate extends StatelessWidget {
 class _GateResult {
   final ArtistVersusModel? versus;
   final UserModel?         currentUser;
-  _GateResult({this.versus, this.currentUser});
+  final String?            errorMessage;
+  _GateResult({this.versus, this.currentUser, this.errorMessage});
+}
+
+/// Public entry matching the file name — loads [versusID] from Firestore and
+/// shows [CollaboratorAcceptScreen] for the invited collaborator.
+class CollaboratorBackroom extends StatelessWidget {
+  final String versusID;
+  const CollaboratorBackroom({super.key, required this.versusID});
+
+  @override
+  Widget build(BuildContext context) =>
+      CollaboratorAcceptGate(versusID: versusID);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,7 +187,7 @@ class CollaboratorAcceptScreen extends StatefulWidget {
 
 class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     with TickerProviderStateMixin {
-  final SpotifyApi _api = SpotifyApi();
+  final SpotifyApi _api = SpotifyService.api;
 
   // ── User1 (author) — read-only ─────────────────────────────────────────────
   List<SpotifyTrack> _user1Tracks = [];

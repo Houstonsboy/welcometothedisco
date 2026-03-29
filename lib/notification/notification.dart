@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
 const _kPink = Color(0xFFf85187);
@@ -568,110 +569,125 @@ class _InviteNotificationRow extends StatelessWidget {
     final isUnread = !n.read;
     final authorLabel = _displayName(n.authorName);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        color: isUnread ? _kPink.withOpacity(0.12) : Colors.transparent,
-        border: isUnread
-            ? Border.all(color: _kPink.withOpacity(0.35), width: 1)
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _NotifAvatar(assetPath: assetPath, isUnread: isUnread),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+        onTap: () {
+          final id = n.versusID.trim();
+          if (id.isEmpty) return;
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CollaboratorBackroom(versusID: id),
+            ),
+          );
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isUnread ? _kPink.withOpacity(0.12) : Colors.transparent,
+            border: isUnread
+                ? Border.all(color: _kPink.withOpacity(0.35), width: 1)
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _NotifAvatar(assetPath: assetPath, isUnread: isUnread),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Text(
-                        n.versusTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                    if (isUnread) ...[
-                      const SizedBox(width: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: _kPink,
-                            shape: BoxShape.circle,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            n.versusTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              height: 1.2,
+                            ),
                           ),
                         ),
+                        if (isUnread) ...[
+                          const SizedBox(width: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: _kPink,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'by $authorLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Inviting you to create this versus together · ${_formatTime(n.timestamp)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.32),
+                        fontSize: 11,
+                        height: 1.25,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'by $authorLabel',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.55),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: LinearGradient(
+                    colors: [
+                      _kPurple.withOpacity(0.45),
+                      _kPink.withOpacity(0.45),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.22),
+                    width: 0.8,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'Inviting you to create this versus together · ${_formatTime(n.timestamp)}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.32),
-                    fontSize: 11,
-                    height: 1.25,
-                  ),
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: Colors.white.withOpacity(0.92),
+                  size: 20,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                colors: [
-                  _kPurple.withOpacity(0.45),
-                  _kPink.withOpacity(0.45),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.22),
-                width: 0.8,
-              ),
-            ),
-            child: Icon(
-              Icons.graphic_eq_rounded,
-              color: Colors.white.withOpacity(0.92),
-              size: 20,
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

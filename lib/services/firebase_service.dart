@@ -714,6 +714,63 @@ class FirebaseService {
         '[FirebaseService] joinArtistVersus → $documentId claimed by $uid');
   }
 
+  // ── Collaboration: invitee confirms artist2 + tracks ─────────────────────
+  /// Called from [CollaboratorAcceptScreen] when the invited user finishes
+  /// picking their artist (if needed) and tracks. Requires `type: collaboration`,
+  /// matching [collaboratorID], and status `incomplete` or `open`.
+  static Future<void> acceptCollaborationInvite({
+    required String versusID,
+    required String artist2ID,
+    required String artist2Name,
+    required List<String> artist2TrackIDs,
+    String? collaboratorComment,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not logged in');
+
+    final ref = _firestore.collection('versus').doc(versusID);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('Versus not found');
+
+      final data = snap.data()!;
+      final type = (data['type'] as String?)?.trim() ?? '';
+      if (type != 'collaboration') {
+        throw Exception('Not a collaboration versus');
+      }
+
+      final collab = (data['collaboratorID'] as String?)?.trim() ?? '';
+      if (collab.isEmpty) {
+        throw Exception('This draft has no invited collaborator');
+      }
+      if (collab != uid) {
+        throw Exception('Only the invited collaborator can confirm');
+      }
+
+      final st = (data['status'] as String?)?.trim() ?? '';
+      if (st != 'incomplete' && st != 'open') {
+        throw Exception('This versus can no longer be updated');
+      }
+
+      final update = <String, dynamic>{
+        'artist2ID': artist2ID.trim(),
+        'artist2Name': artist2Name.trim(),
+        'artist2TrackIDs': artist2TrackIDs.map((e) => e.trim()).toList(),
+        'status': 'active',
+      };
+      final cc = collaboratorComment?.trim();
+      if (cc != null && cc.isNotEmpty) {
+        update['collaboratorComment'] = cc;
+      }
+
+      tx.update(ref, update);
+    });
+
+    debugPrint(
+        '[FirebaseService] acceptCollaborationInvite → $versusID by $uid');
+  }
+
   // ── Promote collaboration draft → open ────────────────────────────────────
   /// Called when the author clicks CREATE after having already sent an invite.
   /// Updates the existing `status: incomplete` collaboration doc with the
@@ -727,7 +784,7 @@ class FirebaseService {
     String? authorComment,
   }) async {
     final data = <String, dynamic>{
-      'status': 'incomplete',
+      'status': 'open',
       'artist1TrackIDs': artist1TrackIDs.map((e) => e.trim()).toList(),
     };
     if (artist2ID != null && artist2ID.trim().isNotEmpty) {
