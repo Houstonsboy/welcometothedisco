@@ -567,8 +567,11 @@ class FirebaseService {
           'author_avatar': author?.avatarPath ?? '',
           // The versus that was just created
           'versusID':    versusID,
+          'artist1ID':   artist1ID.trim(),
           'artist1Name': artist1Name.trim(),
           'artist2Name': artist2Name?.trim() ?? '',
+          if (artist2ID != null && artist2ID.trim().isNotEmpty)
+            'artist2ID': artist2ID.trim(),
         });
         debugPrint(
             '[FirebaseService] createCollaborationInvite → invite sent to $collaboratorUID');
@@ -724,6 +727,8 @@ class FirebaseService {
     required String artist2Name,
     required List<String> artist2TrackIDs,
     String? collaboratorComment,
+    String? collaboratorUsername,
+    String? collaboratorAvatarPath,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -757,7 +762,10 @@ class FirebaseService {
         'artist2ID': artist2ID.trim(),
         'artist2Name': artist2Name.trim(),
         'artist2TrackIDs': artist2TrackIDs.map((e) => e.trim()).toList(),
-        'status': 'active',
+        // Recipient completes the draft → visible in inbox (`getInboxVersusList`).
+        'status': 'open',
+        'collaborator_username': (collaboratorUsername ?? '').trim(),
+        'collaborator_avatar': (collaboratorAvatarPath ?? '').trim(),
       };
       final cc = collaboratorComment?.trim();
       if (cc != null && cc.isNotEmpty) {
@@ -771,11 +779,11 @@ class FirebaseService {
         '[FirebaseService] acceptCollaborationInvite → $versusID by $uid');
   }
 
-  // ── Promote collaboration draft → open ────────────────────────────────────
+  // ── Author finalizes tracks after invite (stays incomplete until collaborator) ─
   /// Called when the author clicks CREATE after having already sent an invite.
-  /// Updates the existing `status: incomplete` collaboration doc with the
-  /// final artist1 track list (and optionally artist2 details) then flips
-  /// status to `open` so it becomes visible in the inbox.
+  /// Patches the existing collaboration doc with final artist1 tracks (and optional
+  /// artist2 fields). **Does not** set `status` to `open` — the invited user does
+  /// that via [acceptCollaborationInvite] when they finish in the backroom.
   static Future<void> openCollaborationVersus({
     required String versusID,
     required List<String> artist1TrackIDs,
@@ -784,7 +792,7 @@ class FirebaseService {
     String? authorComment,
   }) async {
     final data = <String, dynamic>{
-      'status': 'open',
+      'status': 'incomplete',
       'artist1TrackIDs': artist1TrackIDs.map((e) => e.trim()).toList(),
     };
     if (artist2ID != null && artist2ID.trim().isNotEmpty) {
@@ -798,7 +806,8 @@ class FirebaseService {
       data['authorComment'] = comment;
     }
     await _firestore.collection('versus').doc(versusID).update(data);
-    debugPrint('[FirebaseService] openCollaborationVersus → $versusID set to open');
+    debugPrint(
+        '[FirebaseService] openCollaborationVersus → $versusID (author tracks; status stays incomplete)');
   }
 
   // ── Update status ─────────────────────────────────────────────────────────

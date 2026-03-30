@@ -417,8 +417,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   void _toggleMyTrack(SpotifyTrack track) {
     setState(() {
       final idx = _mySelectedTracks.indexWhere((t) => t.id == track.id);
-      if (idx >= 0) _mySelectedTracks.removeAt(idx);
-      else _mySelectedTracks.add(track);
+      if (idx >= 0) {
+        _mySelectedTracks.removeAt(idx);
+      } else {
+        final cap = _authorSideTrackCount;
+        if (cap > 0 && _mySelectedTracks.length >= cap) return;
+        _mySelectedTracks.add(track);
+      }
     });
   }
 
@@ -526,11 +531,42 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   // ── Submission ─────────────────────────────────────────────────────────────
 
-  bool get _canSubmit => _myArtist != null && _mySelectedTracks.isNotEmpty;
+  /// Author side (artist1) track count — collaborator must match this.
+  int get _authorSideTrackCount => widget.versus.artist1TrackIDs.length;
+
+  bool get _canSubmit =>
+      _myArtist != null &&
+      _authorSideTrackCount > 0 &&
+      _mySelectedTracks.length == _authorSideTrackCount;
+
+  String? get _submitHint {
+    if (_myArtist == null) return null;
+    final need = _authorSideTrackCount;
+    final have = _mySelectedTracks.length;
+    if (need == 0) {
+      return 'Their side has no tracks yet — wait for the host to finish their picks';
+    }
+    if (have == 0) {
+      return 'Select $need track${need == 1 ? '' : 's'} to match their side';
+    }
+    if (have < need) {
+      final n = need - have;
+      return 'Select $n more track${n == 1 ? '' : 's'} to match their side';
+    }
+    if (have > need) {
+      final n = have - need;
+      return 'Remove $n track${n == 1 ? '' : 's'} to match their side';
+    }
+    return null;
+  }
 
   String get _submitLabel {
     if (_myArtist == null) return 'PICK YOUR ARTIST FIRST';
+    if (_authorSideTrackCount == 0) return 'THEIR SIDE INCOMPLETE';
     if (_mySelectedTracks.isEmpty) return 'SELECT YOUR TRACKS FIRST';
+    if (_mySelectedTracks.length != _authorSideTrackCount) {
+      return 'SELECT EQUAL TRACKS';
+    }
     return 'CONFIRM & GO LIVE';
   }
 
@@ -546,6 +582,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         collaboratorComment: _commentCtrl.text.trim().isEmpty
             ? null
             : _commentCtrl.text.trim(),
+        collaboratorUsername: widget.currentUser.username.trim(),
+        collaboratorAvatarPath: widget.currentUser.avatarPath.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -682,9 +720,70 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             ],
           ),
         ),
+        if (_myArtist != null &&
+            (_authorSideTrackCount > 0 || _mySelectedTracks.isNotEmpty)) ...[
+          const SizedBox(width: 8),
+          _buildTrackCountBadge(),
+        ],
         const SizedBox(width: 8),
         _buildMyChip(),
       ]),
+    );
+  }
+
+  /// Host track count vs yours — mirrors artist lockeroom balance chip.
+  Widget _buildTrackCountBadge() {
+    final c1 = _authorSideTrackCount;
+    final c2 = _mySelectedTracks.length;
+    final balanced = c1 == c2 && c1 > 0;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: balanced
+            ? Colors.white.withOpacity(0.15)
+            : Colors.orange.withOpacity(0.2),
+        border: Border.all(
+          color: balanced
+              ? Colors.white.withOpacity(0.3)
+              : Colors.orange.withOpacity(0.5),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$c1',
+            style: TextStyle(
+              color: balanced ? Colors.white : _kPurple,
+              fontSize: 12, fontWeight: FontWeight.w800,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text('vs',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 10, fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            '$c2',
+            style: TextStyle(
+              color: balanced ? Colors.white : _kPink,
+              fontSize: 12, fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (balanced) ...[
+            const SizedBox(width: 5),
+            Icon(Icons.check_circle_rounded,
+                color: Colors.white.withOpacity(0.7), size: 13),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1110,6 +1209,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             final i     = entry.key;
             final track = entry.value;
             final alreadyPicked = picked.any((t) => t.id == track.id);
+            final cap = widget.versus.artist1TrackIDs.length;
+            final atCap =
+                cap > 0 && picked.length >= cap && !alreadyPicked;
             return AnimatedBuilder(
               animation: _slideAnim,
               builder: (_, child) => Transform.translate(
@@ -1123,7 +1225,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 isLast:       i == tracks.length - 1,
                 dimmed:       alreadyPicked || picked.isNotEmpty,
                 isSelected:   alreadyPicked,
-                onAdd:        alreadyPicked ? null : () => _toggleMyTrack(track),
+                onAdd:        (alreadyPicked || atCap)
+                    ? null
+                    : () => _toggleMyTrack(track),
               ),
             );
           }),
@@ -1509,6 +1613,10 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // ── Submit bar ─────────────────────────────────────────────────────────────
 
   Widget _buildSubmitBar() {
+    final hint = _submitHint;
+    final need = _authorSideTrackCount;
+    final have = _mySelectedTracks.length;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -1517,25 +1625,31 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
-            child: !_canSubmit
+            child: hint != null
                 ? Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: Colors.white.withOpacity(0.4), size: 13),
+                        Icon(
+                          need > 0 && have > 0 && have != need
+                              ? Icons.balance_rounded
+                              : Icons.info_outline_rounded,
+                          color: Colors.white.withOpacity(0.45),
+                          size: 13,
+                        ),
                         const SizedBox(width: 6),
-                        Flexible(child: Text(
-                          _myArtist == null
-                              ? 'Pick your artist to continue'
-                              : 'Select at least one track for ${_myArtist!.name}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
-                            fontSize: 11, fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            hint,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.45),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        )),
+                        ),
                       ],
                     ),
                   )

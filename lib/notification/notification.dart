@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
 
 const _kPurple = Color(0xFF1E3DE1);
@@ -52,6 +53,9 @@ class InviteNotification {
   final String authorID;
   final String authorName;
   final String authorAvatar;
+  /// Spotify artist IDs (for loading profile images).
+  final String artist1ID;
+  final String? artist2ID;
   final String artist1Name;
   final String? artist2Name;
   final String versusID;
@@ -63,6 +67,8 @@ class InviteNotification {
     required this.authorID,
     required this.authorName,
     required this.authorAvatar,
+    required this.artist1ID,
+    this.artist2ID,
     required this.artist1Name,
     this.artist2Name,
     required this.versusID,
@@ -74,11 +80,14 @@ class InviteNotification {
       QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data();
     final a2 = d['artist2Name'];
+    final id2 = d['artist2ID'];
     return InviteNotification(
       id: doc.id,
       authorID: d['authorID'] as String? ?? '',
       authorName: d['authorName'] as String? ?? '',
       authorAvatar: d['author_avatar'] as String? ?? '',
+      artist1ID: (d['artist1ID'] as String?)?.trim() ?? '',
+      artist2ID: id2 is String && id2.trim().isNotEmpty ? id2.trim() : null,
       artist1Name: d['artist1Name'] as String? ?? '',
       artist2Name: a2 is String && a2.trim().isNotEmpty ? a2.trim() : null,
       versusID: d['versusID'] as String? ?? '',
@@ -545,6 +554,130 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
   }
 }
 
+// ── Invite row: Spotify artist avatars + names ─────────────────────────────
+
+class _InviteArtistMatchupStrip extends StatefulWidget {
+  final InviteNotification notification;
+
+  const _InviteArtistMatchupStrip({required this.notification});
+
+  @override
+  State<_InviteArtistMatchupStrip> createState() =>
+      _InviteArtistMatchupStripState();
+}
+
+class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
+  static const double _avatarSize = 28;
+
+  String? _img1Url;
+  String? _img2Url;
+
+  InviteNotification get _n => widget.notification;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImages();
+  }
+
+  Future<void> _loadImages() async {
+    final id1 = _n.artist1ID.trim();
+    final id2 = _n.artist2ID?.trim() ?? '';
+    if (id1.isEmpty && id2.isEmpty) return;
+    final api = SpotifyService.api;
+    try {
+      final d1 = id1.isNotEmpty ? await api.getArtistDetails(id1) : null;
+      final d2 = id2.isNotEmpty ? await api.getArtistDetails(id2) : null;
+      if (!mounted) return;
+      setState(() {
+        _img1Url = d1?.imageUrl;
+        _img2Url = d2?.imageUrl;
+      });
+    } catch (_) {}
+  }
+
+  Widget _miniArtistAvatar(String? imageUrl, String name) {
+    final t = name.trim();
+    final initial = t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
+    return Container(
+      width: _avatarSize,
+      height: _avatarSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
+        color: Colors.white.withOpacity(0.08),
+      ),
+      child: ClipOval(
+        child: imageUrl != null && imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                width: _avatarSize,
+                height: _avatarSize,
+                errorBuilder: (_, __, ___) => _avatarFallback(initial),
+              )
+            : _avatarFallback(initial),
+      ),
+    );
+  }
+
+  Widget _avatarFallback(String initial) => Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.75),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSecond =
+        _n.artist2Name != null && _n.artist2Name!.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _miniArtistAvatar(_img1Url, _n.artist1Name),
+            if (hasSecond) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  'VS',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.45),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              _miniArtistAvatar(_img2Url, _n.artist2Name ?? ''),
+            ],
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          _n.versusTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.15,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Collaboration invite row ────────────────────────────────────────────────
 
 class _InviteNotificationRow extends StatelessWidget {
@@ -594,7 +727,7 @@ class _InviteNotificationRow extends StatelessWidget {
                 : null,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _NotifAvatar(assetPath: assetPath, isUnread: isUnread),
               const SizedBox(width: 12),
@@ -607,18 +740,7 @@ class _InviteNotificationRow extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Text(
-                            n.versusTitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
-                              height: 1.2,
-                            ),
-                          ),
+                          child: _InviteArtistMatchupStrip(notification: n),
                         ),
                         if (isUnread) ...[
                           const SizedBox(width: 6),
@@ -636,7 +758,7 @@ class _InviteNotificationRow extends StatelessWidget {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
                     Text(
                       'by $authorLabel',
                       maxLines: 1,
@@ -649,7 +771,7 @@ class _InviteNotificationRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Inviting you to create this versus together · ${_formatTime(n.timestamp)}',
+                      'Inviting you to collaborate · ${_formatTime(n.timestamp)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -659,30 +781,6 @@ class _InviteNotificationRow extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [
-                      _kPurple.withOpacity(0.45),
-                      _kPink.withOpacity(0.45),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.22),
-                    width: 0.8,
-                  ),
-                ),
-                child: Icon(
-                  Icons.graphic_eq_rounded,
-                  color: Colors.white.withOpacity(0.92),
-                  size: 20,
                 ),
               ),
             ],

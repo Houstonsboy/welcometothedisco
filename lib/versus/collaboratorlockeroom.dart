@@ -110,7 +110,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   bool _collaborationInviteSent = false;
 
   /// The Firestore doc ID returned by [FirebaseService.createCollaborationInvite].
-  /// On CREATE, this doc is updated (tracks + status: open) instead of a new one being made.
+  /// On CREATE, this doc is updated with final tracks; status stays `incomplete` until
+  /// the collaborator finishes in the backroom (`acceptCollaborationInvite` → `open`).
   String? _collaborationVersusID;
 
   // ── Author comment ─────────────────────────────────────────────────────────
@@ -440,7 +441,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     try {
       final existingID = _collaborationVersusID;
       if (existingID != null) {
-        // Promote the existing incomplete doc to open with the final track list.
+        // Patch the draft with final artist1 tracks; status remains incomplete until collaborator accepts.
         await FirebaseService.openCollaborationVersus(
           versusID: existingID,
           artist1TrackIDs: _selectedTracks1.map((t) => t.id).toList(),

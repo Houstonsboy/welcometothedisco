@@ -17,6 +17,8 @@ import 'package:welcometothedisco/models/users_model.dart';
 ///   status:           "open" | "active" | "completed",
 ///   timestamp:        Timestamp,
 ///   authorComment:     optional note from author (e.g. collaborator invite),
+///   author_username / author_avatar — denormalized on collaboration docs,
+///   collaboratorComment, collaborator_username, collaborator_avatar — invitee fields.
 /// }
 class ArtistVersusModel {
   // ── Firestore identity ────────────────────────────────────────────────────
@@ -46,6 +48,15 @@ class ArtistVersusModel {
   /// Optional message from the author (e.g. collab lockeroom note).
   final String? authorComment;
 
+  /// Denormalized author profile (collaboration docs).
+  final String? authorUsername;
+  final String? authorAvatar;
+
+  /// Invitee note + denormalized profile (set on accept).
+  final String? collaboratorComment;
+  final String? collaboratorUsername;
+  final String? collaboratorAvatar;
+
   // ── Runtime-hydrated: users collection ───────────────────────────────────
   UserModel? author;
   UserModel? collaborator;
@@ -73,6 +84,11 @@ class ArtistVersusModel {
     this.status = 'open',
     this.timestamp,
     this.authorComment,
+    this.authorUsername,
+    this.authorAvatar,
+    this.collaboratorComment,
+    this.collaboratorUsername,
+    this.collaboratorAvatar,
     this.author,
     this.collaborator,
     this.artist1ImageUrl,
@@ -97,6 +113,11 @@ class ArtistVersusModel {
       status: (data['status'] as String?)?.trim() ?? 'incomplete',
       timestamp: data['timestamp'] as Timestamp?,
       authorComment: (data['authorComment'] as String?)?.trim(),
+      authorUsername: (data['author_username'] as String?)?.trim(),
+      authorAvatar: (data['author_avatar'] as String?)?.trim(),
+      collaboratorComment: (data['collaboratorComment'] as String?)?.trim(),
+      collaboratorUsername: (data['collaborator_username'] as String?)?.trim(),
+      collaboratorAvatar: (data['collaborator_avatar'] as String?)?.trim(),
     );
   }
 
@@ -118,6 +139,16 @@ class ArtistVersusModel {
       'timestamp': FieldValue.serverTimestamp(),
       if (authorComment != null && authorComment!.trim().isNotEmpty)
         'authorComment': authorComment!.trim(),
+      if (authorUsername != null && authorUsername!.trim().isNotEmpty)
+        'author_username': authorUsername!.trim(),
+      if (authorAvatar != null && authorAvatar!.trim().isNotEmpty)
+        'author_avatar': authorAvatar!.trim(),
+      if (collaboratorComment != null && collaboratorComment!.trim().isNotEmpty)
+        'collaboratorComment': collaboratorComment!.trim(),
+      if (collaboratorUsername != null && collaboratorUsername!.trim().isNotEmpty)
+        'collaborator_username': collaboratorUsername!.trim(),
+      if (collaboratorAvatar != null && collaboratorAvatar!.trim().isNotEmpty)
+        'collaborator_avatar': collaboratorAvatar!.trim(),
     };
   }
 

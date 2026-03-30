@@ -30,20 +30,65 @@ service cloud.firestore {
       }
     }
 
-    // Versus: read for listing; create for authenticated; update only to add 'type' (backfill) or by author
+    // Versus: read for listing; create for authenticated; update by author, invited collaborator, or open join
     match /versus/{docId} {
+
+      /// Album docs use [Author]; artist / collaboration docs use [authorID].
+      function versusAuthorUid() {
+        return resource.data.get('authorID', resource.data.get('Author', ''));
+      }
+
+      function isVersusAuthor() {
+        return request.auth != null && request.auth.uid == versusAuthorUid();
+      }
+
+      /// Collaboration invitee: may only patch their side + status + comment; cannot reassign author/invite.
+      function collaborationCollaboratorUpdate() {
+        let beforeAuthor = resource.data.get('authorID', resource.data.get('Author', ''));
+        let afterAuthor = request.resource.data.get('authorID', request.resource.data.get('Author', ''));
+        let beforeCollab = resource.data.get('collaboratorID', '');
+        let afterCollab = request.resource.data.get('collaboratorID', '');
+        return request.auth != null
+          && resource.data.get('type', '') == 'collaboration'
+          && beforeCollab != ''
+          && beforeCollab == request.auth.uid
+          && afterAuthor == beforeAuthor
+          && afterCollab == beforeCollab
+          && request.resource.data.get('type', '') == resource.data.get('type', '')
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'artist2ID', 'artist2Name', 'artist2TrackIDs',
+                'status', 'collaboratorComment',
+                'collaborator_username', 'collaborator_avatar'
+              ]);
+      }
+
+      /// Public artist-versus join: claimant sets themselves as collaborator (was not author).
+      function artistVersusOpenJoinUpdate() {
+        return request.auth != null
+          && resource.data.get('type', '') == 'artist'
+          && resource.data.get('status', '') == 'open'
+          && request.auth.uid != versusAuthorUid()
+          && request.resource.data.get('collaboratorID', '') == request.auth.uid
+          && request.resource.data.get('status', '') == 'active'
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'collaboratorID', 'artist2ID', 'artist2Name',
+                'artist2TrackIDs', 'status'
+              ]);
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      // Allow update if: (1) type backfill, (2) author, or (3) invited collaborator (collaboration flow)
       allow update: if request.auth != null
         && (
+          // One-off type backfill (e.g. album versus migration)
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type'])
-          || request.auth.uid == resource.data.Author
-          || request.auth.uid == resource.data.authorID
-          || request.auth.uid == resource.data.collaboratorID
+          || isVersusAuthor()
+          || collaborationCollaboratorUpdate()
+          || artistVersusOpenJoinUpdate()
         );
-      allow delete: if request.auth != null
-        && (request.auth.uid == resource.data.Author || request.auth.uid == resource.data.authorID);
+      allow delete: if request.auth != null && isVersusAuthor();
     }
   }
 }

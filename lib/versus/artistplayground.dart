@@ -298,10 +298,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authorLabel = widget.versus.author?.username != null
-        ? '@${widget.versus.author!.username}'
-        : widget.versus.authorID;
-    final avatarPath = widget.versus.author?.avatarPath;
+    final authorLabel = _playgroundAuthorLabel(widget.versus);
+    final avatarPath = _playgroundAuthorAvatarPath(widget.versus);
 
     return Container(
       decoration: const BoxDecoration(
@@ -521,6 +519,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 ),
               ),
 
+              _buildVersusSideCommentStrip(),
+
               // ── Track pages ────────────────────────────────────────────────
               Expanded(
                 child: PageView(
@@ -617,6 +617,127 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   }
 
   // ── Artist selector (replaces album cards) ────────────────────────────────
+  /// Author display: hydrated user first, then denormalized Firestore fields.
+  static String _playgroundAuthorLabel(ArtistVersusModel v) {
+    final u = v.author?.username.trim() ?? '';
+    if (u.isNotEmpty) return '@$u';
+    final d = v.authorUsername?.trim() ?? '';
+    if (d.isNotEmpty) return '@$d';
+    return v.authorID;
+  }
+
+  static String? _playgroundAuthorAvatarPath(ArtistVersusModel v) {
+    final a = v.author?.avatarPath.trim() ?? '';
+    if (a.isNotEmpty) return v.author!.avatarPath.trim();
+    final d = v.authorAvatar?.trim() ?? '';
+    return d.isNotEmpty ? d : null;
+  }
+
+  /// Comment + profile for the **human** behind each artist column (swaps with PageView).
+  Widget _buildVersusSideCommentStrip() {
+    final isArtist1Side = _selectedArtist == 0;
+    final accent = isArtist1Side ? _color1 : _color2;
+
+    final String userLabel;
+    final String? rawAvatar;
+    final String? comment;
+
+    if (isArtist1Side) {
+      userLabel = _playgroundAuthorLabel(widget.versus);
+      rawAvatar = _playgroundAuthorAvatarPath(widget.versus);
+      comment = widget.versus.authorComment?.trim();
+    } else {
+      final cu = widget.versus.collaborator?.username.trim() ?? '';
+      if (cu.isNotEmpty) {
+        userLabel = '@$cu';
+      } else {
+        final du = widget.versus.collaboratorUsername?.trim() ?? '';
+        userLabel = du.isNotEmpty ? '@$du' : (widget.versus.collaboratorID ?? '—');
+      }
+      final ca = widget.versus.collaborator?.avatarPath.trim() ?? '';
+      if (ca.isNotEmpty) {
+        rawAvatar = widget.versus.collaborator!.avatarPath.trim();
+      } else {
+        final da = widget.versus.collaboratorAvatar?.trim() ?? '';
+        rawAvatar = da.isNotEmpty ? da : null;
+      }
+      comment = widget.versus.collaboratorComment?.trim();
+    }
+
+    final hasComment = comment != null && comment.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: KeyedSubtree(
+          key: ValueKey<int>(_selectedArtist),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                border: Border.all(color: accent.withOpacity(0.35), width: 0.9),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: accent.withOpacity(0.65), width: 1.2),
+                        ),
+                        child: ClipOval(
+                          child: rawAvatar != null && rawAvatar.trim().isNotEmpty
+                              ? _resolveAvatarWidget(rawAvatar.trim(), 30)
+                              : _avatarFallback(30),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          userLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.92),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (hasComment) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      comment!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.72),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildArtistSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
