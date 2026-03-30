@@ -328,22 +328,22 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 260),
               curve: Curves.easeOutCubic,
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: _searchVisible ? [_kPink, _kPurple] : [_kPurple, _kPink],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
                     color: (_searchVisible ? _kPurple : _kPink).withOpacity(0.40),
                     blurRadius: _searchVisible ? 18 : 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 220),
                 transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
@@ -490,17 +490,17 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                   // ── Checkmark badge overlaid on avatar when selected ──────
                   Stack(
                     clipBehavior: Clip.none,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 46, height: 46,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 46, height: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
                             color: isSelected ? ringColor : Colors.white.withOpacity(0.10),
                             width: isSelected ? 2.5 : 1.0,
-                          ),
-                          boxShadow: isSelected
+                      ),
+                      boxShadow: isSelected
                               ? [BoxShadow(color: ringColor.withOpacity(0.50), blurRadius: 14)]
                               : [],
                         ),
@@ -532,9 +532,9 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                    style: TextStyle(
                         color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-                        fontSize: 9,
+                      fontSize: 9,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
@@ -555,7 +555,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
     return AnimatedBuilder(
       animation: _searchCtrl,
       builder: (context, child) {
-        return Padding(
+    return Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Align(
             alignment: Alignment.centerLeft,
@@ -654,21 +654,21 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
               color: _sent
                   ? Colors.white.withOpacity(0.4)
                   : hasTarget
-                      ? Colors.transparent
-                      : Colors.white.withOpacity(0.10),
+                  ? Colors.transparent
+                  : Colors.white.withOpacity(0.10),
               width: 0.8,
             ),
             boxShadow: hasTarget && !_sent
                 ? [BoxShadow(color: _kPink.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 5))]
                 : _sent
-                    ? [
-                        BoxShadow(
+                ? [
+                    BoxShadow(
                           color: _kInviteSentGreen.withOpacity(0.5),
-                          blurRadius: 18,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
-                    : [],
+                      blurRadius: 18,
+                      offset: const Offset(0, 5),
+                    ),
+                  ]
+                : [],
           ),
           child: Center(
             child: _isSending
@@ -696,8 +696,8 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
 
   Widget _buildDivider() => Divider(
     height: 0, thickness: 0.6,
-    color: Colors.white.withOpacity(0.06),
-  );
+        color: Colors.white.withOpacity(0.06),
+      );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -300,9 +300,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
               ),
             ),
             const SizedBox(height: 20),
-            Text(
+                Text(
               'No notifications yet',
-              style: TextStyle(
+                  style: TextStyle(
                 color: Colors.white.withOpacity(0.85),
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -311,9 +311,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
             const SizedBox(height: 6),
             Text(
               'Follows and collaboration invites will show up here',
-              style: TextStyle(
+                  style: TextStyle(
                 color: Colors.white.withOpacity(0.45),
-                fontSize: 12,
+                    fontSize: 12,
               ),
             ),
         ],
@@ -421,78 +421,78 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: isUnread ? _kGreen.withOpacity(0.13) : Colors.transparent,
         border: isUnread
             ? Border.all(color: _kGreen.withOpacity(0.28), width: 1)
             : null,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
           _NotifAvatar(assetPath: widget.assetPath, isUnread: isUnread),
           const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
                         n.followerUsername.isNotEmpty
                             ? n.followerUsername
                             : 'Unknown',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                              style: const TextStyle(
+                                color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.1,
-                        ),
-                      ),
-                    ),
-                    if (isUnread) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
+                              ),
+                            ),
+                          ),
+                          if (isUnread) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
                           color: _kGreen,
-                          shape: BoxShape.circle,
-                        ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
                 if (n.followerBio.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
+                      const SizedBox(height: 2),
+                      Text(
                     n.followerBio,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                        style: TextStyle(
                       color: Colors.white.withOpacity(0.42),
-                      fontSize: 12,
+                          fontSize: 12,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 2),
-                Text(
+                        ),
+                      ],
+                      const SizedBox(height: 2),
+                      Text(
                   'started following you · ${_formatTime(n.timestamp)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                        style: TextStyle(
                     color: Colors.white.withOpacity(0.32),
-                    fontSize: 11,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: _handleFollowBack,
@@ -500,15 +500,15 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
               duration: const Duration(milliseconds: 200),
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
+          decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 gradient: _isFollowing
-                    ? const LinearGradient(
+                ? const LinearGradient(
                         colors: [_kPurple, _kPink],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
                 color: _isFollowing || _loading
                     ? null
                     : Colors.white.withOpacity(0.15),
@@ -545,10 +545,10 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
-                    ),
+              ),
             ),
           ),
-        ],
+      ],
       ),
     );
   }
@@ -602,7 +602,7 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
     return Container(
       width: _avatarSize,
       height: _avatarSize,
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
         color: Colors.white.withOpacity(0.08),
@@ -622,12 +622,12 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
   }
 
   Widget _avatarFallback(String initial) => Center(
-        child: Text(
+          child: Text(
           initial,
-          style: TextStyle(
+            style: TextStyle(
             color: Colors.white.withOpacity(0.75),
             fontSize: 11,
-            fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w700,
           ),
         ),
       );
@@ -719,26 +719,26 @@ class _InviteNotificationRow extends StatelessWidget {
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
             color: isUnread ? _kPink.withOpacity(0.12) : Colors.transparent,
             border: isUnread
                 ? Border.all(color: _kPink.withOpacity(0.35), width: 1)
                 : null,
-          ),
-          child: Row(
+      ),
+      child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        children: [
               _NotifAvatar(assetPath: assetPath, isUnread: isUnread),
               const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  children: [
+              children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    children: [
                         Expanded(
                           child: _InviteArtistMatchupStrip(notification: n),
                         ),
@@ -767,22 +767,22 @@ class _InviteNotificationRow extends StatelessWidget {
                         color: Colors.white.withOpacity(0.55),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                       'Inviting you to collaborate · ${_formatTime(n.timestamp)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                  style: TextStyle(
                         color: Colors.white.withOpacity(0.32),
-                        fontSize: 11,
+                    fontSize: 11,
                         height: 1.25,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
+            ),
+          ),
             ],
           ),
         ),

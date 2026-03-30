@@ -54,7 +54,7 @@ class _AlbumInboxTile extends StatelessWidget {
         splashColor: Colors.white.withOpacity(0.08),
         highlightColor: Colors.white.withOpacity(0.04),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
+          padding: const EdgeInsets.fromLTRB(12.6, 12, 12.6, 11),
           child: Transform.scale(
             scale: 0.85,
             alignment: Alignment.topCenter,
@@ -104,8 +104,14 @@ class _ArtistInboxTile extends StatelessWidget {
 
   const _ArtistInboxTile({required this.artistVersus});
 
+  static const _authorAccent = Color(0xFFE310EF);
+  static const _collaboratorAccent = Color(0xFF1E3DE1);
+
   @override
   Widget build(BuildContext context) {
+    final v = artistVersus;
+    final dualProfiles = v.hasCollaborator;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -119,19 +125,44 @@ class _ArtistInboxTile extends StatelessWidget {
         splashColor: Colors.white.withOpacity(0.08),
         highlightColor: Colors.white.withOpacity(0.04),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
+          padding: const EdgeInsets.fromLTRB(12.6, 12, 12.6, 11),
           child: Transform.scale(
             scale: 0.85,
             alignment: Alignment.topCenter,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Center(
-                  child: _AuthorProfile(
-                    author: artistVersus.author,
-                    authorId: artistVersus.authorID,
+                if (dualProfiles)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      _VersusProfileChip(
+                        user: v.author,
+                        idFallback: v.authorID,
+                        storedUsername: v.authorUsername,
+                        storedAvatar: v.authorAvatar,
+                        accentColor: _authorAccent,
+                      ),
+                      _VersusProfileChip(
+                        user: v.collaborator,
+                        idFallback: v.collaboratorID ?? '',
+                        storedUsername: v.collaboratorUsername,
+                        storedAvatar: v.collaboratorAvatar,
+                        accentColor: _collaboratorAccent,
+                      ),
+                    ],
+                  )
+                else
+                  Center(
+                    child: _VersusProfileChip(
+                      user: v.author,
+                      idFallback: v.authorID,
+                      storedUsername: v.authorUsername,
+                      storedAvatar: v.authorAvatar,
+                      accentColor: _authorAccent,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 10),
                 Row(
                   children: <Widget>[
@@ -248,15 +279,41 @@ class _ArtistTile extends StatelessWidget {
 }
 
 /// Small profile chip: circular avatar + username (no "Author:" label).
-/// Size proportional to username; matches top-bar style.
-/// Uses #E7188A hue so it sticks out while blending with the glassy aesthetic.
+/// Album rows still use this wrapper; artist rows use [_VersusProfileChip] directly.
 class _AuthorProfile extends StatelessWidget {
-  static const _accentColor = Color(0xFFE310EF);
-
   final UserModel? author;
   final String authorId;
 
   const _AuthorProfile({this.author, required this.authorId});
+
+  @override
+  Widget build(BuildContext context) {
+    return _VersusProfileChip(
+      user: author,
+      idFallback: authorId,
+      storedUsername: null,
+      storedAvatar: null,
+      accentColor: const Color(0xFFE310EF),
+    );
+  }
+}
+
+/// Glass chip for author or collaborator — prefers hydrated [UserModel], then
+/// denormalized Firestore strings ([storedUsername] / [storedAvatar]).
+class _VersusProfileChip extends StatelessWidget {
+  final UserModel? user;
+  final String idFallback;
+  final String? storedUsername;
+  final String? storedAvatar;
+  final Color accentColor;
+
+  const _VersusProfileChip({
+    this.user,
+    required this.idFallback,
+    this.storedUsername,
+    this.storedAvatar,
+    required this.accentColor,
+  });
 
   static String? _assetPathFromAvatar(String avatarPath) {
     final p = avatarPath.trim();
@@ -266,17 +323,26 @@ class _AuthorProfile extends StatelessWidget {
     return 'assets/images/$p';
   }
 
+  String get _displayName {
+    final u = user?.username.trim();
+    if (u != null && u.isNotEmpty) return u;
+    final s = storedUsername?.trim() ?? '';
+    if (s.isNotEmpty) return s;
+    if (idFallback.isNotEmpty) return idFallback;
+    return 'Unknown';
+  }
+
+  String get _rawAvatarPath {
+    final ua = user?.avatarPath.trim() ?? '';
+    if (ua.isNotEmpty) return user!.avatarPath.trim();
+    return storedAvatar?.trim() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final username = author?.username.trim();
-    final displayName = (username != null && username.isNotEmpty)
-        ? username
-        : authorId.isNotEmpty
-            ? authorId
-            : 'Unknown';
-    final assetPath = _assetPathFromAvatar(author?.avatarPath ?? '');
     const avatarSize = 20.0;
     const fontSize = 11.0;
+    final path = _rawAvatarPath;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
@@ -286,14 +352,14 @@ class _AuthorProfile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: _accentColor.withOpacity(0.18),
+            color: accentColor.withOpacity(0.18),
             border: Border.all(
-              color: _accentColor.withOpacity(0.5),
+              color: accentColor.withOpacity(0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: _accentColor.withOpacity(0.15),
+                color: accentColor.withOpacity(0.15),
                 blurRadius: 8,
                 spreadRadius: 0,
               ),
@@ -303,37 +369,22 @@ class _AuthorProfile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ClipOval(
-                child: assetPath != null
-                    ? Image.asset(
-                        assetPath,
-                        width: avatarSize,
-                        height: avatarSize,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: avatarSize,
-                        height: avatarSize,
-                        color: _accentColor.withOpacity(0.35),
-                        child: Icon(
-                          Icons.person_rounded,
-                          color: Colors.white.withOpacity(0.9),
-                          size: 12,
-                        ),
-                      ),
+                child: _buildAvatarImage(path, avatarSize),
               ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  displayName,
+                  _displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.95),
                     fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                     shadows: [
                       Shadow(
-                        color: _accentColor.withOpacity(0.4),
+                        color: accentColor.withOpacity(0.4),
                         blurRadius: 6,
                       ),
                     ],
@@ -346,6 +397,52 @@ class _AuthorProfile extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildAvatarImage(String path, double size) {
+    if (path.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        color: accentColor.withOpacity(0.35),
+        child: Icon(
+          Icons.person_rounded,
+          color: Colors.white.withOpacity(0.9),
+          size: 12,
+        ),
+      );
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _avatarFallback(size),
+      );
+    }
+    final assetPath = _assetPathFromAvatar(path);
+    if (assetPath != null) {
+      return Image.asset(
+        assetPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _avatarFallback(size),
+      );
+    }
+    return _avatarFallback(size);
+  }
+
+  Widget _avatarFallback(double size) => Container(
+        width: size,
+        height: size,
+        color: accentColor.withOpacity(0.35),
+        child: Icon(
+          Icons.person_rounded,
+          color: Colors.white.withOpacity(0.9),
+          size: 12,
+        ),
+      );
 }
 
 class _AlbumTile extends StatelessWidget {
