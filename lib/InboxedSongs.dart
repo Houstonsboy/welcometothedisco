@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
 import 'package:welcometothedisco/models/users_model.dart';
@@ -104,8 +105,8 @@ class _ArtistInboxTile extends StatelessWidget {
 
   const _ArtistInboxTile({required this.artistVersus});
 
-  static const _authorAccent = Color(0xFFE310EF);
-  static const _collaboratorAccent = Color(0xFF1E3DE1);
+  static const _authorAccent       = AppTheme.authorAccent;
+  static const _collaboratorAccent = AppTheme.gradientStart;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +294,7 @@ class _AuthorProfile extends StatelessWidget {
       idFallback: authorId,
       storedUsername: null,
       storedAvatar: null,
-      accentColor: const Color(0xFFE310EF),
+      accentColor: AppTheme.authorAccent,
     );
   }
 }

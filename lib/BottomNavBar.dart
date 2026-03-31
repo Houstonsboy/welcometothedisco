@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -33,14 +34,7 @@ class BottomNavBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(34),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF1E3DE1).withOpacity(0.35),
-                    const Color(0xFFf85187).withOpacity(0.35),
-                  ],
-                ),
+                gradient: AppTheme.glassNavGradient(),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.35),
@@ -64,7 +58,7 @@ class BottomNavBar extends StatelessWidget {
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFFf85187).withOpacity(0.6),
+                                  color: AppTheme.gradientEnd.withOpacity(0.6),
                                   blurRadius: 16,
                                   spreadRadius: 1,
                                 ),
@@ -75,7 +69,7 @@ class BottomNavBar extends StatelessWidget {
                         _icons[index],
                         size: 28,
                         color: isSelected
-                            ? const Color(0xFFff66a6)
+                            ? AppTheme.navSelectedIcon
                             : Colors.white.withOpacity(0.55),
                       ),
                     ),

@@ -4,9 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kPurple = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
+const _kPurple = AppTheme.gradientStart;
+const _kPink   = AppTheme.gradientEnd;
 
 class FriendRequest extends StatefulWidget {
   const FriendRequest({super.key});
@@ -403,7 +404,7 @@ class _UserResultRowState extends State<_UserResultRow> {
             'Could not follow: ${e.toString()}',
             style: const TextStyle(fontSize: 13),
           ),
-          backgroundColor: const Color(0xFFf85187).withOpacity(0.85),
+          backgroundColor: AppTheme.gradientEnd.withOpacity(0.85),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

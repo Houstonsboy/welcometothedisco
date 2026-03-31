@@ -8,6 +8,7 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 class Inbox extends StatefulWidget {
   /// null = all (album + artist by timestamp), 'album' | 'artist' = filter.
@@ -138,14 +139,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20.0),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF1E3DE1).withOpacity(0.45),
-                  const Color(0xFFf85187).withOpacity(0.45),
-                ],
-              ),
+              gradient: AppTheme.glassPanelGradient(),
               border: Border.all(
                 color: Colors.white.withOpacity(0.18),
                 width: 0.8,

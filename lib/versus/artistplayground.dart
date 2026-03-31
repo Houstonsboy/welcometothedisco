@@ -6,10 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kDefaultColor1 = Color(0xFF1E3DE1);
-const _kDefaultColor2 = Color(0xFFf85187);
-const _kSpotifyGreen  = Color(0xFF17B560);
+const _kDefaultColor1 = AppTheme.gradientStart;
+const _kDefaultColor2 = AppTheme.gradientEnd;
+const _kSpotifyGreen  = AppTheme.spotifyGreen;
 
 class ArtistVersusPlayground extends StatefulWidget {
   final ArtistVersusModel versus;
@@ -61,6 +62,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   late final AnimationController _slideController;
   late final Animation<double> _pulseAnim;
   late final Animation<double> _slideAnim;
+  OverlayEntry? _profileBubble;
 
   @override
   void initState() {
@@ -155,11 +157,60 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   @override
   void dispose() {
+    _profileBubble?.remove();
     _nowPlayingSub?.cancel();
     _pulseController.dispose();
     _slideController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _showProfileBubble(BuildContext targetContext, String label) {
+    if (label.trim().isEmpty) return;
+    _profileBubble?.remove();
+
+    final overlay = Overlay.of(context);
+    final renderObject = targetContext.findRenderObject();
+    if (overlay == null || renderObject is! RenderBox) return;
+
+    final offset = renderObject.localToGlobal(Offset.zero);
+    final size = renderObject.size;
+
+    _profileBubble = OverlayEntry(
+      builder: (_) => Positioned(
+        left: offset.dx + (size.width / 2) - 56,
+        top: offset.dy + size.height + 6,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_profileBubble!);
+
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      _profileBubble?.remove();
+      _profileBubble = null;
+    });
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -300,22 +351,25 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   Widget build(BuildContext context) {
     final authorLabel = _playgroundAuthorLabel(widget.versus);
     final avatarPath = _playgroundAuthorAvatarPath(widget.versus);
+    final collaboratorLabel = _playgroundCollaboratorLabel(widget.versus);
+    final collaboratorAvatarPath =
+        _playgroundCollaboratorAvatarPath(widget.versus);
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-        ),
-      ),
+      decoration: AppTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: _isLoadingTracks
             ? _buildLoadingState()
             : _loadError != null
                 ? _buildErrorState()
-                : _buildContent(context, authorLabel, avatarPath),
+                : _buildContent(
+                    context,
+                    authorLabel,
+                    avatarPath,
+                    collaboratorLabel,
+                    collaboratorAvatarPath,
+                  ),
       ),
     );
   }
@@ -362,13 +416,24 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   }
 
   Widget _buildContent(
-      BuildContext context, String authorLabel, String? avatarPath) {
+    BuildContext context,
+    String authorLabel,
+    String? avatarPath,
+    String? collaboratorLabel,
+    String? collaboratorAvatarPath,
+  ) {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         // ── Header ──────────────────────────────────────────────────────────
         SliverToBoxAdapter(
-          child: _buildHeader(context, authorLabel, avatarPath),
+          child: _buildHeader(
+            context,
+            authorLabel,
+            avatarPath,
+            collaboratorLabel,
+            collaboratorAvatarPath,
+          ),
         ),
 
         // ── Artist selector (replaces album selector) ────────────────────────
@@ -563,55 +628,106 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader(
-      BuildContext context, String authorLabel, String? avatarPath) {
+    BuildContext context,
+    String authorLabel,
+    String? avatarPath,
+    String? collaboratorLabel,
+    String? collaboratorAvatarPath,
+  ) {
+    final hasCollaboratorSide =
+        collaboratorLabel != null && collaboratorLabel.isNotEmpty;
+
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 12,
         left: 20, right: 20, bottom: 8,
       ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.15),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.2), width: 0.8),
+      child: SizedBox(
+        height: 40,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.15),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.2), width: 0.8),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white, size: 16),
+                ),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white, size: 16),
             ),
-          ),
-          const SizedBox(width: 14),
-          if (avatarPath != null && avatarPath.isNotEmpty) ...[
-            Container(
-              width: 34, height: 34,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: const Color(0xFFf85187), width: 1.5),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (avatarPath != null && avatarPath.isNotEmpty) ...[
+                    Builder(
+                      builder: (avatarContext) => GestureDetector(
+                        onTap: () => _showProfileBubble(avatarContext, authorLabel),
+                        child: Container(
+                          width: 34, height: 34,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppTheme.gradientEnd, width: 1.5),
+                          ),
+                          child: ClipOval(
+                            child: _resolveAvatarWidget(avatarPath, 34),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  const Text('ARTIST VS', style: TextStyle(
+                    fontSize: 13,
+                      fontFamily: 'JraotHollow',
+                      color: Color(0xFFF07012),
+                      letterSpacing: 2.5,
+                  )),
+                  if (hasCollaboratorSide) ...[
+                    const SizedBox(width: 10),
+                    Builder(
+                      builder: (avatarContext) => GestureDetector(
+                        onTap: () =>
+                            _showProfileBubble(avatarContext, collaboratorLabel),
+                        child: Container(
+                          width: 30, height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppTheme.gradientStart, width: 1.3),
+                          ),
+                          child: ClipOval(
+                            child: collaboratorAvatarPath != null &&
+                                    collaboratorAvatarPath.isNotEmpty
+                                ? _resolveAvatarWidget(collaboratorAvatarPath, 30)
+                                : Container(
+                                    color: Colors.white.withOpacity(0.08),
+                                    child: const Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white70,
+                                      size: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              child: ClipOval(child: _resolveAvatarWidget(avatarPath, 34)),
             ),
-            const SizedBox(width: 10),
           ],
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('ARTIST VS', style: TextStyle(
-                color: Colors.white, fontSize: 13,
-                fontWeight: FontWeight.w900, letterSpacing: 3.5,
-              )),
-              Text(authorLabel, style: TextStyle(
-                color: _color2.withOpacity(0.9), fontSize: 11,
-                fontWeight: FontWeight.w500, letterSpacing: 0.3,
-              )),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -631,6 +747,21 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     if (a.isNotEmpty) return v.author!.avatarPath.trim();
     final d = v.authorAvatar?.trim() ?? '';
     return d.isNotEmpty ? d : null;
+  }
+
+  static String? _playgroundCollaboratorLabel(ArtistVersusModel v) {
+    final hydrated = v.collaborator?.username.trim() ?? '';
+    if (hydrated.isNotEmpty) return '@$hydrated';
+    final denormalized = v.collaboratorUsername?.trim() ?? '';
+    if (denormalized.isNotEmpty) return '@$denormalized';
+    return null;
+  }
+
+  static String? _playgroundCollaboratorAvatarPath(ArtistVersusModel v) {
+    final hydrated = v.collaborator?.avatarPath.trim() ?? '';
+    if (hydrated.isNotEmpty) return v.collaborator!.avatarPath.trim();
+    final denormalized = v.collaboratorAvatar?.trim() ?? '';
+    return denormalized.isNotEmpty ? denormalized : null;
   }
 
   /// Comment + profile for the **human** behind each artist column (swaps with PageView).

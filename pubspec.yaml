@@ -71,6 +71,23 @@ flutter:
 
   assets:
     - assets/images/
+  
+  fonts:
+    - family: JraotRegular
+      fonts:
+        - asset: assets/fonts/jraot/Jraot-Regular.ttf
+
+    - family: JraotOutline
+      fonts:
+        - asset: assets/fonts/jraot/Jraot-Outline.ttf
+
+    - family: JraotHollow
+      fonts:
+        - asset: assets/fonts/jraot/Jraot-Hollow.ttf
+
+    - family: JraotExtrude
+      fonts:
+        - asset: assets/fonts/jraot/Jraot-Extrude.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

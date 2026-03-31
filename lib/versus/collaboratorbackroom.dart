@@ -8,11 +8,12 @@ import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kPurple       = Color(0xFF1E3DE1);
-const _kPink         = Color(0xFFf85187);
-const _kSuccessGreen = Color(0xFF22C55E);
-const _kSpotifyGreen = Color(0xFF17B560);
+const _kPurple       = AppTheme.gradientStart;
+const _kPink         = AppTheme.gradientEnd;
+const _kSuccessGreen = AppTheme.successGreen;
+const _kSpotifyGreen = AppTheme.spotifyGreen;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry gate — resolves current user + loads the versus doc from Firestore
@@ -137,13 +138,7 @@ class CollaboratorAcceptGate extends StatelessWidget {
   }
 
   Widget _gradientScaffold(Widget body) => Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-      ),
-    ),
+    decoration: AppTheme.backgroundDecoration,
     child: Scaffold(backgroundColor: Colors.transparent, body: body),
   );
 }
@@ -634,7 +629,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+          colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
         ),
       ),
       child: Scaffold(
@@ -661,7 +656,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft, end: Alignment.bottomRight,
-                        colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+                        colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
                       ),
                     ),
                     child: _buildArtistSearchResults(),

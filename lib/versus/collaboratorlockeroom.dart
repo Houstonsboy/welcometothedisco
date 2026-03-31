@@ -8,10 +8,11 @@ import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/versus/collaboratorinvitebanner.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kPurple = Color(0xFF1E3DE1);
-const _kPink   = Color(0xFFf85187);
-const _kSuccessGreen = Color(0xFF22C55E);
+const _kPurple       = AppTheme.gradientStart;
+const _kPink         = AppTheme.gradientEnd;
+const _kSuccessGreen = AppTheme.successGreen;
 
 /// Entry point for Collaborator VS — author picks both artists, selects tracks
 /// only for artist1, then invites a collaborator to handle artist2.
@@ -520,7 +521,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+          colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
         ),
       ),
       child: Scaffold(
@@ -548,7 +549,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+                              colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
                             ),
                           ),
                           child: _buildResults(),
@@ -644,8 +645,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF1E3DE1).withOpacity(0.40),
-                const Color(0xFFf85187).withOpacity(0.40),
+                AppTheme.gradientStart.withOpacity(0.40),
+                AppTheme.gradientEnd.withOpacity(0.40),
               ],
             ),
             border: Border.all(
@@ -2239,7 +2240,7 @@ class CollaboratorLockeroomGate extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+                colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
               ),
             ),
             child: const Scaffold(
@@ -2253,13 +2254,7 @@ class CollaboratorLockeroomGate extends StatelessWidget {
         final user = snapshot.data;
         if (user == null) {
           return Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-              ),
-            ),
+            decoration: AppTheme.backgroundDecoration,
             child: Scaffold(
               backgroundColor: Colors.transparent,
               appBar: AppBar(

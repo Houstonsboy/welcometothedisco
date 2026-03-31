@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-// default accent colors — swap for palette_generator later
-const _kDefaultColor1 = Color(0xFF1E3DE1);
-const _kDefaultColor2 = Color(0xFFf85187);
-const _kSpotifyGreen = Color(0xFF17B560);
+const _kDefaultColor1 = AppTheme.gradientStart;
+const _kDefaultColor2 = AppTheme.gradientEnd;
+const _kSpotifyGreen  = AppTheme.spotifyGreen;
 
 class VersusPlayground extends StatefulWidget {
   final VersusModel versus;
@@ -311,13 +311,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final avatarPath = widget.versus.author?.avatarPath;
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-        ),
-      ),
+      decoration: AppTheme.backgroundDecoration,
       child: Scaffold(
       backgroundColor: Colors.transparent,
       body: FutureBuilder<List<SpotifyAlbumWithTracks?>>(
@@ -634,7 +628,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
               height: 34,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFf85187), width: 1.5),
+                border: Border.all(color: AppTheme.gradientEnd, width: 1.5),
               ),
               child: ClipOval(
                 child: _resolveAvatarWidget(avatarPath, 34),
@@ -646,23 +640,24 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'VERSUS',
+                'ALBUMS',
                 style: TextStyle(
-                  color: Colors.white,
                   fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3.5,
+                  fontFamily: 'JraotHollow',
+                  color: Color(0xFFF07012),
+                  // fontWeight: FontWeight.w900,
+                  letterSpacing: 2.5,
                 ),
               ),
-              Text(
-                authorLabel,
-                style: TextStyle(
-                  color: _color2.withOpacity(0.9),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
-                ),
-              ),
+              // Text(
+              //   authorLabel,
+              //   style: TextStyle(
+              //     color: _color2.withOpacity(0.9),
+              //     fontSize: 11,
+              //     fontWeight: FontWeight.w500,
+              //     letterSpacing: 0.3,
+              //   ),
+              // ),
             ],
           ),
         ],

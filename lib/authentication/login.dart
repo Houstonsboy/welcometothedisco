@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -86,14 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF1E3DE1).withOpacity(0.45),
-                const Color(0xFFf85187).withOpacity(0.45),
-              ],
-            ),
+            gradient: AppTheme.glassPanelGradient(),
             border: Border.all(
               color: Colors.white.withOpacity(0.18),
               width: 0.8,
@@ -115,13 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-        ),
-      ),
+      decoration: AppTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -131,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
             style: TextStyle(
               fontSize: 25.0,
               fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: Color.fromARGB(255, 159, 181, 63),
+              color: AppTheme.titleAccent,
             ),
           ),
         ),
@@ -202,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: _isLoading
                             ? const Center(
                                 child: CircularProgressIndicator(
-                                  color: Color.fromARGB(255, 159, 181, 63),
+                                  color: AppTheme.titleAccent,
                                 ),
                               )
                             : Material(

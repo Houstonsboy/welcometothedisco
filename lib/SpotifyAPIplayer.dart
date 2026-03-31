@@ -7,6 +7,7 @@ import 'package:welcometothedisco/config/app_config.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 class SpotifyAPIplayer extends StatefulWidget {
   const SpotifyAPIplayer({super.key, this.embedded = false});
@@ -267,7 +268,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+          colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
         ),
       ),
       child: Scaffold(
@@ -665,7 +666,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFf85187).withOpacity(0.7),
+                      color: AppTheme.gradientEnd.withOpacity(0.7),
                     ),
                     child: _searching
                         ? const SizedBox(
@@ -826,8 +827,8 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF1E3DE1).withOpacity(0.40),
-                const Color(0xFFf85187).withOpacity(0.40),
+                AppTheme.gradientStart.withOpacity(0.40),
+                AppTheme.gradientEnd.withOpacity(0.40),
               ],
             ),
             boxShadow: [
@@ -858,12 +859,12 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(50),
           color: highlight
-              ? const Color(0xFFf85187).withOpacity(onTap != null ? 0.75 : 0.35)
+              ? AppTheme.gradientEnd.withOpacity(onTap != null ? 0.75 : 0.35)
               : Colors.white.withOpacity(0.12),
           boxShadow: highlight && onTap != null
               ? [
                   BoxShadow(
-                    color: const Color(0xFFf85187).withOpacity(0.45),
+                    color: AppTheme.gradientEnd.withOpacity(0.45),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),

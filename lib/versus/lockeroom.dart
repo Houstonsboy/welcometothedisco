@@ -4,10 +4,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const _kBlue = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
+const _kBlue = AppTheme.gradientStart;
+const _kPink = AppTheme.gradientEnd;
 
 // ── Album result model ────────────────────────────────────────────────────────
 class AlbumResult {
@@ -872,7 +873,7 @@ class _AlbumResultGridTile extends StatelessWidget {
 // ── Track Preview Card ────────────────────────────────────────────────────────
 class _TrackPreviewCard extends StatelessWidget {
   final AlbumResult album;
-  final Color accentColor;
+final Color accentColor;
 
   const _TrackPreviewCard(
       {required this.album, required this.accentColor});

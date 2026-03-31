@@ -23,6 +23,7 @@ import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -182,13 +183,7 @@ class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-        ),
-      ),
+      decoration: AppTheme.backgroundDecoration,
       child: Stack(
         children: [
           Scaffold(
@@ -199,9 +194,9 @@ class _AppShellState extends State<_AppShell> {
               title: const Text(
                 "Welcome to the Disco",
                 style: TextStyle(
-                  fontSize: 22.0,
-                  fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-                  color: Color.fromARGB(255, 159, 181, 63),
+                  fontSize: 13.0,
+                  fontFamily: 'JraotHollow',
+                  color: Color(0xFF17B5EE),
                 ),
               ),
               actions: [
@@ -343,7 +338,7 @@ class _NotificationBell extends StatelessWidget {
                     width: 9,
                     height: 9,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFf85187),
+                      color: AppTheme.gradientEnd,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -406,14 +401,7 @@ class _FirebaseHeader extends StatelessWidget {
                 padding: padding,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(compact ? 20 : 16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF1E3DE1).withOpacity(0.40),
-                      const Color(0xFFf85187).withOpacity(0.40),
-                    ],
-                  ),
+                  gradient: AppTheme.glassPanelGradient(opacity: 0.40),
                   border: Border.all(
                     color: Colors.white.withOpacity(0.18),
                     width: 0.8,

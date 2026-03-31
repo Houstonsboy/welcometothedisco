@@ -6,9 +6,10 @@ import 'package:welcometothedisco/authentication/login.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/auth_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kBlue = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
+const _kBlue = AppTheme.gradientStart;
+const _kPink = AppTheme.gradientEnd;
 const _kAvatars = [
   'avatar1.jpeg',
   'avatar2.jpeg',
@@ -191,7 +192,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             style: TextStyle(
               fontSize: 22.0,
               fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: Color.fromARGB(255, 159, 181, 63),
+              color: AppTheme.titleAccent,
             ),
           ),
         ),

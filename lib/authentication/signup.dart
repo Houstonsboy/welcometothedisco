@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 // Forces all typed characters to lowercase in real-time.
 class _LowercaseFormatter extends TextInputFormatter {
@@ -26,8 +27,8 @@ const _kAvatars = [
   'avatar6.jpeg',
 ];
 
-const _kBlue = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
+const _kBlue = AppTheme.gradientStart;
+const _kPink = AppTheme.gradientEnd;
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -332,7 +333,7 @@ class _SignupScreenState extends State<SignupScreen> {
           done ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
           size: 14,
           color: done
-              ? const Color.fromARGB(255, 159, 181, 63)
+              ? AppTheme.titleAccent
               : Colors.white.withOpacity(0.35),
         ),
         const SizedBox(width: 6),
@@ -375,7 +376,7 @@ class _SignupScreenState extends State<SignupScreen> {
             style: TextStyle(
               fontSize: 25.0,
               fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: Color.fromARGB(255, 159, 181, 63),
+              color: AppTheme.titleAccent,
             ),
           ),
         ),
@@ -460,7 +461,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: _isLoading
                             ? const Center(
                                 child: CircularProgressIndicator(
-                                  color: Color.fromARGB(255, 159, 181, 63),
+                                  color: AppTheme.titleAccent,
                                 ),
                               )
                             : Material(

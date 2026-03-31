@@ -11,6 +11,7 @@ import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/versus/artistlockeroom.dart';
 import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
 import 'package:welcometothedisco/versus/lockeroom.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -75,13 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
-        ),
-      ),
+      decoration: AppTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -92,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 22.0,
               fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: Color.fromARGB(255, 159, 181, 63),
+              color: AppTheme.titleAccent,
             ),
           ),
         ),
@@ -204,14 +199,7 @@ class SpotifyHeader extends StatelessWidget {
             padding: padding,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(compact ? 20 : 16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF1E3DE1).withOpacity(0.40),
-                  const Color(0xFFf85187).withOpacity(0.40),
-                ],
-              ),
+              gradient: AppTheme.glassPanelGradient(opacity: 0.40),
               border: Border.all(
                 color: Colors.white.withOpacity(0.18),
                 width: 0.8,
@@ -505,9 +493,9 @@ class _FilterChip extends StatelessWidget {
 class _CreateButton extends StatelessWidget {
   const _CreateButton();
 
-  static const _purple = Color(0xFF1E3DE1);
-  static const _pink = Color(0xFFf85187);
-  static const _createGreen = Color.fromARGB(255, 30, 222, 37);
+  static const _purple      = AppTheme.gradientStart;
+  static const _pink        = AppTheme.gradientEnd;
+  static const _createGreen = AppTheme.createGreen;
 
   void _showCreateOptions(BuildContext context) {
     showDialog<void>(
@@ -603,9 +591,9 @@ class _CreateOptionsPopup extends StatelessWidget {
     required this.onCollaborateFriend,
   });
 
-  static const _purple = Color(0xFF1E3DE1);
-  static const _pink = Color(0xFFf85187);
-  static const _green = Color.fromARGB(255, 30, 222, 37);
+  static const _purple = AppTheme.gradientStart;
+  static const _pink   = AppTheme.gradientEnd;
+  static const _green  = AppTheme.createGreen;
 
   @override
   Widget build(BuildContext context) {

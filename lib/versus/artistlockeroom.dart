@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kPurple = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
+const _kPurple = AppTheme.gradientStart;
+const _kPink   = AppTheme.gradientEnd;
 
 /// Entry point for Artist VS — pick two artists, then create versus.
 class ArtistLockeroom extends StatelessWidget {
@@ -344,7 +345,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3DE1), Color(0xFFf85187)],
+          colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
         ),
       ),
       child: Scaffold(

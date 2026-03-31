@@ -3,10 +3,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kBlue = Color(0xFF1E3DE1);
-const _kPink = Color(0xFFf85187);
-const _kGreen = Color.fromARGB(255, 30, 222, 37);
+const _kBlue  = AppTheme.gradientStart;
+const _kPink  = AppTheme.gradientEnd;
+const _kGreen = AppTheme.createGreen;
 
 /// Horizontal friends-strip shown at the top of the home feed.
 /// Streams the current user's document so the list stays live —

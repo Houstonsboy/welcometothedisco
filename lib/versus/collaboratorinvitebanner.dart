@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
 
-const _kPurple = Color(0xFF1E3DE1);
-const _kPink   = Color(0xFFf85187);
+const _kPurple = AppTheme.gradientStart;
+const _kPink   = AppTheme.gradientEnd;
 /// Success state for “invite sent” — reads clearly positive (not pink/red).
-const _kInviteSentGreen = Color(0xFF22C55E);
+const _kInviteSentGreen = AppTheme.successGreen;
 const _kInviteSentGreenDeep = Color(0xFF15803D);
 
 class CollaboratorInviteBanner {
@@ -713,7 +714,7 @@ String? _friendAvatarAssetPath(String avatarPath) {
 Color _accentForUid(String uid) {
   if (uid.isEmpty) return _kPurple;
   const palette = <Color>[
-    Color(0xFF6C63FF), Color(0xFFf85187), Color(0xFF00C9A7),
+    AppTheme.bannerStreak1, AppTheme.gradientEnd, AppTheme.bannerTeal,
     Color(0xFFFFAA00), _kPurple,
   ];
   var h = 0;
