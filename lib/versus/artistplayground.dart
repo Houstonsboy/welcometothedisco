@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
 const _kDefaultColor2 = AppTheme.gradientEnd;
@@ -211,6 +213,25 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       _profileBubble?.remove();
       _profileBubble = null;
     });
+  }
+
+  String? get _currentUid => FirebaseAuth.instance.currentUser?.uid;
+
+  bool get _canOpenEditBackroom {
+    final uid = _currentUid;
+    if (uid == null || uid.isEmpty) return false;
+    final isAuthor = uid == widget.versus.authorID;
+    final isCollaborator = uid == (widget.versus.collaboratorID?.trim() ?? '');
+    return isAuthor || isCollaborator;
+  }
+
+  Future<void> _openEditBackroom() async {
+    if (!_canOpenEditBackroom) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CollaboratorBackroom(versusID: widget.versus.id),
+      ),
+    );
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -719,6 +740,29 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                                     ),
                                   ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_canOpenEditBackroom) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _openEditBackroom,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.edit_rounded,
+                          size: 13,
+                          color: Colors.white.withOpacity(0.9),
                         ),
                       ),
                     ),

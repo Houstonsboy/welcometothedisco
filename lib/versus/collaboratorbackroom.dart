@@ -109,28 +109,16 @@ class CollaboratorAcceptGate extends StatelessWidget {
     }
 
     final uid = currentUser.id;
-    if (versus.authorID == uid) {
-      return _GateResult(
-        versus: null,
-        currentUser: currentUser,
-        errorMessage:
-            'You created this versus. Your collaborator opens it from their notification.',
-      );
-    }
-
     final invited = versus.collaboratorID?.trim() ?? '';
-    if (invited.isEmpty) {
+    final isAuthor = versus.authorID == uid;
+    final isInvitedCollaborator = invited.isNotEmpty && invited == uid;
+
+    // Allow opening from the playground edit button for either side owner.
+    if (!isAuthor && !isInvitedCollaborator) {
       return _GateResult(
         versus: null,
         currentUser: currentUser,
-        errorMessage: 'This collaboration is not linked to an invited account yet.',
-      );
-    }
-    if (invited != uid) {
-      return _GateResult(
-        versus: null,
-        currentUser: currentUser,
-        errorMessage: 'This invite is for another account.',
+        errorMessage: 'You do not have access to edit this versus.',
       );
     }
 
@@ -313,9 +301,21 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   Future<void> _checkPrefilledArtist2() async {
     final id   = widget.versus.artist2ID.trim();
     final name = widget.versus.artist2Name.trim();
+    final savedTrackIds = widget.versus.artist2TrackIDs
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     if (id.isEmpty) return;
     try {
-      final details = await _api.getArtistDetails(id);
+      final results = await Future.wait([
+        _api.getArtistDetails(id),
+        if (savedTrackIds.isNotEmpty)
+          _api.getTracksByIds(savedTrackIds)
+        else
+          Future.value(<SpotifyTrack>[]),
+      ]);
+      final details = results[0] as SpotifyArtistDetails?;
+      final preselectedTracks = results[1] as List<SpotifyTrack>;
       if (!mounted) return;
       setState(() {
         _myArtist       = SpotifyArtistDetails(
@@ -324,6 +324,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           imageUrl: details?.imageUrl,
         );
         _myArtistImageUrl = details?.imageUrl;
+        _mySelectedTracks = preselectedTracks;
         _artist2PreFilled = true;
       });
       _fetchMyTopTracks(id);
@@ -424,6 +425,20 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   void _removeMyTrack(String trackId) {
     setState(() => _mySelectedTracks.removeWhere((t) => t.id == trackId));
+  }
+
+  void _moveMySelectedTrack(int fromIndex, int toIndex) {
+    if (fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= _mySelectedTracks.length ||
+        toIndex >= _mySelectedTracks.length ||
+        fromIndex == toIndex) {
+      return;
+    }
+    setState(() {
+      final item = _mySelectedTracks.removeAt(fromIndex);
+      _mySelectedTracks.insert(toIndex, item);
+    });
   }
 
   List<SpotifyTrack> get _myVisibleTracks {
@@ -1160,10 +1175,21 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             icon: Icons.playlist_add_check_rounded,
             label: 'SELECTED', count: picked.length, accentColor: _kPink,
           ),
-          ...picked.map((track) => _SelectedTrackTile(
-            track: track, accentColor: _kPink,
-            onRemove: () => _removeMyTrack(track.id),
-          )),
+          ...picked.asMap().entries.map((entry) {
+            final i = entry.key;
+            final track = entry.value;
+            return _SelectedTrackTile(
+              track: track,
+              accentColor: _kPink,
+              canMoveUp: i > 0,
+              canMoveDown: i < picked.length - 1,
+              onMoveUp: i > 0 ? () => _moveMySelectedTrack(i, i - 1) : null,
+              onMoveDown: i < picked.length - 1
+                  ? () => _moveMySelectedTrack(i, i + 1)
+                  : null,
+              onRemove: () => _removeMyTrack(track.id),
+            );
+          }),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: Container(
@@ -1976,11 +2002,19 @@ class _ReadOnlyTrackRow extends StatelessWidget {
 class _SelectedTrackTile extends StatelessWidget {
   final SpotifyTrack track;
   final Color        accentColor;
+  final bool         canMoveUp;
+  final bool         canMoveDown;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
   final VoidCallback onRemove;
 
   const _SelectedTrackTile({
     required this.track,
     required this.accentColor,
+    this.canMoveUp = false,
+    this.canMoveDown = false,
+    this.onMoveUp,
+    this.onMoveDown,
     required this.onRemove,
   });
 
@@ -2035,6 +2069,54 @@ class _SelectedTrackTile extends StatelessWidget {
                     ],
                   ],
                 )),
+                const SizedBox(width: 6),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: canMoveUp ? onMoveUp : null,
+                      child: Opacity(
+                        opacity: canMoveUp ? 0.95 : 0.28,
+                        child: Container(
+                          width: 24, height: 18,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            color: accentColor.withOpacity(0.16),
+                            border: Border.all(
+                                color: accentColor.withOpacity(0.34), width: 0.7),
+                          ),
+                          child: const Icon(
+                            Icons.keyboard_arrow_up_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: canMoveDown ? onMoveDown : null,
+                      child: Opacity(
+                        opacity: canMoveDown ? 0.95 : 0.28,
+                        child: Container(
+                          width: 24, height: 18,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            color: accentColor.withOpacity(0.16),
+                            border: Border.all(
+                                color: accentColor.withOpacity(0.34), width: 0.7),
+                          ),
+                          child: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: onRemove,
                   child: Container(
