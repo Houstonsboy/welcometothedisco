@@ -57,6 +57,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.appTheme(),
       initialRoute: '/',
       navigatorObservers: [inboxRouteObserver],
       routes: {
@@ -194,8 +195,8 @@ class _AppShellState extends State<_AppShell> {
               title: const Text(
                 "Welcome to the Disco",
                 style: TextStyle(
-                  fontSize: 13.0,
-                  fontFamily: 'JraotHollow',
+                  fontSize: 12.0,
+                  fontFamily: AppTheme.fontHeader,
                   color: Color(0xFF17B5EE),
                 ),
               ),

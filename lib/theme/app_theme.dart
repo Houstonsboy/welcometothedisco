@@ -23,6 +23,16 @@ abstract final class AppTheme {
   static const Color gradientStart = Color(0xFF1E3DE1); // deep blue / purple
   static const Color gradientEnd   = Color(0xFFf85187); // hot pink
 
+  // ── Global typography ─────────────────────────────────────────────────────
+  /// Use for decorative/title text (app bars, section headers).
+  static const String fontHeader = 'JraotHollow';
+
+  /// Use for standard UI/body text.
+  static const String fontBody = 'Qabrown';
+
+  /// Default color for body typography (matches Stories friend username green).
+  static const Color fontBodyColor = createGreen;
+
   // ── Glass / surface overlays ────────────────────────────────────────────
   /// Opacity used on the top-layer glass panels (cards, drawers).
   static const double glassPanelOpacity   = 0.45;
@@ -99,4 +109,47 @@ abstract final class AppTheme {
           gradientEnd.withOpacity(opacity),
         ],
       );
+
+  /// App-wide baseline theme:
+  /// - Body text uses [fontBody].
+  /// - All default text styles are reduced by 1 point.
+  static ThemeData appTheme() {
+    final base = ThemeData.dark(useMaterial3: true);
+    final text = base.textTheme.apply(
+      fontFamily: fontBody,
+      bodyColor: fontBodyColor,
+    );
+    TextStyle? minusOne(TextStyle? s) {
+      if (s == null) return null;
+      final size = s.fontSize;
+      return size == null ? s : s.copyWith(fontSize: size - 1);
+    }
+    return base.copyWith(
+      textTheme: text.copyWith(
+        displayLarge: minusOne(text.displayLarge),
+        displayMedium: minusOne(text.displayMedium),
+        displaySmall: minusOne(text.displaySmall),
+        headlineLarge: minusOne(text.headlineLarge),
+        headlineMedium: minusOne(text.headlineMedium),
+        headlineSmall: minusOne(text.headlineSmall),
+        titleLarge: minusOne(text.titleLarge),
+        titleMedium: minusOne(text.titleMedium),
+        titleSmall: minusOne(text.titleSmall),
+        bodyLarge: minusOne(text.bodyLarge),
+        bodyMedium: minusOne(text.bodyMedium),
+        bodySmall: minusOne(text.bodySmall),
+        labelLarge: minusOne(text.labelLarge),
+        labelMedium: minusOne(text.labelMedium),
+        labelSmall: minusOne(text.labelSmall),
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        titleTextStyle: const TextStyle(
+          fontFamily: fontHeader,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
 }

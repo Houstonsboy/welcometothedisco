@@ -282,7 +282,11 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   void _onVote(int trackIndex, int albumIndex) {
     setState(() {
-      _votesByIndex[trackIndex] = albumIndex;
+      if (_votesByIndex[trackIndex] == albumIndex) {
+        _votesByIndex.remove(trackIndex);
+      } else {
+        _votesByIndex[trackIndex] = albumIndex;
+      }
     });
   }
 
@@ -314,9 +318,14 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       decoration: AppTheme.backgroundDecoration,
       child: Scaffold(
       backgroundColor: Colors.transparent,
-      body: FutureBuilder<List<SpotifyAlbumWithTracks?>>(
-        future: _albumsFuture,
-        builder: (context, snapshot) {
+      body: DefaultTextStyle.merge(
+        style: const TextStyle(
+          fontFamily: AppTheme.fontBody,
+          fontSize: 12,
+        ),
+        child: FutureBuilder<List<SpotifyAlbumWithTracks?>>(
+          future: _albumsFuture,
+          builder: (context, snapshot) {
           final album1 = snapshot.data?[0];
           final album2 = snapshot.data?[1];
 
@@ -329,7 +338,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
           final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
-          return CustomScrollView(
+            return CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
               // ── App Bar ──────────────────────────────────────────────────
@@ -557,8 +566,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                       ),
               ),
             ],
-          );
-        },
+            );
+          },
+        ),
       ),
     ),
     );
@@ -643,7 +653,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 'ALBUMS',
                 style: TextStyle(
                   fontSize: 13,
-                  fontFamily: 'JraotHollow',
+                  fontFamily: AppTheme.fontHeader,
                   color: Color(0xFFF07012),
                   // fontWeight: FontWeight.w900,
                   letterSpacing: 2.5,
@@ -899,9 +909,7 @@ class _TrackPage extends StatelessWidget {
             isLocked: isLocked,
             showVoteButton: isActive,
             isVoted: isActive && voteAtActiveIndex == albumIndex,
-            isVoteDisabled: isActive &&
-                voteAtActiveIndex != null &&
-                voteAtActiveIndex != albumIndex,
+            isVoteDisabled: false,
             onVote: isActive ? () => onVote(albumIndex) : null,
             onTap: () => onTrackTap(trackIndex, albumIndex),
           ),
