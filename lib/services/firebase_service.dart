@@ -572,6 +572,7 @@ class FirebaseService {
           'artist2Name': artist2Name?.trim() ?? '',
           if (artist2ID != null && artist2ID.trim().isNotEmpty)
             'artist2ID': artist2ID.trim(),
+            
         });
         debugPrint(
             '[FirebaseService] createCollaborationInvite → invite sent to $collaboratorUID');
@@ -723,12 +724,12 @@ class FirebaseService {
   /// matching [collaboratorID], and status `incomplete` or `open`.
   static Future<void> acceptCollaborationInvite({
     required String versusID,
-    required String artist2ID,
-    required String artist2Name,
-    required List<String> artist2TrackIDs,
-    String? collaboratorComment,
-    String? collaboratorUsername,
-    String? collaboratorAvatarPath,
+    required String editedArtistID,
+    required String editedArtistName,
+    required List<String> editedTrackIDs,
+    String? editedComment,
+    String? editorUsername,
+    String? editorAvatarPath,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -745,31 +746,51 @@ class FirebaseService {
         throw Exception('Not a collaboration versus');
       }
 
+      final authorId = (data['authorID'] as String?)?.trim() ?? '';
       final collab = (data['collaboratorID'] as String?)?.trim() ?? '';
-      if (collab.isEmpty) {
-        throw Exception('This draft has no invited collaborator');
-      }
-      if (collab != uid) {
-        throw Exception('Only the invited collaborator can confirm');
+      final isAuthor = authorId.isNotEmpty && authorId == uid;
+      final isCollaborator = collab.isNotEmpty && collab == uid;
+      if (!isAuthor && !isCollaborator) {
+        throw Exception('Only author or invited collaborator can confirm');
       }
 
       final st = (data['status'] as String?)?.trim() ?? '';
-      if (st != 'incomplete' && st != 'open') {
+      if (st == 'completed') {
         throw Exception('This versus can no longer be updated');
       }
 
-      final update = <String, dynamic>{
-        'artist2ID': artist2ID.trim(),
-        'artist2Name': artist2Name.trim(),
-        'artist2TrackIDs': artist2TrackIDs.map((e) => e.trim()).toList(),
-        // Recipient completes the draft → visible in inbox (`getInboxVersusList`).
-        'status': 'open',
-        'collaborator_username': (collaboratorUsername ?? '').trim(),
-        'collaborator_avatar': (collaboratorAvatarPath ?? '').trim(),
-      };
-      final cc = collaboratorComment?.trim();
-      if (cc != null && cc.isNotEmpty) {
-        update['collaboratorComment'] = cc;
+      final update = <String, dynamic>{};
+      if (isAuthor) {
+        update['artist1ID'] = editedArtistID.trim();
+        update['artist1Name'] = editedArtistName.trim();
+        update['artist1TrackIDs'] = editedTrackIDs.map((e) => e.trim()).toList();
+        final ac = editedComment?.trim();
+        if (ac != null && ac.isNotEmpty) {
+          update['authorComment'] = ac;
+        }
+        final un = (editorUsername ?? '').trim();
+        if (un.isNotEmpty) {
+          update['author_username'] = un;
+        }
+        final av = (editorAvatarPath ?? '').trim();
+        if (av.isNotEmpty) {
+          update['author_avatar'] = av;
+        }
+      } else {
+        update['artist2ID'] = editedArtistID.trim();
+        update['artist2Name'] = editedArtistName.trim();
+        update['artist2TrackIDs'] = editedTrackIDs.map((e) => e.trim()).toList();
+        final cc = editedComment?.trim();
+        if (cc != null && cc.isNotEmpty) {
+          update['collaboratorComment'] = cc;
+        }
+        update['collaborator_username'] = (editorUsername ?? '').trim();
+        update['collaborator_avatar'] = (editorAvatarPath ?? '').trim();
+      }
+
+      // Any non-completed collaboration edit should remain visible/active for battle.
+      if (st == 'incomplete' || st.isEmpty) {
+        update['status'] = 'open';
       }
 
       tx.update(ref, update);

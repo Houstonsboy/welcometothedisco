@@ -889,6 +889,7 @@ class _TrackPage extends StatelessWidget {
             ),
           ),
           child: _TrackRow(
+            key: ValueKey('album-$albumIndex-track-$trackIndex'),
             track: track,
             index: trackIndex,
             accentColor: accentColor,
@@ -1005,7 +1006,7 @@ class _AlbumCard extends StatelessWidget {
 }
 
 // ── Track Row ───────────────────────────────────────────────────────────────
-class _TrackRow extends StatelessWidget {
+class _TrackRow extends StatefulWidget {
   final SpotifyAlbumTrack track;
   final int index;
   final Color accentColor;
@@ -1020,6 +1021,7 @@ class _TrackRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _TrackRow({
+    super.key,
     required this.track,
     required this.index,
     required this.accentColor,
@@ -1035,7 +1037,39 @@ class _TrackRow extends StatelessWidget {
   });
 
   @override
+  State<_TrackRow> createState() => _TrackRowState();
+}
+
+class _TrackRowState extends State<_TrackRow> {
+  bool _isNoteOpen = false;
+  late final TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final track = widget.track;
+    final isActive = widget.isActive;
+    final isPast = widget.isPast;
+    final isLocked = widget.isLocked;
+    final accentColor = widget.accentColor;
+    final showVoteButton = widget.showVoteButton;
+    final isVoted = widget.isVoted;
+    final isVoteDisabled = widget.isVoteDisabled;
+    final onVote = widget.onVote;
+    final onTap = widget.onTap;
+    final isLast = widget.isLast;
+
     // visual state — increased visibility for disabled (locked) tracks
     final textOpacity = isActive ? 1.0 : isPast ? 0.6 : 0.52;
     final numberColor = isActive
@@ -1067,9 +1101,11 @@ class _TrackRow extends StatelessWidget {
                 ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
                 : EdgeInsets.zero,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
+              child: Column(
                 children: [
+                  Row(
+                    children: [
                   // Track number or checkmark
                   SizedBox(
                     width: 32,
@@ -1187,20 +1223,25 @@ class _TrackRow extends StatelessWidget {
                   ],
                   // Active badge OR duration
                   if (isActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(99),
-                        color: accentColor.withOpacity(0.55),
-                      ),
-                      child: Text(
-                        'NOW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.5,
+                    GestureDetector(
+                      onTap: () => setState(() => _isNoteOpen = !_isNoteOpen),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: _isNoteOpen
+                              ? accentColor.withOpacity(0.75)
+                              : accentColor.withOpacity(0.55),
+                        ),
+                        child: const Text(
+                          'NOTE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.3,
+                          ),
                         ),
                       ),
                     )
@@ -1214,6 +1255,44 @@ class _TrackRow extends StatelessWidget {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
+                    ],
+                  ),
+                  if (_isNoteOpen && isActive) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9),
+                        color: Colors.white.withOpacity(0.12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.20),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _noteCtrl,
+                        minLines: 1,
+                        maxLines: 3,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'Disclaimer...',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withOpacity(0.42),
+                            fontSize: 12,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

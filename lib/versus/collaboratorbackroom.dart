@@ -172,6 +172,26 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     with TickerProviderStateMixin {
   final SpotifyApi _api = SpotifyService.api;
 
+  bool get _isAuthorEditor => widget.currentUser.id == widget.versus.authorID;
+  bool get _isCollaboratorEditor =>
+      widget.currentUser.id == (widget.versus.collaboratorID?.trim() ?? '');
+  bool get _isKnownEditor => _isAuthorEditor || _isCollaboratorEditor;
+  bool get _editableOnLeft => _isAuthorEditor;
+
+  String get _readOnlyArtistId =>
+      _isAuthorEditor ? widget.versus.artist2ID.trim() : widget.versus.artist1ID.trim();
+  String get _readOnlyArtistName =>
+      _isAuthorEditor ? widget.versus.artist2Name.trim() : widget.versus.artist1Name.trim();
+  List<String> get _readOnlyTrackIds =>
+      _isAuthorEditor ? widget.versus.artist2TrackIDs : widget.versus.artist1TrackIDs;
+
+  String get _editableArtistId =>
+      _isAuthorEditor ? widget.versus.artist1ID.trim() : widget.versus.artist2ID.trim();
+  String get _editableArtistName =>
+      _isAuthorEditor ? widget.versus.artist1Name.trim() : widget.versus.artist2Name.trim();
+  List<String> get _editableTrackIds =>
+      _isAuthorEditor ? widget.versus.artist1TrackIDs : widget.versus.artist2TrackIDs;
+
   // ── User1 (author) — read-only ─────────────────────────────────────────────
   List<SpotifyTrack> _user1Tracks = [];
   String?            _user1ImageUrl;
@@ -280,9 +300,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   Future<void> _loadUser1Tracks() async {
     setState(() => _isLoadingUser1 = true);
     try {
+      final roArtistId = _readOnlyArtistId;
       final results = await Future.wait([
-        _api.getTracksByIds(widget.versus.artist1TrackIDs),
-        _api.getArtistDetails(widget.versus.artist1ID),
+        _api.getTracksByIds(_readOnlyTrackIds),
+        if (roArtistId.isNotEmpty)
+          _api.getArtistDetails(roArtistId)
+        else
+          Future.value(null),
       ]);
       if (!mounted) return;
       setState(() {
@@ -299,12 +323,16 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   /// If the invite doc already has artist2 set (author pre-picked it),
   /// fetch Spotify details and auto-populate the collaborator slot.
   Future<void> _checkPrefilledArtist2() async {
-    final id   = widget.versus.artist2ID.trim();
-    final name = widget.versus.artist2Name.trim();
-    final savedTrackIds = widget.versus.artist2TrackIDs
+    final id   = _editableArtistId;
+    final name = _editableArtistName;
+    final savedTrackIds = _editableTrackIds
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
+    final existingComment = _isAuthorEditor
+        ? (widget.versus.authorComment ?? '')
+        : (widget.versus.collaboratorComment ?? '');
+    _commentCtrl.text = existingComment.trim();
     if (id.isEmpty) return;
     try {
       final results = await Future.wait([
@@ -427,17 +455,16 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     setState(() => _mySelectedTracks.removeWhere((t) => t.id == trackId));
   }
 
-  void _moveMySelectedTrack(int fromIndex, int toIndex) {
-    if (fromIndex < 0 ||
-        toIndex < 0 ||
-        fromIndex >= _mySelectedTracks.length ||
-        toIndex >= _mySelectedTracks.length ||
-        fromIndex == toIndex) {
-      return;
-    }
+  void _reorderMySelectedTracks(int oldIndex, int newIndex) {
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= _mySelectedTracks.length ||
+        newIndex > _mySelectedTracks.length) return;
+
     setState(() {
-      final item = _mySelectedTracks.removeAt(fromIndex);
-      _mySelectedTracks.insert(toIndex, item);
+      if (newIndex > oldIndex) newIndex -= 1;
+      final item = _mySelectedTracks.removeAt(oldIndex);
+      _mySelectedTracks.insert(newIndex, item);
     });
   }
 
@@ -542,19 +569,26 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // ── Submission ─────────────────────────────────────────────────────────────
 
   /// Author side (artist1) track count — collaborator must match this.
-  int get _authorSideTrackCount => widget.versus.artist1TrackIDs.length;
+  int get _authorSideTrackCount => _readOnlyTrackIds.length;
 
-  bool get _canSubmit =>
-      _myArtist != null &&
-      _authorSideTrackCount > 0 &&
-      _mySelectedTracks.length == _authorSideTrackCount;
+  bool get _canSubmit {
+    if (_myArtist == null || !_isKnownEditor) return false;
+    if (_isAuthorEditor && _authorSideTrackCount == 0) {
+      return _mySelectedTracks.isNotEmpty;
+    }
+    return _authorSideTrackCount > 0 &&
+        _mySelectedTracks.length == _authorSideTrackCount;
+  }
 
   String? get _submitHint {
     if (_myArtist == null) return null;
+    if (!_isKnownEditor) return 'You do not have permission to edit this versus';
     final need = _authorSideTrackCount;
     final have = _mySelectedTracks.length;
     if (need == 0) {
-      return 'Their side has no tracks yet — wait for the host to finish their picks';
+      return _isAuthorEditor
+          ? 'Other side is empty — you can still save your side'
+          : 'Their side has no tracks yet — wait for the host to finish their picks';
     }
     if (have == 0) {
       return 'Select $need track${need == 1 ? '' : 's'} to match their side';
@@ -571,10 +605,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   }
 
   String get _submitLabel {
+    if (!_isKnownEditor) return 'NO EDIT PERMISSION';
     if (_myArtist == null) return 'PICK YOUR ARTIST FIRST';
-    if (_authorSideTrackCount == 0) return 'THEIR SIDE INCOMPLETE';
+    if (_authorSideTrackCount == 0 && !_isAuthorEditor) return 'THEIR SIDE INCOMPLETE';
     if (_mySelectedTracks.isEmpty) return 'SELECT YOUR TRACKS FIRST';
-    if (_mySelectedTracks.length != _authorSideTrackCount) {
+    if (_authorSideTrackCount > 0 &&
+        _mySelectedTracks.length != _authorSideTrackCount) {
       return 'SELECT EQUAL TRACKS';
     }
     return 'CONFIRM & GO LIVE';
@@ -586,14 +622,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     try {
       await FirebaseService.acceptCollaborationInvite(
         versusID:       widget.versus.id,
-        artist2ID:      _myArtist!.id,
-        artist2Name:    _myArtist!.name,
-        artist2TrackIDs: _mySelectedTracks.map((t) => t.id).toList(),
-        collaboratorComment: _commentCtrl.text.trim().isEmpty
+        editedArtistID:      _myArtist!.id,
+        editedArtistName:    _myArtist!.name,
+        editedTrackIDs: _mySelectedTracks.map((t) => t.id).toList(),
+        editedComment: _commentCtrl.text.trim().isEmpty
             ? null
             : _commentCtrl.text.trim(),
-        collaboratorUsername: widget.currentUser.username.trim(),
-        collaboratorAvatarPath: widget.currentUser.avatarPath.trim(),
+        editorUsername: widget.currentUser.username.trim(),
+        editorAvatarPath: widget.currentUser.avatarPath.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -638,7 +674,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   @override
   Widget build(BuildContext context) {
-    final showArtistOverlay = _artistSearchCtrl.text.trim().isNotEmpty || _isSearchingArtist;
+    final showArtistOverlay = _artistSearchCtrl.text.trim().isNotEmpty ||
+        _isSearchingArtist;
+    final editablePageIndex = _editableOnLeft ? 0 : 1;
 
     return Container(
       decoration: const BoxDecoration(
@@ -659,13 +697,18 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               PageView(
                 controller: _pageCtrl,
                 onPageChanged: _onPageChanged,
-                children: [
-                  _buildUser1TrackList(),
-                  _buildMyTrackList(),
-                ],
+                children: _editableOnLeft
+                    ? [
+                        _buildMyTrackList(),
+                        _buildUser1TrackList(),
+                      ]
+                    : [
+                        _buildUser1TrackList(),
+                        _buildMyTrackList(),
+                      ],
               ),
               // Artist search overlay on top of page 1
-              if (showArtistOverlay && _currentPage == 1)
+              if (showArtistOverlay && _currentPage == editablePageIndex)
                 Positioned.fill(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -840,23 +883,56 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // ── Artist slots (top strip) ───────────────────────────────────────────────
 
   Widget _buildArtistSlots() {
+    final leftIsEditable = _editableOnLeft;
+    final leftPageIndex = 0;
+    final rightPageIndex = 1;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(children: [
-        // User1 slot — always filled, read-only
+        // Left slot
         Expanded(
-          child: _SlotChip(
-            artist: _SlotArtistData(
-              name:     widget.versus.artist1Name,
-              imageUrl: _user1ImageUrl,
-            ),
-            label:       'THEIR ARTIST',
-            accentColor: _kPurple,
-            isActive:    _currentPage == 0,
-            trackCount:  widget.versus.artist1TrackIDs.length,
-            isReadOnly:  true,
-            onTap:       () => _goToPage(0),
-          ),
+          child: leftIsEditable
+              ? _SlotChip(
+                  artist: _myArtist != null
+                      ? _SlotArtistData(
+                          name: _myArtist!.name,
+                          imageUrl: _myArtistImageUrl,
+                        )
+                      : null,
+                  label: 'YOUR ARTIST',
+                  accentColor: _kPink,
+                  isActive: _currentPage == leftPageIndex,
+                  trackCount: _mySelectedTracks.length,
+                  isReadOnly: false,
+                  onTap: () => _goToPage(leftPageIndex),
+                  onRemove: _myArtist == null
+                      ? null
+                      : () => setState(() {
+                            _myArtist = null;
+                            _myArtistImageUrl = null;
+                            _myTopTracks = [];
+                            _mySelectedTracks = [];
+                            _trackSearchResults = null;
+                            _trackFilterQuery = '';
+                            _trackSearchCtrl.clear();
+                            _artist2PreFilled = false;
+                          }),
+                )
+              : _SlotChip(
+                  artist: _SlotArtistData(
+                    name: _readOnlyArtistName.isNotEmpty
+                        ? _readOnlyArtistName
+                        : (_isAuthorEditor ? 'Other side' : widget.versus.artist1Name),
+                    imageUrl: _user1ImageUrl,
+                  ),
+                  label: 'THEIR ARTIST',
+                  accentColor: _kPurple,
+                  isActive: _currentPage == leftPageIndex,
+                  trackCount: _readOnlyTrackIds.length,
+                  isReadOnly: true,
+                  onTap: () => _goToPage(leftPageIndex),
+                ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -865,40 +941,55 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             fontWeight: FontWeight.w900, letterSpacing: 2,
           )),
         ),
-        // My slot
+        // Right slot
         Expanded(
-          child: _myArtist != null
+          child: leftIsEditable
               ? _SlotChip(
                   artist: _SlotArtistData(
-                    name:     _myArtist!.name,
-                    imageUrl: _myArtistImageUrl,
+                    name: _readOnlyArtistName.isNotEmpty
+                        ? _readOnlyArtistName
+                        : (_isAuthorEditor ? 'Other side' : widget.versus.artist1Name),
+                    imageUrl: _user1ImageUrl,
                   ),
-                  label:       'YOUR ARTIST',
-                  accentColor: _kPink,
-                  isActive:    _currentPage == 1,
-                  trackCount:  _mySelectedTracks.length,
-                  isReadOnly:  false,
-                  onTap:       () => _goToPage(1),
-                  onRemove:    () => setState(() {
-                    _myArtist         = null;
-                    _myArtistImageUrl = null;
-                    _myTopTracks      = [];
-                    _mySelectedTracks = [];
-                    _trackSearchResults = null;
-                    _trackFilterQuery = '';
-                    _trackSearchCtrl.clear();
-                    _artist2PreFilled = false;
-                  }),
+                  label: 'THEIR ARTIST',
+                  accentColor: _kPurple,
+                  isActive: _currentPage == rightPageIndex,
+                  trackCount: _readOnlyTrackIds.length,
+                  isReadOnly: true,
+                  onTap: () => _goToPage(rightPageIndex),
                 )
-              : _SlotChip(
-                  artist: null,
-                  label:       'YOUR ARTIST',
-                  accentColor: _kPink,
-                  isActive:    _currentPage == 1,
-                  trackCount:  0,
-                  isReadOnly:  false,
-                  onTap:       () => _goToPage(1),
-                ),
+              : _myArtist != null
+                  ? _SlotChip(
+                      artist: _SlotArtistData(
+                        name: _myArtist!.name,
+                        imageUrl: _myArtistImageUrl,
+                      ),
+                      label: 'YOUR ARTIST',
+                      accentColor: _kPink,
+                      isActive: _currentPage == rightPageIndex,
+                      trackCount: _mySelectedTracks.length,
+                      isReadOnly: false,
+                      onTap: () => _goToPage(rightPageIndex),
+                      onRemove: () => setState(() {
+                        _myArtist = null;
+                        _myArtistImageUrl = null;
+                        _myTopTracks = [];
+                        _mySelectedTracks = [];
+                        _trackSearchResults = null;
+                        _trackFilterQuery = '';
+                        _trackSearchCtrl.clear();
+                        _artist2PreFilled = false;
+                      }),
+                    )
+                  : _SlotChip(
+                      artist: null,
+                      label: 'YOUR ARTIST',
+                      accentColor: _kPink,
+                      isActive: _currentPage == rightPageIndex,
+                      trackCount: 0,
+                      isReadOnly: false,
+                      onTap: () => _goToPage(rightPageIndex),
+                    ),
         ),
       ]),
     );
@@ -1000,17 +1091,25 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // ── Slider dots ────────────────────────────────────────────────────────────
 
   Widget _buildSliderDots() {
+    final leftPageIndex = 0;
+    final rightPageIndex = 1;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         GestureDetector(
-          onTap: () => _goToPage(0),
-          child: _SwipeDot(isActive: _currentPage == 0, color: _kPurple),
+          onTap: () => _goToPage(leftPageIndex),
+          child: _SwipeDot(
+            isActive: _currentPage == leftPageIndex,
+            color: _editableOnLeft ? _kPink : _kPurple,
+          ),
         ),
         const SizedBox(width: 6),
         GestureDetector(
-          onTap: () => _goToPage(1),
-          child: _SwipeDot(isActive: _currentPage == 1, color: _kPink),
+          onTap: () => _goToPage(rightPageIndex),
+          child: _SwipeDot(
+            isActive: _currentPage == rightPageIndex,
+            color: _editableOnLeft ? _kPurple : _kPink,
+          ),
         ),
       ]),
     );
@@ -1033,21 +1132,40 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       physics: const BouncingScrollPhysics(),
       children: [
         _buildTrackListHeader(
-          name:     widget.versus.artist1Name,
+          name:     _readOnlyArtistName.isNotEmpty
+              ? _readOnlyArtistName
+              : (_isAuthorEditor ? 'Other side' : widget.versus.artist1Name),
           imageUrl: _user1ImageUrl,
           roleLabel: 'THEIR TRACKS',
           accentColor: _kPurple,
           alignRight: false,
         ),
         // Author comment strip (read-only)
-        if (widget.versus.authorComment != null &&
-            widget.versus.authorComment!.isNotEmpty)
+        if ((_isAuthorEditor
+                    ? widget.versus.collaboratorComment
+                    : widget.versus.authorComment) !=
+                null &&
+            (_isAuthorEditor
+                    ? widget.versus.collaboratorComment!
+                    : widget.versus.authorComment!)
+                .isNotEmpty)
           _buildReadOnlyCommentStrip(
-            username:   widget.versus.author?.username ?? widget.versus.authorID,
-            avatarPath: widget.versus.author?.avatarPath,
-            comment:    widget.versus.authorComment!,
+            username: _isAuthorEditor
+                ? ((widget.versus.collaborator?.username ??
+                            widget.versus.collaboratorUsername ??
+                            widget.versus.collaboratorID ??
+                            'collaborator')
+                        .trim())
+                : (widget.versus.author?.username ?? widget.versus.authorID),
+            avatarPath: _isAuthorEditor
+                ? (widget.versus.collaborator?.avatarPath ??
+                    widget.versus.collaboratorAvatar)
+                : widget.versus.author?.avatarPath,
+            comment: _isAuthorEditor
+                ? widget.versus.collaboratorComment!
+                : widget.versus.authorComment!,
             accentColor: _kPurple,
-            roleLabel:  'author',
+            roleLabel:  _isAuthorEditor ? 'collab' : 'author',
           ),
         const SizedBox(height: 10),
         if (_user1Tracks.isEmpty)
@@ -1131,7 +1249,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           imageUrl:    _myArtistImageUrl,
           roleLabel:   'YOUR TRACKS',
           accentColor: _kPink,
-          alignRight:  true,
+          alignRight:  !_editableOnLeft,
           trailing: GestureDetector(
             onTap: () {
               setState(() {
@@ -1175,21 +1293,42 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             icon: Icons.playlist_add_check_rounded,
             label: 'SELECTED', count: picked.length, accentColor: _kPink,
           ),
-          ...picked.asMap().entries.map((entry) {
-            final i = entry.key;
-            final track = entry.value;
-            return _SelectedTrackTile(
-              track: track,
-              accentColor: _kPink,
-              canMoveUp: i > 0,
-              canMoveDown: i < picked.length - 1,
-              onMoveUp: i > 0 ? () => _moveMySelectedTrack(i, i - 1) : null,
-              onMoveDown: i < picked.length - 1
-                  ? () => _moveMySelectedTrack(i, i + 1)
-                  : null,
-              onRemove: () => _removeMyTrack(track.id),
-            );
-          }),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: picked.length,
+            onReorder: _reorderMySelectedTracks,
+            itemBuilder: (context, i) {
+              final track = picked[i];
+              return _SelectedTrackTile(
+                key: ValueKey('selected-${track.id}'),
+                track: track,
+                accentColor: _kPink,
+                reorderHandle: ReorderableDragStartListener(
+                  index: i,
+                  child: Container(
+                    width: 24,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(7),
+                      color: _kPink.withOpacity(0.16),
+                      border: Border.all(
+                        color: _kPink.withOpacity(0.34),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.drag_indicator_rounded,
+                      color: Colors.white,
+                      size: 15,
+                    ),
+                  ),
+                ),
+                onRemove: () => _removeMyTrack(track.id),
+              );
+            },
+          ),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: Container(
@@ -1230,7 +1369,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             final i     = entry.key;
             final track = entry.value;
             final alreadyPicked = picked.any((t) => t.id == track.id);
-            final cap = widget.versus.artist1TrackIDs.length;
+            final cap = _authorSideTrackCount;
             final atCap =
                 cap > 0 && picked.length >= cap && !alreadyPicked;
             return AnimatedBuilder(
@@ -1436,7 +1575,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 borderRadius: BorderRadius.circular(4),
                 color: _kPink.withOpacity(0.18),
               ),
-              child: const Text('collab', style: TextStyle(
+              child: Text(_isAuthorEditor ? 'author' : 'collab', style: const TextStyle(
                 color: _kPink, fontSize: 9, fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
               )),
@@ -2002,19 +2141,14 @@ class _ReadOnlyTrackRow extends StatelessWidget {
 class _SelectedTrackTile extends StatelessWidget {
   final SpotifyTrack track;
   final Color        accentColor;
-  final bool         canMoveUp;
-  final bool         canMoveDown;
-  final VoidCallback? onMoveUp;
-  final VoidCallback? onMoveDown;
+  final Widget       reorderHandle;
   final VoidCallback onRemove;
 
   const _SelectedTrackTile({
+    super.key,
     required this.track,
     required this.accentColor,
-    this.canMoveUp = false,
-    this.canMoveDown = false,
-    this.onMoveUp,
-    this.onMoveDown,
+    required this.reorderHandle,
     required this.onRemove,
   });
 
@@ -2070,52 +2204,7 @@ class _SelectedTrackTile extends StatelessWidget {
                   ],
                 )),
                 const SizedBox(width: 6),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: canMoveUp ? onMoveUp : null,
-                      child: Opacity(
-                        opacity: canMoveUp ? 0.95 : 0.28,
-                        child: Container(
-                          width: 24, height: 18,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            color: accentColor.withOpacity(0.16),
-                            border: Border.all(
-                                color: accentColor.withOpacity(0.34), width: 0.7),
-                          ),
-                          child: const Icon(
-                            Icons.keyboard_arrow_up_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: canMoveDown ? onMoveDown : null,
-                      child: Opacity(
-                        opacity: canMoveDown ? 0.95 : 0.28,
-                        child: Container(
-                          width: 24, height: 18,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            color: accentColor.withOpacity(0.16),
-                            border: Border.all(
-                                color: accentColor.withOpacity(0.34), width: 0.7),
-                          ),
-                          child: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                reorderHandle,
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: onRemove,

@@ -1182,6 +1182,7 @@ class _ArtistTrackPage extends StatelessWidget {
                 opacity: slideAnim.value.clamp(0.0, 1.0), child: child),
           ),
           child: _ArtistTrackRow(
+            key: ValueKey('artist-$artistIndex-track-$trackIndex'),
             track:            track,
             index:            trackIndex,
             accentColor:      accentColor,
@@ -1204,7 +1205,7 @@ class _ArtistTrackPage extends StatelessWidget {
 }
 
 // ── Artist Track Row (uses SpotifyTrack instead of SpotifyAlbumTrack) ─────────
-class _ArtistTrackRow extends StatelessWidget {
+class _ArtistTrackRow extends StatefulWidget {
   final SpotifyTrack track;
   final int index;
   final Color accentColor;
@@ -1214,6 +1215,7 @@ class _ArtistTrackRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _ArtistTrackRow({
+    super.key,
     required this.track,
     required this.index,
     required this.accentColor,
@@ -1229,7 +1231,40 @@ class _ArtistTrackRow extends StatelessWidget {
   });
 
   @override
+  State<_ArtistTrackRow> createState() => _ArtistTrackRowState();
+}
+
+class _ArtistTrackRowState extends State<_ArtistTrackRow> {
+  bool _isNoteOpen = false;
+  late final TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final track = widget.track;
+    final index = widget.index;
+    final accentColor = widget.accentColor;
+    final isLast = widget.isLast;
+    final isActive = widget.isActive;
+    final isPast = widget.isPast;
+    final isLocked = widget.isLocked;
+    final showVoteButton = widget.showVoteButton;
+    final isVoted = widget.isVoted;
+    final isVoteDisabled = widget.isVoteDisabled;
+    final onVote = widget.onVote;
+    final onTap = widget.onTap;
+
     final textOpacity  = isActive ? 1.0 : isPast ? 0.6 : 0.52;
     final numberColor  = isActive
         ? accentColor
@@ -1257,8 +1292,9 @@ class _ArtistTrackRow extends StatelessWidget {
                 ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
                 : EdgeInsets.zero,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              child: Row(children: [
+              padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
+              child: Column(children: [
+                Row(children: [
                 // Track number / state icon
                 SizedBox(
                   width: 32,
@@ -1381,18 +1417,60 @@ class _ArtistTrackRow extends StatelessWidget {
 
                 // Active badge or nothing (SpotifyTrack has no duration field)
                 if (isActive)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(99),
-                      color: accentColor.withOpacity(0.55),
+                  GestureDetector(
+                    onTap: () => setState(() => _isNoteOpen = !_isNoteOpen),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(99),
+                        color: _isNoteOpen
+                            ? accentColor.withOpacity(0.75)
+                            : accentColor.withOpacity(0.55),
+                      ),
+                      child: const Text('NOTE', style: TextStyle(
+                        color: Colors.white, fontSize: 9,
+                        fontWeight: FontWeight.w800, letterSpacing: 1.3,
+                      )),
                     ),
-                    child: const Text('NOW', style: TextStyle(
-                      color: Colors.white, fontSize: 9,
-                      fontWeight: FontWeight.w800, letterSpacing: 1.5,
-                    )),
                   ),
+                ]),
+                if (_isNoteOpen && isActive) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      color: Colors.white.withOpacity(0.12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.20),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _noteCtrl,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Disclaimer...',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.42),
+                          fontSize: 12,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ]),
             ),
           ),
