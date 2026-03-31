@@ -1351,7 +1351,7 @@ class _ArtistTrackPage extends StatelessWidget {
             isLocked:        isLocked,
             showVoteButton:  isActive,
             isVoted:         isVotedForMe,
-            isVoteDisabled:  false,
+            isVoteDisabled:  isVoteDisabled,
             commentController: getCommentCtrl(trackIndex),
             onVote:          isActive ? () => onVote(trackIndex) : null,
             onCommentChanged: (text) => onCommentChanged(trackIndex, text),
@@ -1519,7 +1519,7 @@ class _ArtistTrackRowState extends State<_ArtistTrackRow> {
                   // ── Vote button ──────────────────────────────────────────
                   if (widget.showVoteButton) ...[
                     GestureDetector(
-                    onTap: onVote,
+                    onTap: isVoteDisabled ? null : onVote,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,

@@ -909,7 +909,9 @@ class _TrackPage extends StatelessWidget {
             isLocked: isLocked,
             showVoteButton: isActive,
             isVoted: isActive && voteAtActiveIndex == albumIndex,
-            isVoteDisabled: false,
+            isVoteDisabled: isActive &&
+                voteAtActiveIndex != null &&
+                voteAtActiveIndex != albumIndex,
             onVote: isActive ? () => onVote(albumIndex) : null,
             onTap: () => onTrackTap(trackIndex, albumIndex),
           ),
@@ -1175,7 +1177,7 @@ class _TrackRowState extends State<_TrackRow> {
                   // Tappable on both tracks: tap the other track's button to switch vote.
                   if (showVoteButton) ...[
                     GestureDetector(
-                      onTap: onVote,
+                    onTap: isVoteDisabled ? null : onVote,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
