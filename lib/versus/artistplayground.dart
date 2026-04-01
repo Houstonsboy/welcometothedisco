@@ -1628,7 +1628,7 @@ class _ArtistTrackPage extends StatelessWidget {
             isActive:        isActive,
             isPast:          isPast,
             isLocked:        isLocked,
-            showVoteButton:  isActive,
+            showVoteButton:  isActive || isVotedForMe,
             isVoted:         isVotedForMe,
             isVoteDisabled:  isVoteDisabled,
             commentController: getCommentCtrl(trackIndex),
@@ -1677,8 +1677,6 @@ class _ArtistTrackRow extends StatefulWidget {
 }
 
 class _ArtistTrackRowState extends State<_ArtistTrackRow> {
-  bool _isNoteOpen = false;
-
   @override
   Widget build(BuildContext context) {
     final track          = widget.track;
@@ -1855,30 +1853,24 @@ class _ArtistTrackRowState extends State<_ArtistTrackRow> {
                     const SizedBox(width: 10),
                   ],
 
-                  // NOTE toggle (only on active row)
-                  if (isActive)
-                    GestureDetector(
-                      onTap: () =>
-                          setState(() => _isNoteOpen = !_isNoteOpen),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99),
-                          color: _isNoteOpen
-                              ? accentColor.withOpacity(0.75)
-                              : accentColor.withOpacity(0.55),
-                        ),
-                        child: const Text('NOTE', style: TextStyle(
-                          color: Colors.white, fontSize: 9,
-                          fontWeight: FontWeight.w800, letterSpacing: 1.3,
-                        )),
+                  // NOTE badge shown only for voted rows.
+                  if (isVoted)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(99),
+                        color: accentColor.withOpacity(0.75),
                       ),
+                      child: const Text('NOTE', style: TextStyle(
+                        color: Colors.white, fontSize: 9,
+                        fontWeight: FontWeight.w800, letterSpacing: 1.3,
+                      )),
                     ),
                 ]),
 
                 // ── Note / comment field ────────────────────────────────────
-                if (_isNoteOpen && isActive) ...[
+                if (isVoted) ...[
                   const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(
