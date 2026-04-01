@@ -90,5 +90,48 @@ service cloud.firestore {
         );
       allow delete: if request.auth != null && isVersusAuthor();
     }
+
+    // Polls: one poll doc per voter per versus, keyed as {versus_id}_{voter_id}.
+    match /polls/{pollId} {
+      function isAuthed() {
+        return request.auth != null;
+      }
+
+      function voterId() {
+        return request.resource.data.get('voter_id', '');
+      }
+
+      function versusId() {
+        return request.resource.data.get('versus_id', '');
+      }
+
+      function ownerDocIdMatches() {
+        return pollId == (versusId() + '_' + voterId());
+      }
+
+      function isOwnerCreate() {
+        return isAuthed()
+          && voterId() == request.auth.uid
+          && versusId() != ''
+          && ownerDocIdMatches();
+      }
+
+      function isOwnerUpdate() {
+        return isAuthed()
+          && resource.data.get('voter_id', '') == request.auth.uid
+          && resource.data.get('versus_id', '') != ''
+          && pollId == (
+            resource.data.get('versus_id', '') + '_' + resource.data.get('voter_id', '')
+          )
+          // Immutable identity fields
+          && request.resource.data.get('voter_id', '') == resource.data.get('voter_id', '')
+          && request.resource.data.get('versus_id', '') == resource.data.get('versus_id', '');
+      }
+
+      allow read: if isAuthed();
+      allow create: if isOwnerCreate();
+      allow update: if isOwnerUpdate();
+      allow delete: if isAuthed() && resource.data.get('voter_id', '') == request.auth.uid;
+    }
   }
 }

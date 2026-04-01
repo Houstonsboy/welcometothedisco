@@ -444,8 +444,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       if (idx >= 0) {
         _mySelectedTracks.removeAt(idx);
       } else {
-        final cap = _authorSideTrackCount;
-        if (cap > 0 && _mySelectedTracks.length >= cap) return;
         _mySelectedTracks.add(track);
       }
     });
@@ -573,11 +571,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   bool get _canSubmit {
     if (_myArtist == null || !_isKnownEditor) return false;
-    if (_isAuthorEditor && _authorSideTrackCount == 0) {
-      return _mySelectedTracks.isNotEmpty;
-    }
-    return _authorSideTrackCount > 0 &&
-        _mySelectedTracks.length == _authorSideTrackCount;
+    if (_mySelectedTracks.isEmpty) return false;
+    return _mySelectedTracks.length >= _authorSideTrackCount;
   }
 
   String? get _submitHint {
@@ -586,9 +581,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     final need = _authorSideTrackCount;
     final have = _mySelectedTracks.length;
     if (need == 0) {
-      return _isAuthorEditor
-          ? 'Other side is empty — you can still save your side'
-          : 'Their side has no tracks yet — wait for the host to finish their picks';
+      return 'Other side has no tracks yet — you can continue with your side';
     }
     if (have == 0) {
       return 'Select $need track${need == 1 ? '' : 's'} to match their side';
@@ -599,7 +592,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     }
     if (have > need) {
       final n = have - need;
-      return 'Remove $n track${n == 1 ? '' : 's'} to match their side';
+      return 'You have $n extra track${n == 1 ? '' : 's'} — submit to notify the other side';
     }
     return null;
   }
@@ -607,19 +600,77 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   String get _submitLabel {
     if (!_isKnownEditor) return 'NO EDIT PERMISSION';
     if (_myArtist == null) return 'PICK YOUR ARTIST FIRST';
-    if (_authorSideTrackCount == 0 && !_isAuthorEditor) return 'THEIR SIDE INCOMPLETE';
     if (_mySelectedTracks.isEmpty) return 'SELECT YOUR TRACKS FIRST';
-    if (_authorSideTrackCount > 0 &&
-        _mySelectedTracks.length != _authorSideTrackCount) {
-      return 'SELECT EQUAL TRACKS';
+    if (_mySelectedTracks.length < _authorSideTrackCount) {
+      return 'ADD MORE TRACKS';
+    }
+    if (_mySelectedTracks.length > _authorSideTrackCount) {
+      return 'CONFIRM & NOTIFY';
     }
     return 'CONFIRM & GO LIVE';
+  }
+
+  String get _otherRoleLabel => _isAuthorEditor ? 'collab' : 'author';
+
+  String get _otherUsernameForNotice {
+    if (_isAuthorEditor) {
+      final collab = (widget.versus.collaborator?.username ??
+              widget.versus.collaboratorUsername ??
+              widget.versus.collaboratorID ??
+              'collaborator')
+          .trim();
+      return collab.isEmpty ? 'collaborator' : collab;
+    }
+    final author =
+        (widget.versus.author?.username ?? widget.versus.authorID).trim();
+    return author.isEmpty ? 'author' : author;
+  }
+
+  Future<void> _showLongerTracksNoticeDialog() async {
+    final target = _otherUsernameForNotice;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1B1430),
+          title: const Text(
+            'Track Count Notice',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text.rich(
+            TextSpan(
+              style: TextStyle(color: Colors.white.withOpacity(0.9)),
+              children: [
+                const TextSpan(text: 'your tracks are longer than '),
+                TextSpan(
+                  text: '$target',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const TextSpan(text: ', we will notify '),
+                TextSpan(
+                  text: '$target',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const TextSpan(text: ' to add more tracks'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleSubmit() async {
     if (!_canSubmit || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
+      final hasLongerTracks = _mySelectedTracks.length > _authorSideTrackCount;
       await FirebaseService.acceptCollaborationInvite(
         versusID:       widget.versus.id,
         editedArtistID:      _myArtist!.id,
@@ -633,11 +684,17 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Versus is now live! 🔥'),
+          content: Text(hasLongerTracks
+              ? 'Saved. Other side will be notified to add tracks.'
+              : 'Versus is now live! 🔥'),
           backgroundColor: _kSuccessGreen.withOpacity(0.92),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ));
+        if (hasLongerTracks) {
+          await _showLongerTracksNoticeDialog();
+          if (!mounted) return;
+        }
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -1369,9 +1426,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             final i     = entry.key;
             final track = entry.value;
             final alreadyPicked = picked.any((t) => t.id == track.id);
-            final cap = _authorSideTrackCount;
-            final atCap =
-                cap > 0 && picked.length >= cap && !alreadyPicked;
             return AnimatedBuilder(
               animation: _slideAnim,
               builder: (_, child) => Transform.translate(
@@ -1385,7 +1439,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 isLast:       i == tracks.length - 1,
                 dimmed:       alreadyPicked || picked.isNotEmpty,
                 isSelected:   alreadyPicked,
-                onAdd:        (alreadyPicked || atCap)
+                onAdd:        alreadyPicked
                     ? null
                     : () => _toggleMyTrack(track),
               ),

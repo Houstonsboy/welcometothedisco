@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
 
@@ -48,8 +52,13 @@ class TrackVoteDetail {
 
 class ArtistVersusPlayground extends StatefulWidget {
   final ArtistVersusModel versus;
+  final String? versusId;
 
-  const ArtistVersusPlayground({super.key, required this.versus});
+  const ArtistVersusPlayground({
+    super.key,
+    required this.versus,
+    this.versusId,
+  });
 
   @override
   State<ArtistVersusPlayground> createState() => _ArtistVersusPlaygroundState();
@@ -58,6 +67,15 @@ class ArtistVersusPlayground extends StatefulWidget {
 class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     with TickerProviderStateMixin {
   final SpotifyApi _api = SpotifyApi();
+  String get _resolvedVersusId {
+    final routeId = widget.versusId?.trim() ?? '';
+    if (routeId.isNotEmpty) return routeId;
+    return widget.versus.id.trim();
+  }
+  String _voterId = '';
+  String _voterName = '';
+  String _voterAvatar = '';
+  Timer? _pollDebounce;
 
   // ── Hydrated track lists ──────────────────────────────────────────────────
   List<SpotifyTrack> _tracks1 = [];
@@ -91,11 +109,30 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   /// Map<roundIndex, TrackVoteDetail> — full structured vote data per round
   final Map<int, TrackVoteDetail> _trackDetails = {};
 
-  /// Tally counters: how many rounds voted for artist1 vs artist2
-  int get _artist1VoteCount =>
-      _votesByIndex.values.where((v) => v == 0).length;
-  int get _artist2VoteCount =>
-      _votesByIndex.values.where((v) => v == 1).length;
+  int get _pairedRoundCount => math.min(_tracks1.length, _tracks2.length);
+  int? get _longerSideArtistIndex {
+    if (_tracks1.length == _tracks2.length) return null;
+    return _tracks1.length > _tracks2.length ? 0 : 1;
+  }
+
+  bool get _isVotingCompleteForPairs =>
+      _votesByIndex.length >= _pairedRoundCount;
+
+  int get _bonusVoteForLongerSide =>
+      (_longerSideArtistIndex != null && _isVotingCompleteForPairs) ? 1 : 0;
+
+  /// Tally counters include +1 on longer side once paired voting is complete.
+  int get _artist1VoteCount {
+    final base = _votesByIndex.values.where((v) => v == 0).length;
+    final bonus = _longerSideArtistIndex == 0 ? _bonusVoteForLongerSide : 0;
+    return base + bonus;
+  }
+
+  int get _artist2VoteCount {
+    final base = _votesByIndex.values.where((v) => v == 1).length;
+    final bonus = _longerSideArtistIndex == 1 ? _bonusVoteForLongerSide : 0;
+    return base + bonus;
+  }
 
   // ── Per-track comment controllers (keyed by track index) ─────────────────
   final Map<int, TextEditingController> _commentControllers = {};
@@ -119,6 +156,11 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   @override
   void initState() {
     super.initState();
+    final versusId = _resolvedVersusId;
+    debugPrint(
+      '[ArtistVersusPlayground] opened | versus_id: '
+      '${versusId.isEmpty ? '(missing)' : versusId}',
+    );
 
     _pageController = PageController();
 
@@ -142,7 +184,192 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     );
 
     _slideController.forward();
+    unawaited(_hydrateVoterContext());
     _loadData();
+  }
+
+  Future<void> _hydrateVoterContext() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+    if (uid.isEmpty) return;
+
+    var cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    if (cached == null) {
+      await FirebaseService.ensureCurrentUserProfileCached();
+      cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _voterId = uid;
+      _voterName = cached?.username.trim() ?? '';
+      _voterAvatar = cached?.avatarPath.trim() ?? '';
+    });
+
+    // Attempt to restore any previous voting session for this versus.
+    // _restoreExistingPoll checks internally if tracks are ready.
+    await _restoreExistingPoll();
+    _logVoteTemplateSnapshot('voter-context-ready');
+  }
+
+  /// Fetches the existing poll doc for this voter+versus and restores
+  /// _votesByIndex and _trackDetails so the UI shows prior decisions.
+  ///
+  /// Safe to call before tracks load — it will wait. Safe to call if no
+  /// poll exists — it exits silently.
+  Future<void> _restoreExistingPoll() async {
+    if (_voterId.isEmpty || _resolvedVersusId.isEmpty) return;
+
+    // Wait for tracks to be loaded before restoring — we need them
+    // to exist so the restored state is consistent with the UI.
+    if (_isLoadingTracks) {
+      // Poll every 100ms until tracks are ready, max 8 seconds.
+      int waited = 0;
+      while (_isLoadingTracks && waited < 8000) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        waited += 100;
+      }
+      if (_isLoadingTracks) {
+        debugPrint(
+          '[ArtistVersusPlayground] _restoreExistingPoll → timed out waiting for tracks',
+        );
+        return;
+      }
+    }
+
+    final data = await FirebaseService.getExistingArtistPoll(
+      versusId: _resolvedVersusId,
+      voterId: _voterId,
+    );
+    if (data == null || !mounted) return;
+
+    final rawDetails = data['track_details'] as Map<String, dynamic>?;
+    if (rawDetails == null || rawDetails.isEmpty) return;
+
+    final restoredVotes = <int, int>{};
+    final restoredDetails = <int, TrackVoteDetail>{};
+
+    for (final entry in rawDetails.entries) {
+      final roundIndex = int.tryParse(entry.key);
+      if (roundIndex == null) continue;
+
+      final round = entry.value as Map<String, dynamic>?;
+      if (round == null) continue;
+
+      final isBonus = round['isBonus'] as bool? ?? false;
+      if (isBonus) continue; // skip bonus rounds — they're auto-applied
+
+      final artist1trackID = round['artist1trackID'] as String? ?? '';
+      final artist2trackID = round['artist2trackID'] as String? ?? '';
+      final winnerId = round['Winner'] as String? ?? '';
+
+      if (winnerId.isEmpty || artist1trackID.isEmpty || artist2trackID.isEmpty) {
+        continue;
+      }
+
+      // Determine which artist index won
+      final int winnerArtistIndex;
+      if (winnerId == artist1trackID) {
+        winnerArtistIndex = 0;
+      } else if (winnerId == artist2trackID) {
+        winnerArtistIndex = 1;
+      } else {
+        continue; // malformed — skip
+      }
+
+      restoredVotes[roundIndex] = winnerArtistIndex;
+      restoredDetails[roundIndex] = TrackVoteDetail(
+        artist1trackID: artist1trackID,
+        artist2trackID: artist2trackID,
+        winnerTrackID: winnerId,
+        artist1trackName: round['artist1trackName'] as String? ?? '',
+        artist2trackName: round['artist2trackName'] as String? ?? '',
+        voterComment: round['voter_comment'] as String? ?? '',
+        isBonus: false,
+      );
+    }
+
+    if (restoredVotes.isEmpty || !mounted) return;
+
+    setState(() {
+      _votesByIndex.addAll(restoredVotes);
+      _trackDetails.addAll(restoredDetails);
+    });
+
+    // Restore comment text into controllers so NOTE fields show prior text.
+    for (final entry in restoredDetails.entries) {
+      final comment = entry.value.voterComment;
+      if (comment.isNotEmpty) {
+        _commentCtrlAt(entry.key).text = comment;
+      }
+    }
+
+    debugPrint(
+      '[ArtistVersusPlayground] _restoreExistingPoll → restored ${restoredVotes.length} round(s)',
+    );
+    _logVoteTemplateSnapshot('session-restored');
+  }
+
+  VoteDocTemplateModel _buildVoteTemplateDoc() {
+    final totalRounds = _pairedRoundCount;
+    final votedCount = _votesByIndex.length;
+    final unvoted = totalRounds > votedCount ? totalRounds - votedCount : 0;
+    final completion = totalRounds == 0
+        ? 0.0
+        : ((votedCount / totalRounds) * 100).clamp(0, 100).toDouble();
+
+    final details = <int, VoteTrackDetailModel>{
+      for (final entry in _trackDetails.entries)
+        entry.key: VoteTrackDetailModel(
+          artist1trackID: entry.value.artist1trackID,
+          artist2trackID: entry.value.artist2trackID,
+          winner: entry.value.winnerTrackID,
+          voterComment: entry.value.voterComment,
+          artist1trackName: entry.value.artist1trackName,
+          artist2trackName: entry.value.artist2trackName,
+          isBonus: entry.value.isBonus,
+        ),
+    };
+
+    final longerIndex = _longerSideArtistIndex;
+    if (longerIndex != null) {
+      final longerTracks = longerIndex == 0 ? _tracks1 : _tracks2;
+      for (int i = _pairedRoundCount; i < longerTracks.length; i++) {
+        final t = longerTracks[i];
+        details[i] = VoteTrackDetailModel(
+          artist1trackID: longerIndex == 0 ? t.id : null,
+          artist2trackID: longerIndex == 1 ? t.id : null,
+          winner: t.id,
+          voterComment: '',
+          artist1trackName: longerIndex == 0 ? t.name : null,
+          artist2trackName: longerIndex == 1 ? t.name : null,
+          isBonus: true,
+        );
+      }
+    }
+
+    return VoteDocTemplateModel.artist(
+      versusId: _resolvedVersusId,
+      voterId: _voterId,
+      voterName: _voterName,
+      voterAvatar: _voterAvatar,
+      timestamp: DateTime.now().toUtc(),
+      artist1ID: widget.versus.artist1ID,
+      artist1Name: widget.versus.artist1Name,
+      artist1Vote: _artist1VoteCount,
+      artist2ID: widget.versus.artist2ID,
+      artist2Name: widget.versus.artist2Name,
+      artist2Vote: _artist2VoteCount,
+      completionPercentage: completion,
+      unvotedCount: unvoted,
+      trackDetails: details,
+    );
+  }
+
+  void _logVoteTemplateSnapshot(String reason) {
+    final payload = _buildVoteTemplateDoc();
+    debugPrint(
+      '[ArtistVersusPlayground][$reason] vote_doc_template=${jsonEncode(payload.toMap())}',
+    );
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -171,6 +398,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       });
 
       _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
+      _logVoteTemplateSnapshot('tracks-loaded');
     } catch (e) {
       debugPrint('[ArtistVersusPlayground] _loadData error: $e');
       if (mounted) {
@@ -207,6 +435,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   @override
   void dispose() {
+    _pollDebounce?.cancel();
     _profileBubble?.remove();
     _nowPlayingSub?.cancel();
     _pulseController.dispose();
@@ -226,41 +455,43 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   ///  - If tapping the SAME artist again at this index → remove vote (toggle off).
   ///  - If tapping the other side (or first vote) → set/replace the vote.
   void _onVote(int roundIndex, int artistIndex) {
+    if (roundIndex >= _pairedRoundCount) return;
     final current = _votesByIndex[roundIndex];
     if (current == artistIndex) {
       setState(() {
         _votesByIndex.remove(roundIndex);
         _trackDetails.remove(roundIndex);
       });
-      return;
+    } else {
+      final t1 = _tracks1.elementAtOrNull(roundIndex);
+      final t2 = _tracks2.elementAtOrNull(roundIndex);
+      if (t1 == null || t2 == null) return;
+
+      final winnerTrack = artistIndex == 0 ? t1 : t2;
+      final comment = _commentCtrlAt(roundIndex).text.trim();
+
+      final detail = TrackVoteDetail(
+        artist1trackID:   t1.id,
+        artist2trackID:   t2.id,
+        winnerTrackID:    winnerTrack.id,
+        artist1trackName: t1.name,
+        artist2trackName: t2.name,
+        voterComment:     comment,
+        isBonus:          false,
+      );
+
+      setState(() {
+        _votesByIndex[roundIndex] = artistIndex;
+        _trackDetails[roundIndex]  = detail;
+      });
+
+      // Debug print — remove before production
+      debugPrint('[Vote] Round $roundIndex → ${detail.toMap()}');
+      debugPrint('[Tally] Artist1: $_artist1VoteCount | Artist2: $_artist2VoteCount');
+      debugPrint('[TrackDetails] ${_trackDetails.map((k, v) => MapEntry(k, v.toMap()))}');
     }
-
-    final t1 = _tracks1.elementAtOrNull(roundIndex);
-    final t2 = _tracks2.elementAtOrNull(roundIndex);
-    if (t1 == null || t2 == null) return;
-
-    final winnerTrack = artistIndex == 0 ? t1 : t2;
-    final comment = _commentCtrlAt(roundIndex).text.trim();
-
-    final detail = TrackVoteDetail(
-      artist1trackID:   t1.id,
-      artist2trackID:   t2.id,
-      winnerTrackID:    winnerTrack.id,
-      artist1trackName: t1.name,
-      artist2trackName: t2.name,
-      voterComment:     comment,
-      isBonus:          false,
-    );
-
-    setState(() {
-      _votesByIndex[roundIndex] = artistIndex;
-      _trackDetails[roundIndex]  = detail;
-    });
-
-    // Debug print — remove before production
-    debugPrint('[Vote] Round $roundIndex → ${detail.toMap()}');
-    debugPrint('[Tally] Artist1: $_artist1VoteCount | Artist2: $_artist2VoteCount');
-    debugPrint('[TrackDetails] ${_trackDetails.map((k, v) => MapEntry(k, v.toMap()))}');
+    _logVoteTemplateSnapshot('vote-updated-round-$roundIndex');
+    _schedulePollSync();
   }
 
   /// Updates the voter_comment on an already-cast vote when the user edits the note field.
@@ -268,7 +499,48 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     final detail = _trackDetails[roundIndex];
     if (detail != null) {
       setState(() => detail.voterComment = text);
+      _logVoteTemplateSnapshot('comment-updated-round-$roundIndex');
+      _schedulePollSync();
     }
+  }
+
+  void _schedulePollSync() {
+    _pollDebounce?.cancel();
+    _pollDebounce = Timer(
+      const Duration(milliseconds: 800),
+      _syncPollToFirestore,
+    );
+  }
+
+  Future<void> _syncPollToFirestore() async {
+    if (_voterId.isEmpty || _resolvedVersusId.isEmpty) return;
+
+    // Ensure latest text field values are reflected before write.
+    for (final entry in _commentControllers.entries) {
+      final detail = _trackDetails[entry.key];
+      if (detail != null) {
+        detail.voterComment = entry.value.text.trim();
+      }
+    }
+
+    final doc = _buildVoteTemplateDoc();
+    await FirebaseService.upsertArtistPoll(
+      versusId: _resolvedVersusId,
+      voterId: _voterId,
+      voterName: _voterName,
+      voterAvatar: _voterAvatar,
+      artist1ID: widget.versus.artist1ID,
+      artist1Name: widget.versus.artist1Name,
+      artist1Vote: _artist1VoteCount,
+      artist2ID: widget.versus.artist2ID,
+      artist2Name: widget.versus.artist2Name,
+      artist2Vote: _artist2VoteCount,
+      trackDetails: {
+        for (final e in doc.trackDetails.entries) e.key: e.value.toMap(),
+      },
+      completionPercentage: doc.completionPercentage,
+      unvotedCount: doc.unvotedCount,
+    );
   }
 
   // ── Profile bubble ────────────────────────────────────────────────────────
@@ -331,9 +603,10 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   Future<void> _openEditBackroom() async {
     if (!_canOpenEditBackroom) return;
+    final versusId = _resolvedVersusId;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CollaboratorBackroom(versusID: widget.versus.id),
+        builder: (_) => CollaboratorBackroom(versusID: versusId),
       ),
     );
   }
@@ -721,6 +994,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                     _ArtistTrackPage(
                       tracks:            _tracks1,
                       artistIndex:       0,
+                      votableRoundCount: _pairedRoundCount,
                       artistName:        widget.versus.artist1Name,
                       artistImageUrl:    _artist1ImageUrl,
                       slideAnim:         _slideAnim,
@@ -735,6 +1009,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                     _ArtistTrackPage(
                       tracks:            _tracks2,
                       artistIndex:       1,
+                      votableRoundCount: _pairedRoundCount,
                       artistName:        widget.versus.artist2Name,
                       artistImageUrl:    _artist2ImageUrl,
                       slideAnim:         _slideAnim,
@@ -1224,6 +1499,7 @@ class _ArtistCard extends StatelessWidget {
 class _ArtistTrackPage extends StatelessWidget {
   final List<SpotifyTrack> tracks;
   final int artistIndex;
+  final int votableRoundCount;
   final String artistName;
   final String? artistImageUrl;
   final Animation<double> slideAnim;
@@ -1242,6 +1518,7 @@ class _ArtistTrackPage extends StatelessWidget {
   const _ArtistTrackPage({
     required this.tracks,
     required this.artistIndex,
+    required this.votableRoundCount,
     required this.artistName,
     required this.artistImageUrl,
     required this.slideAnim,
@@ -1324,12 +1601,14 @@ class _ArtistTrackPage extends StatelessWidget {
         final isActive = trackIndex == activeTrackIndex;
         final isPast   = trackIndex < activeTrackIndex;
         final isLocked = trackIndex > activeTrackIndex;
+        final isBonusIndex = trackIndex >= votableRoundCount;
 
         // Vote state for this round
         final votedArtist   = votesByIndex[trackIndex];
         final hasVoted      = votedArtist != null;
         final isVotedForMe  = hasVoted && votedArtist == artistIndex;
-        final isVoteDisabled = hasVoted && votedArtist != artistIndex;
+        final isVoteDisabled =
+            isBonusIndex || (hasVoted && votedArtist != artistIndex);
 
         return AnimatedBuilder(
           animation: slideAnim,
@@ -1353,7 +1632,7 @@ class _ArtistTrackPage extends StatelessWidget {
             isVoted:         isVotedForMe,
             isVoteDisabled:  isVoteDisabled,
             commentController: getCommentCtrl(trackIndex),
-            onVote:          isActive ? () => onVote(trackIndex) : null,
+            onVote:          isActive && !isBonusIndex ? () => onVote(trackIndex) : null,
             onCommentChanged: (text) => onCommentChanged(trackIndex, text),
             onTap:           () => onTrackTap(trackIndex, artistIndex),
           ),

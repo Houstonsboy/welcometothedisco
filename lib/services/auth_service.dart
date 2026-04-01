@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
+import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 
 class AuthService {
   final _auth        = FirebaseAuth.instance;
@@ -58,6 +59,7 @@ class AuthService {
           // Not a registered app user — undo both sign-ins immediately.
           await _auth.signOut();
           await _googleSignIn.signOut();
+          await UserProfileCacheService.clear();
           throw 'No account found for this Google email. Please sign up first.';
         }
       }
@@ -73,6 +75,7 @@ class AuthService {
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+    await UserProfileCacheService.clear();
   }
 
   // Call this only when the user explicitly wants to disconnect Spotify.

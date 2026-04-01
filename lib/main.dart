@@ -96,6 +96,7 @@ class _AuthGateState extends State<_AuthGate> {
     if (current != null) {
       _user = current;
       _initializing = false;
+      unawaited(FirebaseService.ensureCurrentUserProfileCached());
     }
     // Stream handles future sign-in / sign-out events.
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -104,6 +105,9 @@ class _AuthGateState extends State<_AuthGate> {
           _user = user;
           _initializing = false;
         });
+      }
+      if (user != null) {
+        unawaited(FirebaseService.ensureCurrentUserProfileCached());
       }
     });
   }

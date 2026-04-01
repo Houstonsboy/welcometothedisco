@@ -1,4 +1,6 @@
 // lib/services/firebase_service.dart
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -6,10 +8,39 @@ import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 
 class FirebaseService {
   static final _firestore = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
+
+  static Future<UserModel?> _fetchCurrentUserFromFirestore(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return null;
+      final user = UserModel.fromFirestore(doc.data()!, doc.id);
+      await UserProfileCacheService.saveUser(user);
+      return user;
+    } catch (e) {
+      debugPrint('[FirebaseService] _fetchCurrentUserFromFirestore($uid) failed: $e');
+      return null;
+    }
+  }
+
+  /// Ensures secure-storage cache exists for the authenticated user.
+  /// If cache is missing (e.g. app storage cleared), it refetches from Firestore.
+  static Future<void> ensureCurrentUserProfileCached() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.trim().isEmpty) return;
+
+    final cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    if (cached != null) return;
+
+    debugPrint(
+      '[FirebaseService] user profile cache missing; refetching from Firestore for uid=$uid',
+    );
+    await _fetchCurrentUserFromFirestore(uid);
+  }
 
   // ── Fetch user by UID ─────────────────────────────────────────────────────
   static Future<UserModel?> getUserById(String uid) async {
@@ -28,23 +59,40 @@ class FirebaseService {
   static Future<UserModel?> getCurrentUser() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
-    return getUserById(uid);
+    final cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    if (cached != null) {
+      // Refresh cache in background so data self-heals if profile changed.
+      unawaited(_fetchCurrentUserFromFirestore(uid));
+      return cached;
+    }
+    return _fetchCurrentUserFromFirestore(uid);
   }
 
   // ── Live stream of current user's document ────────────────────────────────
   /// Emits a new [UserModel] whenever the user's Firestore doc changes —
   /// friends list, username, avatar, etc. update in real-time with no
   /// extra fetch needed.
-  static Stream<UserModel?> getCurrentUserStream() {
+  static Stream<UserModel?> getCurrentUserStream() async* {
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return Stream.value(null);
-    return _firestore
+    if (uid == null) {
+      yield null;
+      return;
+    }
+
+    final cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    if (cached != null) {
+      yield cached;
+    }
+
+    yield* _firestore
         .collection('users')
         .doc(uid)
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
           if (!snap.exists || snap.data() == null) return null;
-          return UserModel.fromFirestore(snap.data()!, snap.id);
+          final user = UserModel.fromFirestore(snap.data()!, snap.id);
+          await UserProfileCacheService.saveUser(user);
+          return user;
         });
   }
 
@@ -855,6 +903,154 @@ class FirebaseService {
     await _firestore.collection('versus').doc(documentId).delete();
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // POLLS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Upserts a poll document for an artist versus session.
+  ///
+  /// Doc ID is deterministic: `{versusId}_{voterId}` — guarantees one doc
+  /// per voter per versus, and makes the existence check a direct get()
+  /// rather than a query (cheaper, faster).
+  ///
+  /// Called on every debounced vote tap. Uses set() with merge:false on
+  /// creation, update() on subsequent taps — so only changed fields are
+  /// sent on updates, keeping write costs minimal.
+  static Future<void> upsertArtistPoll({
+    required String versusId,
+    required String voterId,
+    required String voterName,
+    required String voterAvatar,
+    required String artist1ID,
+    required String artist1Name,
+    required int artist1Vote,
+    required String artist2ID,
+    required String artist2Name,
+    required int artist2Vote,
+    required Map<int, Map<String, dynamic>> trackDetails,
+    required double completionPercentage,
+    required int unvotedCount,
+  }) async {
+    final versusIdTrim = versusId.trim();
+    final voterIdTrim = voterId.trim();
+    if (versusIdTrim.isEmpty) {
+      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty versusId');
+      return;
+    }
+    if (voterIdTrim.isEmpty) {
+      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty voterId');
+      return;
+    }
+
+    // Deterministic doc ID — direct get, no query needed.
+    final docId = '${versusIdTrim}_$voterIdTrim';
+    final ref = _firestore.collection('polls').doc(docId);
+    debugPrint('[FirebaseService] voting pollID: $docId');
+
+    // Firestore requires string keys in maps.
+    final trackMap = {
+      for (final e in trackDetails.entries) '${e.key}': e.value,
+    };
+
+    try {
+      final snap = await ref.get();
+
+      if (!snap.exists) {
+        // ── First vote: write full document ──────────────────────────────
+        await ref.set({
+          'versus_id': versusIdTrim,
+          'voter_id': voterIdTrim,
+          'voter_name': voterName.trim(),
+          'voter_avatar': voterAvatar.trim(),
+          'timestamp': FieldValue.serverTimestamp(),
+          'artist1ID': artist1ID.trim(),
+          'artist1Name': artist1Name.trim(),
+          'artist1Vote': artist1Vote,
+          'artist2ID': artist2ID.trim(),
+          'artist2Name': artist2Name.trim(),
+          'artist2Vote': artist2Vote,
+          'completion_percentage': completionPercentage,
+          'unvoted_count': unvotedCount,
+          'track_details': trackMap,
+        });
+        debugPrint('[FirebaseService] upsertArtistPoll → created $docId');
+      } else {
+        // ── Subsequent vote: only update fields that change ──────────────
+        await ref.update({
+          'artist1Vote': artist1Vote,
+          'artist2Vote': artist2Vote,
+          'completion_percentage': completionPercentage,
+          'unvoted_count': unvotedCount,
+          'track_details': trackMap,
+        });
+        debugPrint('[FirebaseService] upsertArtistPoll → updated $docId');
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] upsertArtistPoll($docId) failed: $e');
+    }
+  }
+
+  // ── Fetch existing poll for this voter + versus ───────────────────────────
+  /// Returns the raw poll document data if it exists, null otherwise.
+  /// Used by [ArtistVersusPlayground] to restore a voter's previous session.
+  static Future<Map<String, dynamic>?> getExistingArtistPoll({
+    required String versusId,
+    required String voterId,
+  }) async {
+    final vId = versusId.trim();
+    final uId = voterId.trim();
+    if (vId.isEmpty || uId.isEmpty) return null;
+
+    try {
+      final doc = await _firestore.collection('polls').doc('${vId}_$uId').get();
+      if (!doc.exists || doc.data() == null) return null;
+      debugPrint('[FirebaseService] getExistingArtistPoll → found ${vId}_$uId');
+      return doc.data();
+    } catch (e) {
+      debugPrint('[FirebaseService] getExistingArtistPoll failed: $e');
+      return null;
+    }
+  }
+
+  static Future<void> upsertAlbumPoll({
+    required String versusId,
+    required String voterId,
+    required String voterName,
+    required String voterAvatar,
+    required String album1ID,
+    required String album1Name,
+    required int album1Vote,
+    required String album2ID,
+    required String album2Name,
+    required int album2Vote,
+    required Map<int, Map<String, dynamic>> trackDetails,
+    required double completionPercentage,
+    required int unvotedCount,
+  }) async {
+    final docId = '${versusId.trim()}_${voterId.trim()}';
+    if (docId.trim().isEmpty) return;
+    debugPrint('[FirebaseService] voting pollID: $docId');
+    await _firestore.collection('polls').doc(docId).set({
+      'Versus_id': versusId.trim(),
+      'Voter_id': voterId.trim(),
+      'Voter_name': voterName.trim(),
+      'Voter_avatar': voterAvatar.trim(),
+      'timestamp': FieldValue.serverTimestamp(),
+      'album1ID': album1ID.trim(),
+      'album1Name': album1Name.trim(),
+      'album1_vote': album1Vote,
+      'album2ID': album2ID.trim(),
+      'album2Name': album2Name.trim(),
+      'album2_vote': album2Vote,
+      'Completion_percentage': completionPercentage,
+      'Unvoted_count': unvotedCount,
+      'Track_details': {
+        for (final e in trackDetails.entries) e.key.toString(): e.value,
+      },
+      'poll_type': 'album',
+    }, SetOptions(merge: true));
+  }
+
   // ── Search users by username (prefix match, case-insensitive) ────────────
   /// All usernames are stored lowercase, so lowercasing the query gives
   /// case-insensitive prefix search with no extra Firestore index needed.
@@ -943,6 +1139,9 @@ class FirebaseService {
       'bio': bio,
       'avatar_path': avatarPath,
     }, SetOptions(merge: true));
+    if (_auth.currentUser?.uid == uid) {
+      await _fetchCurrentUserFromFirestore(uid);
+    }
   }
 
   // ── Update current user's editable profile fields ─────────────────────────
@@ -959,5 +1158,6 @@ class FirebaseService {
       'bio': bio.trim(),
       'avatar_path': avatarPath.trim(),
     }, SetOptions(merge: true));
+    await _fetchCurrentUserFromFirestore(uid);
   }
 }

@@ -20,13 +20,17 @@ class ArtistLockeroom extends StatelessWidget {
     return ArtistSearchScreen(
       onCreateVersus: (artist1, artist2, selectedTracks1, selectedTracks2) async {
         try {
-          await FirebaseService.createArtistVersus(
+          final createdVersusId = await FirebaseService.createArtistVersus(
             artist1ID:       artist1.id,
             artist1Name:     artist1.name,
             artist1TrackIDs: selectedTracks1.map((t) => t.id).toList(),
             artist2ID:       artist2.id,
             artist2Name:     artist2.name,
             artist2TrackIDs: selectedTracks2.map((t) => t.id).toList(),
+          );
+          debugPrint(
+            '[ArtistLockeroom] createArtistVersus success | versus_id: '
+            '${createdVersusId.trim().isEmpty ? '(missing)' : createdVersusId}',
           );
           if (context.mounted) Navigator.of(context).pop();
         } catch (e) {

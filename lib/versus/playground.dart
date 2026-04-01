@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
@@ -14,8 +19,13 @@ const _kSpotifyGreen  = AppTheme.spotifyGreen;
 
 class VersusPlayground extends StatefulWidget {
   final VersusModel versus;
+  final String? versusId;
 
-  const VersusPlayground({super.key, required this.versus});
+  const VersusPlayground({
+    super.key,
+    required this.versus,
+    this.versusId,
+  });
 
   @override
   State<VersusPlayground> createState() => _VersusPlaygroundState();
@@ -24,6 +34,11 @@ class VersusPlayground extends StatefulWidget {
 class _VersusPlaygroundState extends State<VersusPlayground>
     with TickerProviderStateMixin {
   final SpotifyApi _api = SpotifyApi();
+  String get _resolvedVersusId {
+    final routeId = widget.versusId?.trim() ?? '';
+    if (routeId.isNotEmpty) return routeId;
+    return widget.versus.id.trim();
+  }
 
   late final Future<List<SpotifyAlbumWithTracks?>> _albumsFuture;
   late final AnimationController _pulseController;
@@ -56,6 +71,34 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   /// At each track index, which album was voted: 0 = album1, 1 = album2.
   /// Only one vote per index (toggle: voting for one disables the other).
   final Map<int, int> _votesByIndex = {};
+  final Map<int, VoteTrackDetailModel> _trackDetails = {};
+
+  String _voterId = '';
+  String _voterName = '';
+  String _voterAvatar = '';
+  Timer? _pollDebounce;
+
+  int get _pairedRoundCount {
+    final albums = _albums;
+    return math.min(
+      albums?[0]?.tracks.length ?? 0,
+      albums?[1]?.tracks.length ?? 0,
+    );
+  }
+
+  int? get _longerSideAlbumIndex {
+    final albums = _albums;
+    final a1 = albums?[0]?.tracks.length ?? 0;
+    final a2 = albums?[1]?.tracks.length ?? 0;
+    if (a1 == a2) return null;
+    return a1 > a2 ? 0 : 1;
+  }
+
+  bool get _isVotingCompleteForPairs =>
+      _votesByIndex.length >= _pairedRoundCount;
+
+  int get _bonusVoteForLongerSide =>
+      (_longerSideAlbumIndex != null && _isVotingCompleteForPairs) ? 1 : 0;
 
   // extracted palette colors — start with defaults
   Color _color1 = _kDefaultColor1;
@@ -64,10 +107,16 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   @override
   void initState() {
     super.initState();
+    final versusId = _resolvedVersusId;
+    debugPrint(
+      '[VersusPlayground] opened | versus_id: '
+      '${versusId.isEmpty ? '(missing)' : versusId}',
+    );
     _albumsFuture = _api.getBothAlbumsWithTracks(
       widget.versus.album1ID,
       widget.versus.album2ID,
     );
+    unawaited(_hydrateVoterContext());
 
     _albumsFuture.then((list) {
       if (!mounted || list == null || list.length < 2) return;
@@ -76,6 +125,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
         list[1]?.imageUrl ?? widget.versus.album2ImageUrl,
       );
+      _logVoteTemplateSnapshot('albums-loaded');
     });
 
     _pageController = PageController();
@@ -100,6 +150,89 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     );
 
     _slideController.forward();
+  }
+
+  Future<void> _hydrateVoterContext() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+    if (uid.isEmpty) return;
+
+    var cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    if (cached == null) {
+      await FirebaseService.ensureCurrentUserProfileCached();
+      cached = await UserProfileCacheService.readUser(expectedUid: uid);
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _voterId = uid;
+      _voterName = cached?.username.trim() ?? '';
+      _voterAvatar = cached?.avatarPath.trim() ?? '';
+    });
+    _logVoteTemplateSnapshot('voter-context-ready');
+  }
+
+  int get _album1VoteCount {
+    final base = _votesByIndex.values.where((v) => v == 0).length;
+    final bonus = _longerSideAlbumIndex == 0 ? _bonusVoteForLongerSide : 0;
+    return base + bonus;
+  }
+
+  int get _album2VoteCount {
+    final base = _votesByIndex.values.where((v) => v == 1).length;
+    final bonus = _longerSideAlbumIndex == 1 ? _bonusVoteForLongerSide : 0;
+    return base + bonus;
+  }
+
+  VoteDocTemplateModel _buildVoteTemplateDoc() {
+    final albums = _albums;
+    final totalRounds = _pairedRoundCount;
+    final votedCount = _votesByIndex.length;
+    final unvoted = totalRounds > votedCount ? totalRounds - votedCount : 0;
+    final completion = totalRounds == 0
+        ? 0.0
+        : ((votedCount / totalRounds) * 100).clamp(0, 100).toDouble();
+
+    final details = <int, VoteTrackDetailModel>{..._trackDetails};
+    final longerIndex = _longerSideAlbumIndex;
+    if (albums != null && longerIndex != null) {
+      final longerTracks = albums[longerIndex]?.tracks ?? const <SpotifyAlbumTrack>[];
+      for (int i = _pairedRoundCount; i < longerTracks.length; i++) {
+        final t = longerTracks[i];
+        details[i] = VoteTrackDetailModel(
+          artist1trackID: longerIndex == 0 ? t.id : null,
+          artist2trackID: longerIndex == 1 ? t.id : null,
+          winner: t.id,
+          voterComment: '',
+          artist1trackName: longerIndex == 0 ? t.name : null,
+          artist2trackName: longerIndex == 1 ? t.name : null,
+          isBonus: true,
+        );
+      }
+    }
+
+    return VoteDocTemplateModel.album(
+      versusId: _resolvedVersusId,
+      voterId: _voterId,
+      voterName: _voterName,
+      voterAvatar: _voterAvatar,
+      timestamp: DateTime.now().toUtc(),
+      album1ID: widget.versus.album1ID,
+      album1Name: widget.versus.album1Name,
+      album1Vote: _album1VoteCount,
+      album2ID: widget.versus.album2ID,
+      album2Name: widget.versus.album2Name,
+      album2Vote: _album2VoteCount,
+      completionPercentage: completion,
+      unvotedCount: unvoted,
+      trackDetails: details,
+    );
+  }
+
+  void _logVoteTemplateSnapshot(String reason) {
+    final payload = _buildVoteTemplateDoc();
+    debugPrint(
+      '[VersusPlayground][$reason] vote_doc_template=${jsonEncode(payload.toMap())}',
+    );
   }
 
   Future<void> _extractPalette(String? url1, String? url2) async {
@@ -131,6 +264,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   @override
   void dispose() {
+    _pollDebounce?.cancel();
     _nowPlayingSub?.cancel();
     _pulseController.dispose();
     _slideController.dispose();
@@ -281,13 +415,60 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   }
 
   void _onVote(int trackIndex, int albumIndex) {
+    if (trackIndex >= _pairedRoundCount) return;
+    final albums = _albums;
+    final t1 = albums?[0]?.tracks.elementAtOrNull(trackIndex);
+    final t2 = albums?[1]?.tracks.elementAtOrNull(trackIndex);
+    if (t1 == null || t2 == null) return;
     setState(() {
       if (_votesByIndex[trackIndex] == albumIndex) {
         _votesByIndex.remove(trackIndex);
+        _trackDetails.remove(trackIndex);
       } else {
         _votesByIndex[trackIndex] = albumIndex;
+        _trackDetails[trackIndex] = VoteTrackDetailModel(
+          artist1trackID: t1.id,
+          artist2trackID: t2.id,
+          winner: albumIndex == 0 ? t1.id : t2.id,
+          voterComment: '',
+          artist1trackName: t1.name,
+          artist2trackName: t2.name,
+          isBonus: false,
+        );
       }
     });
+    _logVoteTemplateSnapshot('vote-updated-round-$trackIndex');
+    _schedulePollSync();
+  }
+
+  void _schedulePollSync() {
+    _pollDebounce?.cancel();
+    _pollDebounce = Timer(
+      const Duration(milliseconds: 800),
+      _syncPollToFirestore,
+    );
+  }
+
+  Future<void> _syncPollToFirestore() async {
+    if (_voterId.isEmpty || _resolvedVersusId.isEmpty) return;
+    final doc = _buildVoteTemplateDoc();
+    await FirebaseService.upsertAlbumPoll(
+      versusId: _resolvedVersusId,
+      voterId: _voterId,
+      voterName: _voterName,
+      voterAvatar: _voterAvatar,
+      album1ID: widget.versus.album1ID,
+      album1Name: widget.versus.album1Name,
+      album1Vote: _album1VoteCount,
+      album2ID: widget.versus.album2ID,
+      album2Name: widget.versus.album2Name,
+      album2Vote: _album2VoteCount,
+      trackDetails: {
+        for (final e in doc.trackDetails.entries) e.key: e.value.toMap(),
+      },
+      completionPercentage: doc.completionPercentage,
+      unvotedCount: doc.unvotedCount,
+    );
   }
 
   /// Tap any row to jump the active round to that index AND remember which
@@ -539,6 +720,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   accentColor: _color1,
                                   isVisible: _selectedAlbum == 0,
                                   activeTrackIndex: _activeTrackIndex,
+                                  votableRoundCount: _pairedRoundCount,
                                   voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
                                   onVote: (int albumIndex) => _onVote(_activeTrackIndex, albumIndex),
                                   onTrackTap: (trackIndex, albumIndex) =>
@@ -554,6 +736,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   accentColor: _color2,
                                   isVisible: _selectedAlbum == 1,
                                   activeTrackIndex: _activeTrackIndex,
+                                  votableRoundCount: _pairedRoundCount,
                                   voteAtActiveIndex: _votesByIndex[_activeTrackIndex],
                                   onVote: (int albumIndex) => _onVote(_activeTrackIndex, albumIndex),
                                   onTrackTap: (trackIndex, albumIndex) =>
@@ -801,6 +984,7 @@ class _TrackPage extends StatelessWidget {
   final Color accentColor;
   final bool isVisible;
   final int activeTrackIndex;
+  final int votableRoundCount;
   final int? voteAtActiveIndex; // null = no vote, 0/1 = voted for that album
   final void Function(int albumIndex) onVote;
   final void Function(int trackIndex, int albumIndex) onTrackTap;
@@ -815,6 +999,7 @@ class _TrackPage extends StatelessWidget {
     required this.accentColor,
     required this.isVisible,
     required this.activeTrackIndex,
+    required this.votableRoundCount,
     required this.voteAtActiveIndex,
     required this.onVote,
     required this.onTrackTap,
@@ -885,6 +1070,7 @@ class _TrackPage extends StatelessWidget {
         final isActive = trackIndex == activeTrackIndex;
         final isPast   = trackIndex < activeTrackIndex;
         final isLocked = trackIndex > activeTrackIndex;
+        final isBonusIndex = trackIndex >= votableRoundCount;
 
         return AnimatedBuilder(
           animation: slideAnim,
@@ -909,10 +1095,11 @@ class _TrackPage extends StatelessWidget {
             isLocked: isLocked,
             showVoteButton: isActive,
             isVoted: isActive && voteAtActiveIndex == albumIndex,
-            isVoteDisabled: isActive &&
-                voteAtActiveIndex != null &&
-                voteAtActiveIndex != albumIndex,
-            onVote: isActive ? () => onVote(albumIndex) : null,
+            isVoteDisabled: isBonusIndex ||
+                (isActive &&
+                    voteAtActiveIndex != null &&
+                    voteAtActiveIndex != albumIndex),
+            onVote: isActive && !isBonusIndex ? () => onVote(albumIndex) : null,
             onTap: () => onTrackTap(trackIndex, albumIndex),
           ),
         );

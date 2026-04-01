@@ -46,9 +46,17 @@ class _AlbumInboxTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
+          final selectedVersusId = versus.id.trim();
+          debugPrint(
+            '[InboxedSongs] navigating to VersusPlayground | versus_id: '
+            '${selectedVersusId.isEmpty ? '(missing)' : selectedVersusId}',
+          );
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => VersusPlayground(versus: versus),
+              builder: (_) => VersusPlayground(
+                versus: versus,
+                versusId: selectedVersusId,
+              ),
             ),
           );
         },
@@ -117,9 +125,17 @@ class _ArtistInboxTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
+          final selectedVersusId = artistVersus.id.trim();
+          debugPrint(
+            '[InboxedSongs] navigating to ArtistVersusPlayground | versus_id: '
+            '${selectedVersusId.isEmpty ? '(missing)' : selectedVersusId}',
+          );
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => ArtistVersusPlayground(versus: artistVersus),
+              builder: (_) => ArtistVersusPlayground(
+                versus: artistVersus,
+                versusId: selectedVersusId,
+              ),
             ),
           );
         },
