@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/playground.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const _kBlue = AppTheme.gradientStart;
@@ -200,19 +203,53 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
     if (_album1 == null || _album2 == null) return;
     setState(() => _isSaving = true);
     try {
-      await FirebaseService.createVersusFromLockeroom(
-        album1ID: _album1!.id,
-        album1Name: _album1!.name,
-        album2ID: _album2!.id,
-        album2Name: _album2!.name,
+      final album1 = _album1!;
+      final album2 = _album2!;
+      // Ranking stubs for both albums are ensured inside [FirebaseService.createVersusFromLockeroom]
+      // (see RANKINGS section there) using cached cover URLs for cards.
+      final versusId = await FirebaseService.createVersusFromLockeroom(
+        album1ID: album1.id,
+        album1Name: album1.name,
+        album2ID: album2.id,
+        album2Name: album2.name,
+        album1ImageUrl: album1.imageUrl ?? '',
+        album2ImageUrl: album2.imageUrl ?? '',
       );
-      if (mounted) {
-        _showSnack('Versus created!', _kBlue, Icons.check_circle_rounded);
-        setState(() {
-          _album1 = null;
-          _album2 = null;
-        });
-      }
+      if (!mounted) return;
+
+      final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+
+      final versus = VersusModel(
+        id: versusId,
+        type: 'album',
+        authorId: uid,
+        album1ID: album1.id,
+        album1Name: album1.name,
+        album2ID: album2.id,
+        album2Name: album2.name,
+        status: 'open',
+        album1Title: album1.name,
+        album2Title: album2.name,
+        album1ArtistName: album1.artistName,
+        album2ArtistName: album2.artistName,
+        album1ImageUrl: album1.imageUrl,
+        album2ImageUrl: album2.imageUrl,
+      );
+
+      _showSnack('Versus created!', _kBlue, Icons.check_circle_rounded);
+      setState(() {
+        _album1 = null;
+        _album2 = null;
+      });
+
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VersusPlayground(
+            versus: versus,
+            versusId: versusId.trim(),
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted) _showSnack('Error: $e', _kPink, Icons.error_rounded);
     } finally {

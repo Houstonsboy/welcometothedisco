@@ -35,6 +35,7 @@ class CollaboratorLockeroom extends StatelessWidget {
       onCreateVersus:
           (artist1, artist2, selectedTracks1, authorComment) async {
         try {
+          // Initial `rankings/{artistId}` stubs: [FirebaseService.createCollaboratorVersus] → [createArtistVersus].
           await FirebaseService.createCollaboratorVersus(
             artist1ID:       artist1.id,
             artist1Name:     artist1.name,
@@ -43,6 +44,8 @@ class CollaboratorLockeroom extends StatelessWidget {
             artist2Name:     artist2?.name ?? '',
             artist2TrackIDs: [],   // collaborator fills this in later
             authorComment:   authorComment,
+            artist1ImageUrl: artist1.imageUrl ?? '',
+            artist2ImageUrl: artist2?.imageUrl ?? '',
           );
           if (context.mounted) Navigator.of(context).pop();
         } catch (e) {
@@ -1278,6 +1281,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
             artist1TrackIDs: _selectedTracks1.map((t) => t.id).toList(),
             artist2ID: artist2?.id,
             artist2Name: artist2?.name,
+            artist1ImageUrl: artist1.imageUrl ?? '',
+            artist2ImageUrl: artist2?.imageUrl ?? '',
             authorComment: authorComment,
             collaboratorUID: selectedFriend?.uid,
             collaboratorUsername: selectedFriend?.username,

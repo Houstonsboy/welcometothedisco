@@ -18,6 +18,11 @@ const _kDefaultColor1 = AppTheme.gradientStart;
 const _kDefaultColor2 = AppTheme.gradientEnd;
 const _kSpotifyGreen  = AppTheme.spotifyGreen;
 
+// Ranking: first-time `rankings/{spotifyArtistId}` documents are created when a versus
+// is saved from the artist lockeroom / collaborator flows — see
+// [FirebaseService.createArtistVersus] and [FirebaseService.ensureRankingDocIfAbsent]
+// (RANKINGS section in firebase_service.dart). This screen only consumes versus + polls.
+
 // ── Track Vote Detail ─────────────────────────────────────────────────────────
 /// Represents a fully captured vote for a single round (index).
 class TrackVoteDetail {

@@ -20,6 +20,7 @@ class ArtistLockeroom extends StatelessWidget {
     return ArtistSearchScreen(
       onCreateVersus: (artist1, artist2, selectedTracks1, selectedTracks2) async {
         try {
+          // Initial `rankings/{artistId}` docs (if missing) are created in [FirebaseService.createArtistVersus].
           final createdVersusId = await FirebaseService.createArtistVersus(
             artist1ID:       artist1.id,
             artist1Name:     artist1.name,
@@ -27,6 +28,8 @@ class ArtistLockeroom extends StatelessWidget {
             artist2ID:       artist2.id,
             artist2Name:     artist2.name,
             artist2TrackIDs: selectedTracks2.map((t) => t.id).toList(),
+            artist1ImageUrl: artist1.imageUrl ?? '',
+            artist2ImageUrl: artist2.imageUrl ?? '',
           );
           debugPrint(
             '[ArtistLockeroom] createArtistVersus success | versus_id: '

@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
+import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
@@ -377,18 +378,126 @@ class FirebaseService {
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // RANKINGS — initial entity stubs (`rankings/{spotifyEntityId}`)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Each Spotify artist or album can have one document in [rankings], keyed by
+  // the same ID used in versus docs. We only perform a full-document [set] here
+  // when that doc does not exist yet (first time the entity appears in any
+  // versus). Ongoing vote / head-to-head updates must use atomic
+  // [FieldValue.increment] and dotted [update] paths — not read-modify-write of
+  // the whole document (see [RankingModel] and future [updateRankingsFromPoll]).
+  //
+  // Called from: [createVersus], [createArtistVersus], [createCollaborationInvite],
+  // plus [joinArtistVersus], [acceptCollaborationInvite], [openCollaborationVersus]
+  // when an artist ID first appears on an existing versus doc.
+
+  /// Creates `rankings/{entityId}` with zeros + identity fields if missing.
+  static Future<void> ensureRankingDocIfAbsent({
+    required String entityId,
+    required String entityType,
+    required String entityName,
+    String entityImage = '',
+  }) async {
+    final id = entityId.trim();
+    if (id.isEmpty) return;
+
+    final type = entityType.trim().toLowerCase();
+    if (type != 'artist' && type != 'album') {
+      debugPrint(
+        '[FirebaseService] ensureRankingDocIfAbsent → skip: invalid entityType "$type"',
+      );
+      return;
+    }
+
+    final ref = _firestore.collection('rankings').doc(id);
+    try {
+      final snap = await ref.get();
+      if (snap.exists) return;
+
+      final model = RankingModel.newEntityStub(
+        entityId: id,
+        entityType: type,
+        entityName: entityName.trim().isEmpty ? 'Unknown' : entityName.trim(),
+        entityImage: entityImage.trim(),
+      );
+      await ref.set(model.toFirestore());
+      debugPrint('[FirebaseService] ensureRankingDocIfAbsent → created rankings/$id');
+    } catch (e) {
+      debugPrint('[FirebaseService] ensureRankingDocIfAbsent($id) failed: $e');
+    }
+  }
+
+  static Future<void> _ensureRankingStubsForAlbumPair({
+    required String album1ID,
+    required String album1Name,
+    String album1Image = '',
+    required String album2ID,
+    required String album2Name,
+    String album2Image = '',
+  }) async {
+    await Future.wait([
+      ensureRankingDocIfAbsent(
+        entityId: album1ID,
+        entityType: 'album',
+        entityName: album1Name,
+        entityImage: album1Image,
+      ),
+      ensureRankingDocIfAbsent(
+        entityId: album2ID,
+        entityType: 'album',
+        entityName: album2Name,
+        entityImage: album2Image,
+      ),
+    ]);
+  }
+
+  static Future<void> _ensureRankingStubsForArtists({
+    required String artist1ID,
+    required String artist1Name,
+    String artist1Image = '',
+    String artist2ID = '',
+    String artist2Name = '',
+    String artist2Image = '',
+  }) async {
+    final futures = <Future<void>>[
+      ensureRankingDocIfAbsent(
+        entityId: artist1ID,
+        entityType: 'artist',
+        entityName: artist1Name,
+        entityImage: artist1Image,
+      ),
+    ];
+    final id2 = artist2ID.trim();
+    if (id2.isNotEmpty) {
+      futures.add(
+        ensureRankingDocIfAbsent(
+          entityId: id2,
+          entityType: 'artist',
+          entityName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
+          entityImage: artist2Image,
+        ),
+      );
+    }
+    await Future.wait(futures);
+  }
+
   // ── Create album versus ───────────────────────────────────────────────────
-  static Future<void> createVersus({
+  /// Returns the new versus document ID.
+  static Future<String> createVersus({
     required String type,
     required String album1ID,
     required String album1Name,
     required String album2ID,
     required String album2Name,
+    String album1ImageUrl = '',
+    String album2ImageUrl = '',
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
 
-    await _firestore.collection('versus').add({
+    final ref = await _firestore.collection('versus').add({
       'type': type,
       'status': 'open',
       'Author': uid,
@@ -398,20 +507,36 @@ class FirebaseService {
       'album2Name': album2Name,
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    await _ensureRankingStubsForAlbumPair(
+      album1ID: album1ID.trim(),
+      album1Name: album1Name.trim(),
+      album1Image: album1ImageUrl.trim(),
+      album2ID: album2ID.trim(),
+      album2Name: album2Name.trim(),
+      album2Image: album2ImageUrl.trim(),
+    );
+
+    return ref.id;
   }
 
-  static Future<void> createVersusFromLockeroom({
+  /// Returns the new versus document ID.
+  static Future<String> createVersusFromLockeroom({
     required String album1ID,
     required String album1Name,
     required String album2ID,
     required String album2Name,
-  }) async {
-    await createVersus(
+    String album1ImageUrl = '',
+    String album2ImageUrl = '',
+  }) {
+    return createVersus(
       type: 'album',
       album1ID: album1ID.trim(),
       album1Name: album1Name.trim(),
       album2ID: album2ID.trim(),
       album2Name: album2Name.trim(),
+      album1ImageUrl: album1ImageUrl,
+      album2ImageUrl: album2ImageUrl,
     );
   }
 
@@ -484,6 +609,8 @@ class FirebaseService {
     required String artist2Name,
     required List<String> artist2TrackIDs,
     String? authorComment,
+    String artist1ImageUrl = '',
+    String artist2ImageUrl = '',
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -507,6 +634,16 @@ class FirebaseService {
         await _firestore.collection('versus').add(model.toFirestore());
 
     debugPrint('[FirebaseService] createArtistVersus → doc: ${ref.id}');
+
+    await _ensureRankingStubsForArtists(
+      artist1ID: model.artist1ID,
+      artist1Name: model.artist1Name,
+      artist1Image: artist1ImageUrl,
+      artist2ID: model.artist2ID,
+      artist2Name: model.artist2Name,
+      artist2Image: artist2ImageUrl,
+    );
+
     return ref.id;
   }
 
@@ -520,6 +657,8 @@ class FirebaseService {
     required String artist2Name,
     required List<String> artist2TrackIDs,
     String? authorComment,
+    String artist1ImageUrl = '',
+    String artist2ImageUrl = '',
   }) {
     return createArtistVersus(
       artist1ID: artist1ID,
@@ -529,6 +668,8 @@ class FirebaseService {
       artist2Name: artist2Name,
       artist2TrackIDs: artist2TrackIDs,
       authorComment: authorComment,
+      artist1ImageUrl: artist1ImageUrl,
+      artist2ImageUrl: artist2ImageUrl,
     );
   }
 
@@ -546,6 +687,8 @@ class FirebaseService {
     // Collaborator's artist (nullable — may not be chosen yet)
     String? artist2ID,
     String? artist2Name,
+    String artist1ImageUrl = '',
+    String artist2ImageUrl = '',
     // Author note from the comment strip
     String? authorComment,
     // Selected recipient from invite banner (nullable)
@@ -597,6 +740,15 @@ class FirebaseService {
     final ref = await _firestore.collection('versus').add(versusData);
     final versusID = ref.id;
     debugPrint('[FirebaseService] createCollaborationInvite → doc: $versusID');
+
+    await _ensureRankingStubsForArtists(
+      artist1ID: artist1ID.trim(),
+      artist1Name: artist1Name.trim(),
+      artist1Image: artist1ImageUrl,
+      artist2ID: artist2ID?.trim() ?? '',
+      artist2Name: artist2Name?.trim() ?? '',
+      artist2Image: artist2ImageUrl,
+    );
 
     // ── 2. Send invite notification if a recipient was chosen ─────────────────
     if (collaboratorUID != null && collaboratorUID.trim().isNotEmpty) {
@@ -764,6 +916,13 @@ class FirebaseService {
 
     debugPrint(
         '[FirebaseService] joinArtistVersus → $documentId claimed by $uid');
+
+    await ensureRankingDocIfAbsent(
+      entityId: artist2ID,
+      entityType: 'artist',
+      entityName: artist2Name,
+      entityImage: '',
+    );
   }
 
   // ── Collaboration: invitee confirms artist2 + tracks ─────────────────────
@@ -846,6 +1005,13 @@ class FirebaseService {
 
     debugPrint(
         '[FirebaseService] acceptCollaborationInvite → $versusID by $uid');
+
+    await ensureRankingDocIfAbsent(
+      entityId: editedArtistID.trim(),
+      entityType: 'artist',
+      entityName: editedArtistName.trim(),
+      entityImage: '',
+    );
   }
 
   // ── Author finalizes tracks after invite (stays incomplete until collaborator) ─
@@ -877,6 +1043,16 @@ class FirebaseService {
     await _firestore.collection('versus').doc(versusID).update(data);
     debugPrint(
         '[FirebaseService] openCollaborationVersus → $versusID (author tracks; status stays incomplete)');
+
+    final id2 = artist2ID?.trim() ?? '';
+    if (id2.isNotEmpty) {
+      await ensureRankingDocIfAbsent(
+        entityId: id2,
+        entityType: 'artist',
+        entityName: (artist2Name ?? '').trim(),
+        entityImage: '',
+      );
+    }
   }
 
   // ── Update status ─────────────────────────────────────────────────────────

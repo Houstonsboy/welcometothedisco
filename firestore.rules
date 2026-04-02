@@ -91,6 +91,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && isVersusAuthor();
     }
 
+    // Rankings: one doc per Spotify artist or album (`rankings/{spotifyEntityId}`).
+    // Initial stub is created client-side when an entity first appears in a versus;
+    // later updates should use atomic increments / dotted paths, not full overwrites.
+    match /rankings/{entityId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.get('entity_id', '') == entityId
+        && (request.resource.data.get('entity_type', '') == 'artist'
+            || request.resource.data.get('entity_type', '') == 'album');
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // Polls: one poll doc per voter per versus, keyed as {versus_id}_{voter_id}.
     match /polls/{pollId} {
       function isAuthed() {
