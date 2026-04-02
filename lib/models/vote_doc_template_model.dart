@@ -30,6 +30,7 @@ class VoteTrackDetailModel {
 
 class VoteDocTemplateModel {
   final String versusId;
+  final String versusType;
   final String voterId;
   final String voterName;
   final String voterAvatar;
@@ -49,6 +50,7 @@ class VoteDocTemplateModel {
 
   const VoteDocTemplateModel({
     required this.versusId,
+    required this.versusType,
     required this.voterId,
     required this.voterName,
     required this.voterAvatar,
@@ -67,6 +69,7 @@ class VoteDocTemplateModel {
 
   factory VoteDocTemplateModel.artist({
     required String versusId,
+    required String versusType,
     required String voterId,
     required String voterName,
     required String voterAvatar,
@@ -83,6 +86,7 @@ class VoteDocTemplateModel {
   }) {
     return VoteDocTemplateModel(
       versusId: versusId,
+      versusType: versusType,
       voterId: voterId,
       voterName: voterName,
       voterAvatar: voterAvatar,
@@ -102,6 +106,7 @@ class VoteDocTemplateModel {
 
   factory VoteDocTemplateModel.album({
     required String versusId,
+    required String versusType,
     required String voterId,
     required String voterName,
     required String voterAvatar,
@@ -118,6 +123,7 @@ class VoteDocTemplateModel {
   }) {
     return VoteDocTemplateModel(
       versusId: versusId,
+      versusType: versusType,
       voterId: voterId,
       voterName: voterName,
       voterAvatar: voterAvatar,
@@ -137,6 +143,7 @@ class VoteDocTemplateModel {
 
   Map<String, dynamic> toMap() => {
         'Versus_id': versusId,
+        'Versus_type': versusType,
         'Voter_id': voterId,
         'Voter_name': voterName,
         'Voter_avatar': voterAvatar,
@@ -144,17 +151,17 @@ class VoteDocTemplateModel {
         if (isArtistTemplate) ...{
           'artist1ID': side1Id,
           'artist1Name': side1Name,
-          'artist1_vote': side1Vote,
+          'artist1Vote': side1Vote,
           'artist2ID': side2Id,
           'artist2Name': side2Name,
-          'artist2_vote': side2Vote,
+          'artist2Vote': side2Vote,
         } else ...{
           'album1ID': side1Id,
           'album1Name': side1Name,
-          'album1_vote': side1Vote,
+          'album1Vote': side1Vote,
           'album2ID': side2Id,
           'album2Name': side2Name,
-          'album2_vote': side2Vote,
+          'album2Vote': side2Vote,
         },
         'Completion_percentage': completionPercentage,
         'Unvoted_count': unvotedCount,

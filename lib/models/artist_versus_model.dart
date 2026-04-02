@@ -24,6 +24,9 @@ class ArtistVersusModel {
   // ── Firestore identity ────────────────────────────────────────────────────
   final String id;
 
+  /// Firestore `type` field (e.g. `artist`, `collaboration`).
+  final String type;
+
   // ── Artist 1 ──────────────────────────────────────────────────────────────
   final String artist1ID;
   final String artist1Name;
@@ -73,6 +76,7 @@ class ArtistVersusModel {
 
   ArtistVersusModel({
     required this.id,
+    this.type = 'artist',
     required this.artist1ID,
     required this.artist1Name,
     required this.artist1TrackIDs,
@@ -102,6 +106,9 @@ class ArtistVersusModel {
       Map<String, dynamic> data, String id) {
     return ArtistVersusModel(
       id: id,
+      type: (data['type'] as String?)?.trim().isNotEmpty == true
+          ? (data['type'] as String).trim()
+          : 'artist',
       artist1ID: (data['artist1ID'] as String?)?.trim() ?? '',
       artist1Name: (data['artist1Name'] as String?)?.trim() ?? '',
       artist1TrackIDs: _parseStringList(data['artist1TrackIDs']),
@@ -126,7 +133,7 @@ class ArtistVersusModel {
   /// Runtime-hydrated fields (images, track objects, user models) are excluded.
   Map<String, dynamic> toFirestore() {
     return {
-      'type': 'artist',
+      'type': type,
       'artist1ID': artist1ID,
       'artist1Name': artist1Name,
       'artist1TrackIDs': artist1TrackIDs,

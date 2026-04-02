@@ -351,6 +351,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
     return VoteDocTemplateModel.artist(
       versusId: _resolvedVersusId,
+      versusType: _versus.type,
       voterId: _voterId,
       voterName: _voterName,
       voterAvatar: _voterAvatar,
@@ -528,6 +529,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     final doc = _buildVoteTemplateDoc();
     await FirebaseService.upsertArtistPoll(
       versusId: _resolvedVersusId,
+      versusType: _versus.type,
       voterId: _voterId,
       voterName: _voterName,
       voterAvatar: _voterAvatar,

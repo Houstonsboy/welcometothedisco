@@ -918,6 +918,7 @@ class FirebaseService {
   /// sent on updates, keeping write costs minimal.
   static Future<void> upsertArtistPoll({
     required String versusId,
+    required String versusType,
     required String voterId,
     required String voterName,
     required String voterAvatar,
@@ -932,9 +933,14 @@ class FirebaseService {
     required int unvotedCount,
   }) async {
     final versusIdTrim = versusId.trim();
+    final versusTypeTrim = versusType.trim();
     final voterIdTrim = voterId.trim();
     if (versusIdTrim.isEmpty) {
       debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty versusId');
+      return;
+    }
+    if (versusTypeTrim.isEmpty) {
+      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty versusType');
       return;
     }
     if (voterIdTrim.isEmpty) {
@@ -959,6 +965,7 @@ class FirebaseService {
         // ── First vote: write full document ──────────────────────────────
         await ref.set({
           'versus_id': versusIdTrim,
+          'Versus_type': versusTypeTrim,
           'voter_id': voterIdTrim,
           'voter_name': voterName.trim(),
           'voter_avatar': voterAvatar.trim(),
@@ -982,6 +989,7 @@ class FirebaseService {
           'completion_percentage': completionPercentage,
           'unvoted_count': unvotedCount,
           'track_details': trackMap,
+          'Versus_type': versusTypeTrim,
         });
         debugPrint('[FirebaseService] upsertArtistPoll → updated $docId');
       }
@@ -1014,6 +1022,7 @@ class FirebaseService {
 
   static Future<void> upsertAlbumPoll({
     required String versusId,
+    required String versusType,
     required String voterId,
     required String voterName,
     required String voterAvatar,
@@ -1027,28 +1036,94 @@ class FirebaseService {
     required double completionPercentage,
     required int unvotedCount,
   }) async {
-    final docId = '${versusId.trim()}_${voterId.trim()}';
-    if (docId.trim().isEmpty) return;
-    debugPrint('[FirebaseService] voting pollID: $docId');
-    await _firestore.collection('polls').doc(docId).set({
-      'Versus_id': versusId.trim(),
-      'Voter_id': voterId.trim(),
-      'Voter_name': voterName.trim(),
-      'Voter_avatar': voterAvatar.trim(),
-      'timestamp': FieldValue.serverTimestamp(),
-      'album1ID': album1ID.trim(),
-      'album1Name': album1Name.trim(),
-      'album1_vote': album1Vote,
-      'album2ID': album2ID.trim(),
-      'album2Name': album2Name.trim(),
-      'album2_vote': album2Vote,
-      'Completion_percentage': completionPercentage,
-      'Unvoted_count': unvotedCount,
-      'Track_details': {
-        for (final e in trackDetails.entries) e.key.toString(): e.value,
-      },
-      'poll_type': 'album',
-    }, SetOptions(merge: true));
+    final versusIdTrim = versusId.trim();
+    final versusTypeTrim = versusType.trim();
+    final voterIdTrim = voterId.trim();
+    if (versusIdTrim.isEmpty || voterIdTrim.isEmpty) return;
+    if (versusTypeTrim.isEmpty) return;
+
+    final docId = '${versusIdTrim}_$voterIdTrim';
+    final ref = _firestore.collection('polls').doc(docId);
+
+    final trackMap = {
+      for (final e in trackDetails.entries) '${e.key}': e.value,
+    };
+
+    try {
+      final snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({
+          'versus_id': versusIdTrim,
+          'Versus_type': versusTypeTrim,
+          'voter_id': voterIdTrim,
+          'voter_name': voterName.trim(),
+          'voter_avatar': voterAvatar.trim(),
+          'timestamp': FieldValue.serverTimestamp(),
+          'album1ID': album1ID.trim(),
+          'album1Name': album1Name.trim(),
+          'album1Vote': album1Vote,
+          'album2ID': album2ID.trim(),
+          'album2Name': album2Name.trim(),
+          'album2Vote': album2Vote,
+          'completion_percentage': completionPercentage,
+          'unvoted_count': unvotedCount,
+          'track_details': trackMap,
+        });
+        debugPrint('[FirebaseService] upsertAlbumPoll → created $docId');
+      } else {
+        await ref.update({
+          'album1Vote': album1Vote,
+          'album2Vote': album2Vote,
+          'completion_percentage': completionPercentage,
+          'unvoted_count': unvotedCount,
+          'track_details': trackMap,
+        });
+        debugPrint('[FirebaseService] upsertAlbumPoll → updated $docId');
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] upsertAlbumPoll($docId) failed: $e');
+    }
+  }
+
+  /// Fetches an existing album poll for session restore.
+  static Future<Map<String, dynamic>?> getExistingAlbumPoll({
+    required String versusId,
+    required String voterId,
+  }) async {
+    final vId = versusId.trim();
+    final uId = voterId.trim();
+    if (vId.isEmpty || uId.isEmpty) return null;
+    try {
+      final doc =
+          await _firestore.collection('polls').doc('${vId}_$uId').get();
+      if (!doc.exists || doc.data() == null) return null;
+      return doc.data();
+    } catch (e) {
+      debugPrint('[FirebaseService] getExistingAlbumPoll failed: $e');
+      return null;
+    }
+  }
+
+  // ── Fetch all polls by a voter (history / profile screen) ─────────────
+  static Future<List<Map<String, dynamic>>> getPollsByVoter({
+    required String voterId,
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    if (voterId.trim().isEmpty) return [];
+    try {
+      var query = _firestore
+          .collection('polls')
+          .where('voter_id', isEqualTo: voterId.trim())
+          .orderBy('timestamp', descending: true)
+          .limit(limit);
+      if (startAfter != null) query = query.startAfterDocument(startAfter);
+      final snap = await query.get();
+      return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    } catch (e) {
+      debugPrint('[FirebaseService] getPollsByVoter($voterId) failed: $e');
+      return [];
+    }
   }
 
   // ── Search users by username (prefix match, case-insensitive) ────────────
