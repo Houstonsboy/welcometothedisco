@@ -695,7 +695,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           await _showLongerTracksNoticeDialog();
           if (!mounted) return;
         }
-        Navigator.of(context).pop();
+        // Return versusId so the caller can refetch/refresh.
+        Navigator.of(context).pop(widget.versus.id);
       }
     } catch (e) {
       if (mounted) {

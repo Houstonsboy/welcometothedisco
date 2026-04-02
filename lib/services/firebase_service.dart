@@ -790,8 +790,8 @@ class FirebaseService {
 
       final data = snap.data()!;
       final type = (data['type'] as String?)?.trim() ?? '';
-      if (type != 'collaboration') {
-        throw Exception('Not a collaboration versus');
+      if (type != 'collaboration' && type != 'artist') {
+        throw Exception('Not a supported versus type for this update');
       }
 
       final authorId = (data['authorID'] as String?)?.trim() ?? '';

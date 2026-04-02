@@ -67,6 +67,7 @@ class ArtistVersusPlayground extends StatefulWidget {
 class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     with TickerProviderStateMixin {
   final SpotifyApi _api = SpotifyApi();
+  late ArtistVersusModel _versus;
   String get _resolvedVersusId {
     final routeId = widget.versusId?.trim() ?? '';
     if (routeId.isNotEmpty) return routeId;
@@ -156,6 +157,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   @override
   void initState() {
     super.initState();
+    _versus = widget.versus;
     final versusId = _resolvedVersusId;
     debugPrint(
       '[ArtistVersusPlayground] opened | versus_id: '
@@ -353,11 +355,11 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       voterName: _voterName,
       voterAvatar: _voterAvatar,
       timestamp: DateTime.now().toUtc(),
-      artist1ID: widget.versus.artist1ID,
-      artist1Name: widget.versus.artist1Name,
+      artist1ID: _versus.artist1ID,
+      artist1Name: _versus.artist1Name,
       artist1Vote: _artist1VoteCount,
-      artist2ID: widget.versus.artist2ID,
-      artist2Name: widget.versus.artist2Name,
+      artist2ID: _versus.artist2ID,
+      artist2Name: _versus.artist2Name,
       artist2Vote: _artist2VoteCount,
       completionPercentage: completion,
       unvotedCount: unvoted,
@@ -377,10 +379,10 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     setState(() { _isLoadingTracks = true; _loadError = null; });
     try {
       final results = await Future.wait([
-        _api.getTracksByIds(widget.versus.artist1TrackIDs),
-        _api.getTracksByIds(widget.versus.artist2TrackIDs),
-        _api.getArtistDetails(widget.versus.artist1ID),
-        _api.getArtistDetails(widget.versus.artist2ID),
+        _api.getTracksByIds(_versus.artist1TrackIDs),
+        _api.getTracksByIds(_versus.artist2TrackIDs),
+        _api.getArtistDetails(_versus.artist1ID),
+        _api.getArtistDetails(_versus.artist2ID),
       ]);
 
       final tracks1  = results[0] as List<SpotifyTrack>;
@@ -529,11 +531,11 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       voterId: _voterId,
       voterName: _voterName,
       voterAvatar: _voterAvatar,
-      artist1ID: widget.versus.artist1ID,
-      artist1Name: widget.versus.artist1Name,
+      artist1ID: _versus.artist1ID,
+      artist1Name: _versus.artist1Name,
       artist1Vote: _artist1VoteCount,
-      artist2ID: widget.versus.artist2ID,
-      artist2Name: widget.versus.artist2Name,
+      artist2ID: _versus.artist2ID,
+      artist2Name: _versus.artist2Name,
       artist2Vote: _artist2VoteCount,
       trackDetails: {
         for (final e in doc.trackDetails.entries) e.key: e.value.toMap(),
@@ -596,19 +598,44 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   bool get _canOpenEditBackroom {
     final uid = _currentUid;
     if (uid == null || uid.isEmpty) return false;
-    final isAuthor       = uid == widget.versus.authorID;
-    final isCollaborator = uid == (widget.versus.collaboratorID?.trim() ?? '');
+    final isAuthor       = uid == _versus.authorID;
+    final isCollaborator = uid == (_versus.collaboratorID?.trim() ?? '');
     return isAuthor || isCollaborator;
   }
 
   Future<void> _openEditBackroom() async {
     if (!_canOpenEditBackroom) return;
     final versusId = _resolvedVersusId;
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CollaboratorBackroom(versusID: versusId),
       ),
     );
+    if (!mounted) return;
+
+    // If the backroom updated the versus, refetch so track names/IDs are current.
+    if (result is String && result.trim() == versusId.trim()) {
+      await _refetchVersusAndReloadTracks();
+    }
+  }
+
+  Future<void> _refetchVersusAndReloadTracks() async {
+    if (_resolvedVersusId.isEmpty) return;
+    final fresh = await FirebaseService.getArtistVersusById(_resolvedVersusId);
+    if (!mounted || fresh == null) return;
+
+    setState(() {
+      _versus = fresh;
+      // Votes/comments tied to old track IDs may no longer match; reset UI state.
+      _votesByIndex.clear();
+      _trackDetails.clear();
+      for (final ctrl in _commentControllers.values) {
+        ctrl.clear();
+      }
+    });
+
+    await _loadData();
+    await _restoreExistingPoll();
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -742,10 +769,10 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authorLabel            = _playgroundAuthorLabel(widget.versus);
-    final avatarPath             = _playgroundAuthorAvatarPath(widget.versus);
-    final collaboratorLabel      = _playgroundCollaboratorLabel(widget.versus);
-    final collaboratorAvatarPath = _playgroundCollaboratorAvatarPath(widget.versus);
+    final authorLabel            = _playgroundAuthorLabel(_versus);
+    final avatarPath             = _playgroundAuthorAvatarPath(_versus);
+    final collaboratorLabel      = _playgroundCollaboratorLabel(_versus);
+    final collaboratorAvatarPath = _playgroundCollaboratorAvatarPath(_versus);
 
     return Container(
       decoration: AppTheme.backgroundDecoration,
@@ -995,7 +1022,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                       tracks:            _tracks1,
                       artistIndex:       0,
                       votableRoundCount: _pairedRoundCount,
-                      artistName:        widget.versus.artist1Name,
+                      artistName:        _versus.artist1Name,
                       artistImageUrl:    _artist1ImageUrl,
                       slideAnim:         _slideAnim,
                       accentColor:       _color1,
@@ -1010,7 +1037,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                       tracks:            _tracks2,
                       artistIndex:       1,
                       votableRoundCount: _pairedRoundCount,
-                      artistName:        widget.versus.artist2Name,
+                      artistName:        _versus.artist2Name,
                       artistImageUrl:    _artist2ImageUrl,
                       slideAnim:         _slideAnim,
                       accentColor:       _color2,
@@ -1196,7 +1223,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   Widget _buildVersusSideCommentStrip() {
     final isArtist1Side = _selectedArtist == 0;
     final accent = isArtist1Side ? _color1 : _color2;
-    final hasCollaborator = (widget.versus.collaboratorID?.trim().isNotEmpty ?? false);
+    final hasCollaborator =
+        (_versus.collaboratorID?.trim().isNotEmpty ?? false);
     final isSoloVersus = !hasCollaborator;
 
     final String userLabel;
@@ -1205,30 +1233,30 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
     if (isSoloVersus) {
       userLabel = '';
-      rawAvatar = _playgroundAuthorAvatarPath(widget.versus);
-      comment = widget.versus.authorComment?.trim();
+      rawAvatar = _playgroundAuthorAvatarPath(_versus);
+      comment = _versus.authorComment?.trim();
     } else if (isArtist1Side) {
-      userLabel = _playgroundAuthorLabel(widget.versus);
-      rawAvatar = _playgroundAuthorAvatarPath(widget.versus);
-      comment   = widget.versus.authorComment?.trim();
+      userLabel = _playgroundAuthorLabel(_versus);
+      rawAvatar = _playgroundAuthorAvatarPath(_versus);
+      comment   = _versus.authorComment?.trim();
     } else {
-      final cu = widget.versus.collaborator?.username.trim() ?? '';
+      final cu = _versus.collaborator?.username.trim() ?? '';
       if (cu.isNotEmpty) {
         userLabel = '@$cu';
       } else {
-        final du = widget.versus.collaboratorUsername?.trim() ?? '';
+        final du = _versus.collaboratorUsername?.trim() ?? '';
         userLabel = du.isNotEmpty
             ? '@$du'
-            : (widget.versus.collaboratorID ?? '—');
+            : (_versus.collaboratorID ?? '—');
       }
-      final ca = widget.versus.collaborator?.avatarPath.trim() ?? '';
+      final ca = _versus.collaborator?.avatarPath.trim() ?? '';
       if (ca.isNotEmpty) {
-        rawAvatar = widget.versus.collaborator!.avatarPath.trim();
+        rawAvatar = _versus.collaborator!.avatarPath.trim();
       } else {
-        final da = widget.versus.collaboratorAvatar?.trim() ?? '';
+        final da = _versus.collaboratorAvatar?.trim() ?? '';
         rawAvatar = da.isNotEmpty ? da : null;
       }
-      comment = widget.versus.collaboratorComment?.trim();
+      comment = _versus.collaboratorComment?.trim();
     }
 
     final hasComment = comment != null && comment.isNotEmpty;
@@ -1322,7 +1350,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 child: GestureDetector(
                   onTap: () => _selectArtist(0),
                   child: _ArtistCard(
-                    name:        widget.versus.artist1Name,
+                    name:        _versus.artist1Name,
                     imageUrl:    _artist1ImageUrl,
                     isSelected:  _selectedArtist == 0,
                     accentColor: _color1,
@@ -1336,7 +1364,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 child: GestureDetector(
                   onTap: () => _selectArtist(1),
                   child: _ArtistCard(
-                    name:        widget.versus.artist2Name,
+                    name:        _versus.artist2Name,
                     imageUrl:    _artist2ImageUrl,
                     isSelected:  _selectedArtist == 1,
                     accentColor: _color2,
