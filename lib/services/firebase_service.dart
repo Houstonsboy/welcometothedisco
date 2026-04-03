@@ -383,15 +383,38 @@ class FirebaseService {
   // ══════════════════════════════════════════════════════════════════════════
   //
   // Each Spotify artist or album can have one document in [rankings], keyed by
-  // the same ID used in versus docs. We only perform a full-document [set] here
-  // when that doc does not exist yet (first time the entity appears in any
-  // versus). Ongoing vote / head-to-head updates must use atomic
-  // [FieldValue.increment] and dotted [update] paths — not read-modify-write of
-  // the whole document (see [RankingModel] and future [updateRankingsFromPoll]).
+  // the same ID used in versus docs. For a **pair** in a live versus we use
+  // [_ensureRankingEntityOpponentLink] on each side: create stub + nested
+  // [opponents.opponentId] on first touch, or increment root [versus_count] and
+  // that opponent's [versus_count] on rematches. Single-entity edge cases still
+  // use [ensureRankingDocIfAbsent]. Ongoing vote tallies use atomic increments
+  // (see [RankingModel] and future [updateRankingsFromPoll]).
   //
-  // Called from: [createVersus], [createArtistVersus], [createCollaborationInvite],
-  // plus [joinArtistVersus], [acceptCollaborationInvite], [openCollaborationVersus]
-  // when an artist ID first appears on an existing versus doc.
+  // Called from: [createVersus] / [createArtistVersus] when a new versus is written
+  // already live (album + immediate-open artist versus). Collaboration *invites*
+  // stay [incomplete] until the backroom — rankings for those are created only in
+  // [_ensureRankingStubsForVersusDocIfLive] after [acceptCollaborationInvite] when
+  // status is open|active and both artists exist. [joinArtistVersus] still stubs the
+  // joiner when a public open slot is claimed (active).
+  //
+  // Pair sync is scheduled with [_scheduleRankingWritesAfterVersus] so versus
+  // creation returns as soon as the versus doc exists; ranking work runs in the
+  // background (several Firestore round-trips: per entity, read + write, ×2 entities).
+
+  /// Fire-and-forget ranking sync after the versus document is committed.
+  static void _scheduleRankingWritesAfterVersus(Future<void> Function() work) {
+    unawaited(
+      Future<void>(() async {
+        try {
+          await work();
+        } catch (e, st) {
+          debugPrint(
+            '[FirebaseService] background ranking sync failed: $e\n$st',
+          );
+        }
+      }),
+    );
+  }
 
   /// Creates `rankings/{entityId}` with zeros + identity fields if missing.
   static Future<void> ensureRankingDocIfAbsent({
@@ -429,7 +452,124 @@ class FirebaseService {
     }
   }
 
+  /// Dot-path fields for `opponents.{oid}.versus.{versusDocId}` when the session
+  /// is not finished yet (`entity_votes` / `opponent_votes` only; no `result`).
+  static Map<String, dynamic> _pendingVersusSubdocFields(
+    String opponentsOidPrefix,
+    String versusDocId,
+  ) {
+    final base = '$opponentsOidPrefix.versus.$versusDocId';
+    return {
+      '$base.entity_votes': 0,
+      '$base.opponent_votes': 0,
+    };
+  }
+
+  /// Ensures `rankings/{entityId}` exists and records one versus session against
+  /// [opponentId]: new doc with [RankingModel.newEntityStubWithOpponent], or
+  /// increments root [versus_count] and either adds [opponents.opponentId] with
+  /// [versus_count] 1 or increments that nested [versus_count] for rematches.
+  ///
+  /// Always writes `opponents.*.versus.{versusId}` with pending vote/result rows
+  /// for the Firestore versus doc that triggered this link.
+  static Future<void> _ensureRankingEntityOpponentLink({
+    required String entityId,
+    required String entityType,
+    required String entityName,
+    String entityImage = '',
+    required String opponentId,
+    required String opponentName,
+    String opponentImage = '',
+    required String versusId,
+  }) async {
+    final eid = entityId.trim();
+    final oid = opponentId.trim();
+    final vid = versusId.trim();
+    if (eid.isEmpty || oid.isEmpty || vid.isEmpty) return;
+
+    final type = entityType.trim().toLowerCase();
+    if (type != 'artist' && type != 'album') {
+      debugPrint(
+        '[FirebaseService] _ensureRankingEntityOpponentLink → skip: invalid '
+        'entityType "$type"',
+      );
+      return;
+    }
+
+    final ref = _firestore.collection('rankings').doc(eid);
+    final oppPrefix = 'opponents.$oid';
+
+    try {
+      final snap = await ref.get();
+      if (!snap.exists) {
+        final initialOpp = OpponentModel.newVersusOpponentStub(
+          opponentId: oid,
+          opponentName: opponentName.trim().isEmpty ? 'Unknown' : opponentName.trim(),
+          opponentImage: opponentImage.trim(),
+          sharedVersusId: vid,
+        );
+        final model = RankingModel.newEntityStubWithOpponent(
+          entityId: eid,
+          entityType: type,
+          entityName: entityName.trim().isEmpty ? 'Unknown' : entityName.trim(),
+          entityImage: entityImage.trim(),
+          initialOpponent: initialOpp,
+        );
+        await ref.set(model.toFirestore());
+        debugPrint(
+          '[FirebaseService] _ensureRankingEntityOpponentLink → created '
+          'rankings/$eid with opponent $oid versus $vid',
+        );
+        return;
+      }
+
+      final data = snap.data()!;
+      final rawOpponents = data['opponents'];
+      final hasOpp =
+          rawOpponents is Map && rawOpponents.containsKey(oid);
+
+      if (hasOpp) {
+        await ref.update({
+          'versus_count': FieldValue.increment(1),
+          '$oppPrefix.versus_count': FieldValue.increment(1),
+          '$oppPrefix.last_played': FieldValue.serverTimestamp(),
+          'last_updated': FieldValue.serverTimestamp(),
+          ..._pendingVersusSubdocFields(oppPrefix, vid),
+        });
+        debugPrint(
+          '[FirebaseService] _ensureRankingEntityOpponentLink → rematch '
+          'rankings/$eid vs $oid versus $vid',
+        );
+      } else {
+        await ref.update({
+          'versus_count': FieldValue.increment(1),
+          '$oppPrefix.opponent_name':
+              opponentName.trim().isEmpty ? 'Unknown' : opponentName.trim(),
+          '$oppPrefix.opponent_image': opponentImage.trim(),
+          '$oppPrefix.versus_count': 1,
+          '$oppPrefix.wins_against': 0,
+          '$oppPrefix.losses_to': 0,
+          '$oppPrefix.draws': 0,
+          '$oppPrefix.total_entity_votes': 0,
+          '$oppPrefix.total_opponent_votes': 0,
+          '$oppPrefix.last_played': FieldValue.serverTimestamp(),
+          'last_updated': FieldValue.serverTimestamp(),
+          ..._pendingVersusSubdocFields(oppPrefix, vid),
+        });
+        debugPrint(
+          '[FirebaseService] _ensureRankingEntityOpponentLink → new opponent '
+          '$oid on rankings/$eid versus $vid',
+        );
+      }
+    } catch (e) {
+      debugPrint(
+        '[FirebaseService] _ensureRankingEntityOpponentLink($eid) failed: $e',
+      );
+    }
+  }
+
   static Future<void> _ensureRankingStubsForAlbumPair({
+    required String versusId,
     required String album1ID,
     required String album1Name,
     String album1Image = '',
@@ -437,23 +577,35 @@ class FirebaseService {
     required String album2Name,
     String album2Image = '',
   }) async {
+    final id1 = album1ID.trim();
+    final id2 = album2ID.trim();
+    if (id1.isEmpty || id2.isEmpty) return;
     await Future.wait([
-      ensureRankingDocIfAbsent(
-        entityId: album1ID,
+      _ensureRankingEntityOpponentLink(
+        entityId: id1,
         entityType: 'album',
         entityName: album1Name,
         entityImage: album1Image,
+        opponentId: id2,
+        opponentName: album2Name,
+        opponentImage: album2Image,
+        versusId: versusId,
       ),
-      ensureRankingDocIfAbsent(
-        entityId: album2ID,
+      _ensureRankingEntityOpponentLink(
+        entityId: id2,
         entityType: 'album',
         entityName: album2Name,
         entityImage: album2Image,
+        opponentId: id1,
+        opponentName: album1Name,
+        opponentImage: album1Image,
+        versusId: versusId,
       ),
     ]);
   }
 
   static Future<void> _ensureRankingStubsForArtists({
+    required String versusId,
     required String artist1ID,
     required String artist1Name,
     String artist1Image = '',
@@ -461,26 +613,100 @@ class FirebaseService {
     String artist2Name = '',
     String artist2Image = '',
   }) async {
-    final futures = <Future<void>>[
-      ensureRankingDocIfAbsent(
-        entityId: artist1ID,
+    final id1 = artist1ID.trim();
+    final id2 = artist2ID.trim();
+    final vid = versusId.trim();
+    if (id1.isEmpty) return;
+
+    if (id2.isEmpty) {
+      await ensureRankingDocIfAbsent(
+        entityId: id1,
         entityType: 'artist',
         entityName: artist1Name,
         entityImage: artist1Image,
+      );
+      return;
+    }
+
+    if (vid.isEmpty) return;
+
+    await Future.wait([
+      _ensureRankingEntityOpponentLink(
+        entityId: id1,
+        entityType: 'artist',
+        entityName: artist1Name,
+        entityImage: artist1Image,
+        opponentId: id2,
+        opponentName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
+        opponentImage: artist2Image,
+        versusId: vid,
       ),
-    ];
-    final id2 = artist2ID.trim();
-    if (id2.isNotEmpty) {
-      futures.add(
-        ensureRankingDocIfAbsent(
-          entityId: id2,
-          entityType: 'artist',
-          entityName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
-          entityImage: artist2Image,
-        ),
+      _ensureRankingEntityOpponentLink(
+        entityId: id2,
+        entityType: 'artist',
+        entityName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
+        entityImage: artist2Image,
+        opponentId: id1,
+        opponentName: artist1Name,
+        opponentImage: artist1Image,
+        versusId: vid,
+      ),
+    ]);
+  }
+
+  /// Ensures ranking stubs for **both** artists on a versus document only when the
+  /// session is **live** (`status` is `open` or `active`) and both `artist1ID` and
+  /// `artist2ID` are non-empty. Skips `incomplete` (and other) drafts so entities are
+  /// not added to `rankings` until the match is actually votable.
+  ///
+  /// Used after [acceptCollaborationInvite] (e.g. [CollaboratorBackroom] submit).
+  static Future<void> _ensureRankingStubsForVersusDocIfLive(
+    String versusID,
+  ) async {
+    final id = versusID.trim();
+    if (id.isEmpty) return;
+
+    try {
+      final snap = await _firestore.collection('versus').doc(id).get();
+      if (!snap.exists || snap.data() == null) return;
+
+      final data = snap.data()!;
+      final status = (data['status'] as String?)?.trim() ?? '';
+      if (status != 'open' && status != 'active') {
+        debugPrint(
+          '[FirebaseService] _ensureRankingStubsForVersusDocIfLive → skip '
+          'rankings/$id: status=$status (not live yet)',
+        );
+        return;
+      }
+
+      final a1 = (data['artist1ID'] as String?)?.trim() ?? '';
+      final a2 = (data['artist2ID'] as String?)?.trim() ?? '';
+      if (a1.isEmpty || a2.isEmpty) {
+        debugPrint(
+          '[FirebaseService] _ensureRankingStubsForVersusDocIfLive → skip '
+          'rankings for versus $id: missing artist1ID or artist2ID',
+        );
+        return;
+      }
+
+      final n1 = (data['artist1Name'] as String?)?.trim() ?? 'Unknown';
+      final n2 = (data['artist2Name'] as String?)?.trim() ?? 'Unknown';
+
+      await _ensureRankingStubsForArtists(
+        versusId: id,
+        artist1ID: a1,
+        artist1Name: n1,
+        artist1Image: '',
+        artist2ID: a2,
+        artist2Name: n2,
+        artist2Image: '',
+      );
+    } catch (e) {
+      debugPrint(
+        '[FirebaseService] _ensureRankingStubsForVersusDocIfLive($id) failed: $e',
       );
     }
-    await Future.wait(futures);
   }
 
   // ── Create album versus ───────────────────────────────────────────────────
@@ -508,13 +734,16 @@ class FirebaseService {
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-    await _ensureRankingStubsForAlbumPair(
-      album1ID: album1ID.trim(),
-      album1Name: album1Name.trim(),
-      album1Image: album1ImageUrl.trim(),
-      album2ID: album2ID.trim(),
-      album2Name: album2Name.trim(),
-      album2Image: album2ImageUrl.trim(),
+    _scheduleRankingWritesAfterVersus(
+      () => _ensureRankingStubsForAlbumPair(
+        versusId: ref.id,
+        album1ID: album1ID.trim(),
+        album1Name: album1Name.trim(),
+        album1Image: album1ImageUrl.trim(),
+        album2ID: album2ID.trim(),
+        album2Name: album2Name.trim(),
+        album2Image: album2ImageUrl.trim(),
+      ),
     );
 
     return ref.id;
@@ -635,14 +864,27 @@ class FirebaseService {
 
     debugPrint('[FirebaseService] createArtistVersus → doc: ${ref.id}');
 
-    await _ensureRankingStubsForArtists(
-      artist1ID: model.artist1ID,
-      artist1Name: model.artist1Name,
-      artist1Image: artist1ImageUrl,
-      artist2ID: model.artist2ID,
-      artist2Name: model.artist2Name,
-      artist2Image: artist2ImageUrl,
-    );
+    // Rankings only when both artist IDs exist (immediate duel). If [artist2ID] is
+    // still empty, collaborator lockeroom defers side 2 to the backroom — stubs are
+    // then created in [_ensureRankingStubsForVersusDocIfLive] after
+    // [acceptCollaborationInvite] when status is open|active.
+    if (model.artist2ID.trim().isNotEmpty) {
+      _scheduleRankingWritesAfterVersus(
+        () => _ensureRankingStubsForArtists(
+          versusId: ref.id,
+          artist1ID: model.artist1ID,
+          artist1Name: model.artist1Name,
+          artist1Image: artist1ImageUrl,
+          artist2ID: model.artist2ID,
+          artist2Name: model.artist2Name,
+          artist2Image: artist2ImageUrl,
+        ),
+      );
+    } else {
+      debugPrint(
+        '[FirebaseService] createArtistVersus → defer rankings (no artist2 yet)',
+      );
+    }
 
     return ref.id;
   }
@@ -740,15 +982,8 @@ class FirebaseService {
     final ref = await _firestore.collection('versus').add(versusData);
     final versusID = ref.id;
     debugPrint('[FirebaseService] createCollaborationInvite → doc: $versusID');
-
-    await _ensureRankingStubsForArtists(
-      artist1ID: artist1ID.trim(),
-      artist1Name: artist1Name.trim(),
-      artist1Image: artist1ImageUrl,
-      artist2ID: artist2ID?.trim() ?? '',
-      artist2Name: artist2Name?.trim() ?? '',
-      artist2Image: artist2ImageUrl,
-    );
+    // Rankings: deferred until versus is live (open|active) with both artists —
+    // see [_ensureRankingStubsForVersusDocIfLive] after [acceptCollaborationInvite].
 
     // ── 2. Send invite notification if a recipient was chosen ─────────────────
     if (collaboratorUID != null && collaboratorUID.trim().isNotEmpty) {
@@ -917,12 +1152,23 @@ class FirebaseService {
     debugPrint(
         '[FirebaseService] joinArtistVersus → $documentId claimed by $uid');
 
-    await ensureRankingDocIfAbsent(
-      entityId: artist2ID,
-      entityType: 'artist',
-      entityName: artist2Name,
-      entityImage: '',
-    );
+    final vsSnap = await ref.get();
+    final d = vsSnap.data();
+    if (d != null) {
+      final a1 = (d['artist1ID'] as String?)?.trim() ?? '';
+      final n1 = (d['artist1Name'] as String?)?.trim() ?? 'Unknown';
+      if (a1.isNotEmpty) {
+        await _ensureRankingStubsForArtists(
+          versusId: documentId.trim(),
+          artist1ID: a1,
+          artist1Name: n1,
+          artist1Image: '',
+          artist2ID: artist2ID.trim(),
+          artist2Name: artist2Name.trim(),
+          artist2Image: '',
+        );
+      }
+    }
   }
 
   // ── Collaboration: invitee confirms artist2 + tracks ─────────────────────
@@ -1006,11 +1252,9 @@ class FirebaseService {
     debugPrint(
         '[FirebaseService] acceptCollaborationInvite → $versusID by $uid');
 
-    await ensureRankingDocIfAbsent(
-      entityId: editedArtistID.trim(),
-      entityType: 'artist',
-      entityName: editedArtistName.trim(),
-      entityImage: '',
+    // Ranking stubs only when the versus doc is live and both sides have artists.
+    _scheduleRankingWritesAfterVersus(
+      () => _ensureRankingStubsForVersusDocIfLive(versusID),
     );
   }
 
@@ -1043,16 +1287,8 @@ class FirebaseService {
     await _firestore.collection('versus').doc(versusID).update(data);
     debugPrint(
         '[FirebaseService] openCollaborationVersus → $versusID (author tracks; status stays incomplete)');
-
-    final id2 = artist2ID?.trim() ?? '';
-    if (id2.isNotEmpty) {
-      await ensureRankingDocIfAbsent(
-        entityId: id2,
-        entityType: 'artist',
-        entityName: (artist2Name ?? '').trim(),
-        entityImage: '',
-      );
-    }
+    // Versus remains incomplete — no ranking stubs until collaborator confirms
+    // and [acceptCollaborationInvite] sets status open|active.
   }
 
   // ── Update status ─────────────────────────────────────────────────────────

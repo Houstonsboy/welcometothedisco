@@ -671,6 +671,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     setState(() => _isSubmitting = true);
     try {
       final hasLongerTracks = _mySelectedTracks.length > _authorSideTrackCount;
+      // When this succeeds with both artists and live status, [FirebaseService]
+      // creates ranking stubs for both entities (see _ensureRankingStubsForVersusDocIfLive).
       await FirebaseService.acceptCollaborationInvite(
         versusID:       widget.versus.id,
         editedArtistID:      _myArtist!.id,

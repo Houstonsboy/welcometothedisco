@@ -35,7 +35,10 @@ class CollaboratorLockeroom extends StatelessWidget {
       onCreateVersus:
           (artist1, artist2, selectedTracks1, authorComment) async {
         try {
-          // Initial `rankings/{artistId}` stubs: [FirebaseService.createCollaboratorVersus] → [createArtistVersus].
+          // Rankings are NOT written here when artist2 is still empty — only after
+          // the backroom submit ([acceptCollaborationInvite]) when versus is open|active
+          // with both artists. If both artists are chosen up front, [createArtistVersus]
+          // stubs both immediately.
           await FirebaseService.createCollaboratorVersus(
             artist1ID:       artist1.id,
             artist1Name:     artist1.name,
@@ -1275,6 +1278,8 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
       onInviteSent: (FriendEntry? selectedFriend) async {
         String? versusID;
         try {
+          // Versus is `incomplete` — no `rankings` docs until backroom confirms and
+          // [FirebaseService.acceptCollaborationInvite] sets status open|active.
           versusID = await FirebaseService.createCollaborationInvite(
             artist1ID: artist1.id,
             artist1Name: artist1.name,

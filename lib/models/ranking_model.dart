@@ -8,39 +8,71 @@
     final String versusId;    // the key in the map — stored here for convenience
     final int    entityVotes;
     final int    opponentVotes;
-    final String result;      // "win" | "loss" | "draw"
+    /// `null` until the matchup is decided / written by poll aggregation.
+    final String? result;     // "win" | "loss" | "draw"
     final DateTime? playedAt;
 
     const VersusResultModel({
         required this.versusId,
         required this.entityVotes,
         required this.opponentVotes,
-        required this.result,
+        this.result,
         this.playedAt,
     });
+
+    /// Placeholder row when a versus doc is linked under [opponents].*.versus.
+    factory VersusResultModel.pendingForVersus(String versusId) {
+        final vid = versusId.trim();
+        return VersusResultModel(
+        versusId:      vid,
+        entityVotes:   0,
+        opponentVotes: 0,
+        result:        null,
+        playedAt:      null,
+        );
+    }
 
     factory VersusResultModel.fromMap(String versusId, Map<String, dynamic> data) {
         return VersusResultModel(
         versusId:   versusId,
-        entityVotes:   (data['our_votes']   as num?)?.toInt() ?? 0,
-        opponentVotes: (data['their_votes'] as num?)?.toInt() ?? 0,
-        result:     (data['result']      as String?)?.trim() ?? 'draw',
+        entityVotes:   (data['entity_votes'] as num?)?.toInt() ??
+            (data['our_votes'] as num?)?.toInt() ??
+            0,
+        opponentVotes: (data['opponent_votes'] as num?)?.toInt() ??
+            (data['their_votes'] as num?)?.toInt() ??
+            0,
+        result:     _optionalResultString(data['result']),
         playedAt:   _toDateTime(data['played_at']),
         );
     }
 
-    Map<String, dynamic> toMap() => {
-        'our_votes':   entityVotes,
-        'their_votes': opponentVotes,
-        'result':      result,
-        'played_at':   playedAt != null
-            ? Timestamp.fromDate(playedAt!)
-            : FieldValue.serverTimestamp(),
-    };
+    Map<String, dynamic> toMap() {
+        final m = <String, dynamic>{
+        'entity_votes':   entityVotes,
+        'opponent_votes': opponentVotes,
+        };
+        if (result != null && result!.trim().isNotEmpty) {
+        m['result'] = result!.trim();
+        }
+        if (playedAt != null) {
+        m['played_at'] = Timestamp.fromDate(playedAt!);
+        } else if (result != null && result!.trim().isNotEmpty) {
+        m['played_at'] = FieldValue.serverTimestamp();
+        }
+        return m;
+    }
 
+    bool get isPending => result == null || result!.trim().isEmpty;
     bool get isWin  => result == 'win';
     bool get isLoss => result == 'loss';
     bool get isDraw => result == 'draw';
+    }
+
+    String? _optionalResultString(dynamic value) {
+    if (value == null) return null;
+    if (value is! String) return null;
+    final s = value.trim();
+    return s.isEmpty ? null : s;
     }
 
     // ── Head-to-head record against one opponent ──────────────────────────────────
@@ -80,6 +112,37 @@
         this.versus = const {},
     });
 
+    /// Initial nested row when two entities meet for the first time in [rankings].
+    /// Includes [versus] keyed by [sharedVersusId] with pending votes/result until
+    /// poll aggregation runs.
+    factory OpponentModel.newVersusOpponentStub({
+        required String opponentId,
+        required String opponentName,
+        String opponentImage = '',
+        required String sharedVersusId,
+    }) {
+        final oid = opponentId.trim();
+        final vid = sharedVersusId.trim();
+        final versusMap = vid.isEmpty
+            ? const <String, VersusResultModel>{}
+            : <String, VersusResultModel>{
+                vid: VersusResultModel.pendingForVersus(vid),
+              };
+        return OpponentModel(
+        opponentId:        oid,
+        opponentName:      opponentName.trim().isEmpty ? 'Unknown' : opponentName.trim(),
+        opponentImage:     opponentImage.trim(),
+        versusCount:       1,
+        winsAgainst:       0,
+        lossesTo:          0,
+        draws:             0,
+        totalentityVotes:  0,
+        totalopponentVotes: 0,
+        lastPlayed:        null,
+        versus:            versusMap,
+        );
+    }
+
     factory OpponentModel.fromMap(String opponentId, Map<String, dynamic> data) {
         // Parse the nested versus map
         final rawVersus = data['versus'] as Map<String, dynamic>? ?? {};
@@ -98,8 +161,12 @@
         winsAgainst:       (data['wins_against']        as num?)?.toInt() ?? 0,
         lossesTo:          (data['losses_to']           as num?)?.toInt() ?? 0,
         draws:             (data['draws']               as num?)?.toInt() ?? 0,
-        totalentityVotes:     (data['total_our_votes']     as num?)?.toInt() ?? 0,
-        totalopponentVotes:   (data['total_their_votes']   as num?)?.toInt() ?? 0,
+        totalentityVotes:     (data['total_entity_votes'] as num?)?.toInt() ??
+            (data['total_our_votes'] as num?)?.toInt() ??
+            0,
+        totalopponentVotes:   (data['total_opponent_votes'] as num?)?.toInt() ??
+            (data['total_their_votes'] as num?)?.toInt() ??
+            0,
         lastPlayed:        _toDateTime(data['last_played']),
         versus:            versusMap,
         );
@@ -115,8 +182,8 @@
         'wins_against':       winsAgainst,
         'losses_to':          lossesTo,
         'draws':              draws,
-        'total_our_votes':    totalentityVotes,
-        'total_their_votes':  totalopponentVotes,
+        'total_entity_votes':    totalentityVotes,
+        'total_opponent_votes':  totalopponentVotes,
         'last_played':        lastPlayed != null
             ? Timestamp.fromDate(lastPlayed!)
             : FieldValue.serverTimestamp(),
@@ -211,6 +278,11 @@
     /// Stub document for `rankings/{entityId}` the first time this Spotify entity
     /// appears in any versus. Only used for initial `set()`; later updates should
     /// use atomic `FieldValue.increment` / dot-path `update()` (see model header).
+    ///
+    /// [versusCount] starts at **1** because this write only happens when the
+    /// entity is being added to a versus — that session is their first appearance.
+    /// [wins] / [losses] / [draws] / [totalVotes] stay 0 until results and votes
+    /// are applied via incremental updates.
     factory RankingModel.newEntityStub({
         required String entityId,
         required String entityType,
@@ -225,12 +297,39 @@
         entityName:   entityName.trim(),
         entityImage:  entityImage.trim(),
         totalVotes:   0,
-        versusCount:  0,
+        versusCount:  1,
         wins:         0,
         losses:       0,
         draws:        0,
         winRate:      0.0,
         opponents:    const {},
+        );
+    }
+
+    /// New `rankings/{entityId}` with one [opponents] entry for the other entity
+    /// in the versus (head-to-head [versus_count] = 1 on both root and opponent row).
+    factory RankingModel.newEntityStubWithOpponent({
+        required String entityId,
+        required String entityType,
+        required String entityName,
+        String entityImage = '',
+        required OpponentModel initialOpponent,
+    }) {
+        final id = entityId.trim();
+        final type = entityType.trim().toLowerCase();
+        final oid = initialOpponent.opponentId;
+        return RankingModel(
+        entityId:     id,
+        entityType:   type == 'album' ? 'album' : 'artist',
+        entityName:   entityName.trim().isEmpty ? 'Unknown' : entityName.trim(),
+        entityImage:  entityImage.trim(),
+        totalVotes:   0,
+        versusCount:  1,
+        wins:         0,
+        losses:       0,
+        draws:        0,
+        winRate:      0.0,
+        opponents:    {oid: initialOpponent},
         );
     }
 
