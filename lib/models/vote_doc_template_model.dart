@@ -37,12 +37,12 @@ class VoteDocTemplateModel {
   final DateTime timestamp;
 
   final bool isArtistTemplate;
-  final String side1Id;
-  final String side1Name;
-  final int side1Vote;
-  final String side2Id;
-  final String side2Name;
-  final int side2Vote;
+  final String entity1Id;
+  final String entity1Name;
+  final int entity1Vote;
+  final String entity2Id;
+  final String entity2Name;
+  final int entity2Vote;
 
   final double completionPercentage;
   final int unvotedCount;
@@ -56,12 +56,12 @@ class VoteDocTemplateModel {
     required this.voterAvatar,
     required this.timestamp,
     required this.isArtistTemplate,
-    required this.side1Id,
-    required this.side1Name,
-    required this.side1Vote,
-    required this.side2Id,
-    required this.side2Name,
-    required this.side2Vote,
+    required this.entity1Id,
+    required this.entity1Name,
+    required this.entity1Vote,
+    required this.entity2Id,
+    required this.entity2Name,
+    required this.entity2Vote,
     required this.completionPercentage,
     required this.unvotedCount,
     required this.trackDetails,
@@ -92,12 +92,12 @@ class VoteDocTemplateModel {
       voterAvatar: voterAvatar,
       timestamp: timestamp,
       isArtistTemplate: true,
-      side1Id: artist1ID,
-      side1Name: artist1Name,
-      side1Vote: artist1Vote,
-      side2Id: artist2ID,
-      side2Name: artist2Name,
-      side2Vote: artist2Vote,
+      entity1Id: artist1ID,
+      entity1Name: artist1Name,
+      entity1Vote: artist1Vote,
+      entity2Id: artist2ID,
+      entity2Name: artist2Name,
+      entity2Vote: artist2Vote,
       completionPercentage: completionPercentage,
       unvotedCount: unvotedCount,
       trackDetails: trackDetails,
@@ -129,12 +129,12 @@ class VoteDocTemplateModel {
       voterAvatar: voterAvatar,
       timestamp: timestamp,
       isArtistTemplate: false,
-      side1Id: album1ID,
-      side1Name: album1Name,
-      side1Vote: album1Vote,
-      side2Id: album2ID,
-      side2Name: album2Name,
-      side2Vote: album2Vote,
+      entity1Id: album1ID,
+      entity1Name: album1Name,
+      entity1Vote: album1Vote,
+      entity2Id: album2ID,
+      entity2Name: album2Name,
+      entity2Vote: album2Vote,
       completionPercentage: completionPercentage,
       unvotedCount: unvotedCount,
       trackDetails: trackDetails,
@@ -149,19 +149,19 @@ class VoteDocTemplateModel {
         'Voter_avatar': voterAvatar,
         'timestamp': timestamp.toIso8601String(),
         if (isArtistTemplate) ...{
-          'artist1ID': side1Id,
-          'artist1Name': side1Name,
-          'artist1Vote': side1Vote,
-          'artist2ID': side2Id,
-          'artist2Name': side2Name,
-          'artist2Vote': side2Vote,
+          'artist1ID': entity1Id,
+          'artist1Name': entity1Name,
+          'artist1Vote': entity1Vote,
+          'artist2ID': entity2Id,
+          'artist2Name': entity2Name,
+          'artist2Vote': entity2Vote,
         } else ...{
-          'album1ID': side1Id,
-          'album1Name': side1Name,
-          'album1Vote': side1Vote,
-          'album2ID': side2Id,
-          'album2Name': side2Name,
-          'album2Vote': side2Vote,
+          'album1ID': entity1Id,
+          'album1Name': entity1Name,
+          'album1Vote': entity1Vote,
+          'album2ID': entity2Id,
+          'album2Name': entity2Name,
+          'album2Vote': entity2Vote,
         },
         'Completion_percentage': completionPercentage,
         'Unvoted_count': unvotedCount,

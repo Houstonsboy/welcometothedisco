@@ -31,7 +31,15 @@ const _kBlue = AppTheme.gradientStart;
 const _kPink = AppTheme.gradientEnd;
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({
+    super.key,
+    this.initialEmail,
+    this.initialDisplayName,
+  });
+
+  /// Hint when arriving from login (Google account email not yet registered).
+  final String? initialEmail;
+  final String? initialDisplayName;
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -40,25 +48,28 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _authService = AuthService();
 
-  final _emailController    = TextEditingController();
-  final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
-  final _bioController      = TextEditingController();
 
   String? _selectedAvatar;
-  bool _isLoading    = false;
+  bool _isLoading = false;
   String _errorMessage = '';
 
   bool get _hasAvatar => _selectedAvatar != null;
   bool get _hasUsername => _usernameController.text.trim().isNotEmpty;
-  bool get _hasBio => _bioController.text.trim().isNotEmpty;
-  bool get _isProfileComplete => _hasAvatar && _hasUsername && _hasBio;
+  /// Google sign-in is enabled only when both avatar and username are set.
+  bool get _canCreateAccount => _hasAvatar && _hasUsername;
 
   @override
   void initState() {
     super.initState();
+    final preName = widget.initialDisplayName?.trim();
+    if (preName != null && preName.isNotEmpty) {
+      final space = preName.indexOf(' ');
+      _usernameController.text = space > 0
+          ? preName.substring(0, space).toLowerCase()
+          : preName.toLowerCase();
+    }
     _usernameController.addListener(_onProfileFieldChanged);
-    _bioController.addListener(_onProfileFieldChanged);
   }
 
   void _onProfileFieldChanged() {
@@ -69,70 +80,21 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void dispose() {
     _usernameController.removeListener(_onProfileFieldChanged);
-    _bioController.removeListener(_onProfileFieldChanged);
-    _emailController.dispose();
-    _passwordController.dispose();
     _usernameController.dispose();
-    _bioController.dispose();
     super.dispose();
   }
 
-  // ── Validation ─────────────────────────────────────────────────────────────
-  /// Returns an error string if profile fields are incomplete, null otherwise.
-  String? _validateProfile() {
+  /// Returns an error string if avatar or username is missing.
+  String? _validateForGoogleSignUp() {
     if (_selectedAvatar == null) return 'Please select a profile picture.';
-    if (_usernameController.text.trim().isEmpty) return 'Username is required.';
-    if (_bioController.text.trim().isEmpty) return 'Bio is required.';
+    if (_usernameController.text.trim().isEmpty) {
+      return 'Please enter a username.';
+    }
     return null;
   }
 
-  // ── Email register ──────────────────────────────────────────────────────────
-  Future<void> _handleRegister() async {
-    final profileError = _validateProfile();
-    if (profileError != null) {
-      setState(() => _errorMessage = profileError);
-      return;
-    }
-    if (_emailController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Email is required.');
-      return;
-    }
-    if (_passwordController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Password is required.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-    try {
-      final cred = await _authService.registerWithEmail(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
-      if (cred?.user == null) throw 'Account creation failed.';
-
-      await FirebaseService.createUserProfile(
-        uid:        cred!.user!.uid,
-        email:      _emailController.text.trim(),
-        username:   _usernameController.text.trim(),
-        bio:        _bioController.text.trim(),
-        avatarPath: _selectedAvatar!,
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context);
-    } catch (e) {
-      setState(() => _errorMessage = e is String ? e : e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // ── Google sign-in ──────────────────────────────────────────────────────────
-  Future<void> _handleGoogleSignIn() async {
-    final profileError = _validateProfile();
+  Future<void> _handleGoogleSignUp() async {
+    final profileError = _validateForGoogleSignUp();
     if (profileError != null) {
       setState(() => _errorMessage = profileError);
       return;
@@ -143,18 +105,19 @@ class _SignupScreenState extends State<SignupScreen> {
       _errorMessage = '';
     });
     try {
-      final cred = await _authService.signInWithGoogle();
+      final cred = await _authService.signInWithGoogle(
+        requireExistingUserProfile: false,
+      );
       if (cred?.user == null) {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
       final user = cred!.user!;
       await FirebaseService.createUserProfile(
-        uid:        user.uid,
-        email:      user.email ?? '',
-        username:   _usernameController.text.trim(),
-        bio:        _bioController.text.trim(),
+        uid: user.uid,
+        email: user.email ?? '',
+        username: _usernameController.text.trim(),
         avatarPath: _selectedAvatar!,
       );
 
@@ -167,7 +130,6 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
   Widget _glassCard({required Widget child}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -205,16 +167,11 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget _glassTextField({
     required TextEditingController controller,
     required String label,
-    bool obscure = false,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
+      keyboardType: TextInputType.text,
       inputFormatters: inputFormatters,
       style: TextStyle(color: Colors.white.withOpacity(0.95)),
       decoration: InputDecoration(
@@ -230,7 +187,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ── Avatar row ──────────────────────────────────────────────────────────────
   Widget _buildAvatarPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +213,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // Circle avatar — 60×60 matching the lockeroom artist chip
                       ClipOval(
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
@@ -278,7 +233,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                       ),
-                      // Selected check badge
                       if (isSelected)
                         Positioned(
                           bottom: -2,
@@ -291,12 +245,16 @@ class _SignupScreenState extends State<SignupScreen> {
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 4),
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4,
+                                ),
                               ],
                             ),
-                            child: Icon(Icons.check_rounded,
-                                color: _kBlue, size: 12),
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: _kBlue,
+                              size: 12,
+                            ),
                           ),
                         ),
                     ],
@@ -351,9 +309,10 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final hintEmail = widget.initialEmail?.trim();
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -367,8 +326,10 @@ class _SignupScreenState extends State<SignupScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new,
-                color: Colors.white.withOpacity(0.9)),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.white.withOpacity(0.9),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(
@@ -401,48 +362,52 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-
-                      // ── Avatar picker ─────────────────────────────────────
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          'Pick an avatar and username, then continue with Google.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: Colors.white.withOpacity(0.6),
+                          ),
+                        ),
+                      ),
+                      if (hintEmail != null && hintEmail.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Text(
+                            'Google: $hintEmail',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.75),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
                       _buildAvatarPicker(),
-                      const SizedBox(height: 24),
-
-                      // ── Profile fields ────────────────────────────────────
+                      const SizedBox(height: 20),
                       _glassTextField(
                         controller: _usernameController,
                         label: 'Username',
                         inputFormatters: [_LowercaseFormatter()],
                       ),
-                      const SizedBox(height: 16),
-                      _glassTextField(
-                        controller: _bioController,
-                        label: 'Bio',
-                        maxLines: 2,
+                      const SizedBox(height: 12),
+                      _requirementRow(
+                        label: 'Avatar selected',
+                        done: _hasAvatar,
                       ),
-                      const SizedBox(height: 10),
-                      _requirementRow(label: 'Avatar selected', done: _hasAvatar),
                       const SizedBox(height: 4),
-                      _requirementRow(label: 'Username added', done: _hasUsername),
-                      const SizedBox(height: 4),
-                      _requirementRow(label: 'Bio added', done: _hasBio),
-                      const SizedBox(height: 16),
-
-                      // ── Email / password ──────────────────────────────────
-                      _glassTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        keyboardType: TextInputType.emailAddress,
+                      _requirementRow(
+                        label: 'Username entered',
+                        done: _hasUsername,
                       ),
-                      const SizedBox(height: 16),
-                      _glassTextField(
-                        controller: _passwordController,
-                        label: 'Password',
-                        obscure: true,
-                      ),
-
-                      // ── Error message ─────────────────────────────────────
                       if (_errorMessage.isNotEmpty) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         Text(
                           _errorMessage,
                           style: TextStyle(
@@ -452,10 +417,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ],
-
                       const SizedBox(height: 24),
-
-                      // ── Register button ───────────────────────────────────
                       SizedBox(
                         width: double.infinity,
                         child: _isLoading
@@ -464,28 +426,49 @@ class _SignupScreenState extends State<SignupScreen> {
                                   color: AppTheme.titleAccent,
                                 ),
                               )
-                            : Material(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(50),
-                                child: InkWell(
-                                  onTap: _handleRegister,
-                                  borderRadius: BorderRadius.circular(50),
-                                  child: const Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(vertical: 14),
-                                    child: Center(
-                                      child: Text(
-                                        'Register',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
+                            : OutlinedButton.icon(
+                                onPressed: (_canCreateAccount)
+                                    ? _handleGoogleSignUp
+                                    : null,
+                                icon: Icon(
+                                  Icons.g_mobiledata_rounded,
+                                  color: Colors.white.withOpacity(0.9),
+                                  size: 26,
+                                ),
+                                label: Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: Colors.white.withOpacity(
+                                      _canCreateAccount ? 0.45 : 0.2,
                                     ),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
                                   ),
                                 ),
                               ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          _canCreateAccount
+                              ? 'Your Google account will be linked to this profile.'
+                              : 'Select an avatar and username to enable Google sign-up.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _canCreateAccount
+                                ? Colors.white.withOpacity(0.35)
+                                : Colors.red.shade200.withOpacity(0.85),
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Center(
@@ -497,69 +480,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               color: Colors.white.withOpacity(0.9),
                               decoration: TextDecoration.underline,
                             ),
-                          ),
-                        ),
-                      ),
-
-                      // ── OR divider ────────────────────────────────────────
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child:
-                                Divider(color: Colors.white.withOpacity(0.3)),
-                          ),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'or',
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6)),
-                            ),
-                          ),
-                          Expanded(
-                            child:
-                                Divider(color: Colors.white.withOpacity(0.3)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ── Google button ─────────────────────────────────────
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: (_isLoading || !_isProfileComplete)
-                              ? null
-                              : _handleGoogleSignIn,
-                          icon: Icon(
-                            Icons.g_mobiledata_rounded,
-                            color: Colors.white.withOpacity(0.9),
-                            size: 24,
-                          ),
-                          label: Text(
-                            'Continue with Google',
-                            style: TextStyle(
-                                color: Colors.white.withOpacity(0.95)),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                                color: Colors.white.withOpacity(0.4)),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Center(
-                        child: Text(
-                          'Fill in avatar, username & bio before using Google',
-                          style: TextStyle(
-                            color: _isProfileComplete
-                                ? Colors.white.withOpacity(0.35)
-                                : Colors.red.shade200.withOpacity(0.9),
-                            fontSize: 10,
                           ),
                         ),
                       ),

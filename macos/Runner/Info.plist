@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your versus result image to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Save your versus result image to your photo library.</string>
 </dict>
 </plist>

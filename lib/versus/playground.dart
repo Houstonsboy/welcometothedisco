@@ -1,17 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:welcometothedisco/models/vote_doc_template_model.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:gal/gal.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/widgets/versus_share_card.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
 const _kDefaultColor2 = AppTheme.gradientEnd;
@@ -64,6 +72,8 @@ class VersusPlayground extends StatefulWidget {
 
 class _VersusPlaygroundState extends State<VersusPlayground>
     with TickerProviderStateMixin {
+  final GlobalKey _shareCardKey = GlobalKey();
+  bool _shareCardOffstage = true;
   final SpotifyApi _api = SpotifyApi();
 
   String get _resolvedVersusId {
@@ -153,6 +163,185 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final base  = _votesByIndex.values.where((v) => v == 1).length;
     final bonus = _longerSideAlbumIndex == 1 ? _bonusVoteForLongerSide : 0;
     return base + bonus;
+  }
+
+  String get _shareAlbum1Title =>
+      _albums?[0]?.title ??
+      widget.versus.album1Title ??
+      widget.versus.album1Name;
+  String get _shareAlbum2Title =>
+      _albums?[1]?.title ??
+      widget.versus.album2Title ??
+      widget.versus.album2Name;
+  String? get _shareAlbum1ImageUrl =>
+      _albums?[0]?.imageUrl ?? widget.versus.album1ImageUrl;
+  String? get _shareAlbum2ImageUrl =>
+      _albums?[1]?.imageUrl ?? widget.versus.album2ImageUrl;
+
+  Map<int, Map<String, dynamic>> _buildShareTrackDetails() {
+    return {
+      for (final e in _trackDetails.entries) e.key: e.value.toMap(),
+    };
+  }
+
+  Future<Uint8List?> _captureShareCard() async {
+    for (final entry in _commentControllers.entries) {
+      final detail = _trackDetails[entry.key];
+      if (detail != null) {
+        detail.voterComment = entry.value.text.trim();
+      }
+    }
+    if (!mounted) return null;
+
+    setState(() => _shareCardOffstage = false);
+    await WidgetsBinding.instance.endOfFrame;
+
+    Uint8List? result;
+    try {
+      final boundary = _shareCardKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary != null) {
+        final image = await boundary.toImage(pixelRatio: 3.0);
+        final byteData =
+            await image.toByteData(format: ui.ImageByteFormat.png);
+        result = byteData?.buffer.asUint8List();
+      }
+    } finally {
+      if (mounted) setState(() => _shareCardOffstage = true);
+    }
+    return result;
+  }
+
+  void _showShareBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ShareSheet(
+        onShare: _handleShare,
+        onCopyLink: _handleCopyLink,
+        onSaveToGallery: _handleSaveToGallery,
+      ),
+    );
+  }
+
+  Future<void> _handleSaveToGallery() async {
+    Navigator.pop(context);
+    if (_trackDetails.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Vote on at least one round to save a results image',
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+    final bytes = await _captureShareCard();
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not create image'),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await Gal.putImageBytes(bytes, name: 'wttd_album_versus_result');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Saved to gallery'),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } on GalException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.type.message),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not save to gallery'),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleShare(String platform) async {
+    Navigator.pop(context);
+    if (_trackDetails.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Vote on at least one round to share a results image',
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+    final bytes = await _captureShareCard();
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not create share image'),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final file = await File(
+      '${tempDir.path}/wttd_album_versus.png',
+    ).writeAsBytes(bytes);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: '$_shareAlbum1Title vs $_shareAlbum2Title '
+          '— voted on welcometothedisco',
+    );
+  }
+
+  Future<void> _handleCopyLink() async {
+    Navigator.pop(context);
+    final link = 'https://welcometothedisco.app/versus/$_resolvedVersusId';
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link copied')),
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -574,9 +763,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         backgroundColor: Colors.transparent,
         body: DefaultTextStyle.merge(
           style: const TextStyle(fontFamily: AppTheme.fontBody, fontSize: 12),
-          child: FutureBuilder<List<SpotifyAlbumWithTracks?>>(
-            future: _albumsFuture,
-            builder: (context, snapshot) {
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: FutureBuilder<List<SpotifyAlbumWithTracks?>>(
+                  future: _albumsFuture,
+                  builder: (context, snapshot) {
               final album1   = snapshot.data?[0];
               final album2   = snapshot.data?[1];
               final a1Title  = album1?.title    ?? widget.versus.album1Name ?? 'Album 1';
@@ -727,6 +920,73 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 ],
               );
             },
+                ),
+              ),
+              if (_albums != null &&
+                  _albums!.length >= 2 &&
+                  _albums![0] != null &&
+                  _albums![1] != null &&
+                  _pairedRoundCount > 0)
+                Positioned(
+                  left: -8000,
+                  top: 0,
+                  width: 360,
+                  child: Offstage(
+                    offstage: _shareCardOffstage,
+                    child: RepaintBoundary(
+                      key: _shareCardKey,
+                      child: SizedBox(
+                        width: 360,
+                        child: VersusShareCard(
+                          artist1Name: _shareAlbum1Title,
+                          artist2Name: _shareAlbum2Title,
+                          artist1ImageUrl: _shareAlbum1ImageUrl,
+                          artist2ImageUrl: _shareAlbum2ImageUrl,
+                          artist1Votes: _album1VoteCount,
+                          artist2Votes: _album2VoteCount,
+                          color1: _color1,
+                          color2: _color2,
+                          voterName: _voterName.trim().isEmpty
+                              ? 'anonymous'
+                              : _voterName.trim(),
+                          trackDetails: _buildShareTrackDetails(),
+                          pairedRoundCount: _pairedRoundCount,
+                          roundTrackNames1: List.generate(
+                            _pairedRoundCount,
+                            (i) => _albums![0]!.tracks
+                                    .elementAtOrNull(i)
+                                    ?.name ??
+                                '—',
+                          ),
+                          roundTrackNames2: List.generate(
+                            _pairedRoundCount,
+                            (i) => _albums![1]!.tracks
+                                    .elementAtOrNull(i)
+                                    ?.name ??
+                                '—',
+                          ),
+                          roundTrackIds1: List.generate(
+                            _pairedRoundCount,
+                            (i) => _albums![0]!
+                                    .tracks
+                                    .elementAtOrNull(i)
+                                    ?.id ??
+                                '',
+                          ),
+                          roundTrackIds2: List.generate(
+                            _pairedRoundCount,
+                            (i) => _albums![1]!
+                                    .tracks
+                                    .elementAtOrNull(i)
+                                    ?.id ??
+                                '',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -760,6 +1020,27 @@ class _VersusPlaygroundState extends State<VersusPlayground>
           const SizedBox(width: 10),
         ],
         const Text('ALBUMS', style: TextStyle(fontSize: 13, fontFamily: AppTheme.fontHeader, color: Color(0xFFF07012), letterSpacing: 2.5)),
+        const Spacer(),
+        GestureDetector(
+          onTap: _showShareBottomSheet,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.25),
+                width: 0.8,
+              ),
+            ),
+            child: const Icon(
+              Icons.ios_share_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+        ),
       ]),
     );
   }
@@ -811,7 +1092,192 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   }
 }
 
-// ── Swipe Dot ─────────────────────────────────────────────────────────────────
+// ── Share bottom sheet (album versus) ─────────────────────────────────────────
+class _ShareSheet extends StatelessWidget {
+  final Future<void> Function(String platform) onShare;
+  final VoidCallback onCopyLink;
+  final VoidCallback onSaveToGallery;
+
+  const _ShareSheet({
+    required this.onShare,
+    required this.onCopyLink,
+    required this.onSaveToGallery,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Share result',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _ShareButton(
+                  label: 'Instagram',
+                  icon: Icons.camera_alt_outlined,
+                  color: const Color(0xFFE1306C),
+                  onTap: () => onShare('instagram'),
+                ),
+                const SizedBox(width: 12),
+                _ShareButton(
+                  label: 'WhatsApp',
+                  icon: Icons.chat_rounded,
+                  color: const Color(0xFF25D366),
+                  onTap: () => onShare('whatsapp'),
+                ),
+                const SizedBox(width: 12),
+                _ShareButton(
+                  label: 'Other',
+                  icon: Icons.share_rounded,
+                  color: Colors.white24,
+                  onTap: () => onShare('other'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onSaveToGallery,
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.06),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.12),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.photo_library_outlined,
+                      color: Colors.white.withOpacity(0.7),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Save to gallery',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onCopyLink,
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.06),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.12),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.link_rounded,
+                      color: Colors.white.withOpacity(0.7),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Copy link',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ShareButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(0.15),
+              border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SwipeDot extends StatelessWidget {
   final bool  isActive;
   final Color color;

@@ -1,48 +1,44 @@
     // lib/models/ranking_model.dart
     import 'package:cloud_firestore/cloud_firestore.dart';
 
-    // ── Individual versus result under an opponent ────────────────────────────────
+    // ── VersusResultModel — status field (won | lost | draw | null) ─────────────
     /// Represents one specific versus session between two entities.
     /// Stored as a nested map inside [OpponentModel.versus], keyed by versus doc ID.
+    /// [status] is written/replaced on every reconcile batch.
     class VersusResultModel {
-    final String versusId;    // the key in the map — stored here for convenience
-    final int    entityVotes;
-    final int    opponentVotes;
-    /// `null` until the matchup is decided / written by poll aggregation.
-    final String? result;     // "win" | "loss" | "draw"
+    final String  versusId;
+    final int     entityVotes;
+    final int     opponentVotes;
+    final String? status;    // "won" | "lost" | "draw" | null (pending)
     final DateTime? playedAt;
 
     const VersusResultModel({
         required this.versusId,
         required this.entityVotes,
         required this.opponentVotes,
-        this.result,
+        this.status,
         this.playedAt,
     });
 
-    /// Placeholder row when a versus doc is linked under [opponents].*.versus.
     factory VersusResultModel.pendingForVersus(String versusId) {
-        final vid = versusId.trim();
         return VersusResultModel(
-        versusId:      vid,
+        versusId:      versusId.trim(),
         entityVotes:   0,
         opponentVotes: 0,
-        result:        null,
+        status:        null,
         playedAt:      null,
         );
     }
 
     factory VersusResultModel.fromMap(String versusId, Map<String, dynamic> data) {
         return VersusResultModel(
-        versusId:   versusId,
-        entityVotes:   (data['entity_votes'] as num?)?.toInt() ??
-            (data['our_votes'] as num?)?.toInt() ??
-            0,
-        opponentVotes: (data['opponent_votes'] as num?)?.toInt() ??
-            (data['their_votes'] as num?)?.toInt() ??
-            0,
-        result:     _optionalResultString(data['result']),
-        playedAt:   _toDateTime(data['played_at']),
+        versusId:      versusId,
+        entityVotes:   (data['entity_votes']   as num?)?.toInt() ??
+            (data['our_votes']       as num?)?.toInt() ?? 0,
+        opponentVotes: (data['opponent_votes']  as num?)?.toInt() ??
+            (data['their_votes']     as num?)?.toInt() ?? 0,
+        status:        _optionalStatusString(data['status']),
+        playedAt:      _toDateTime(data['played_at']),
         );
     }
 
@@ -51,28 +47,36 @@
         'entity_votes':   entityVotes,
         'opponent_votes': opponentVotes,
         };
-        if (result != null && result!.trim().isNotEmpty) {
-        m['result'] = result!.trim();
+        if (status != null && status!.trim().isNotEmpty) {
+        m['status'] = status!.trim();
         }
         if (playedAt != null) {
         m['played_at'] = Timestamp.fromDate(playedAt!);
-        } else if (result != null && result!.trim().isNotEmpty) {
+        } else if (status != null) {
         m['played_at'] = FieldValue.serverTimestamp();
         }
         return m;
     }
 
-    bool get isPending => result == null || result!.trim().isEmpty;
-    bool get isWin  => result == 'win';
-    bool get isLoss => result == 'loss';
-    bool get isDraw => result == 'draw';
+    /// Called with current vote totals to produce the status string.
+    static String computeStatus(int entityVotes, int opponentVotes) {
+        if (entityVotes > opponentVotes) return 'won';
+        if (opponentVotes > entityVotes) return 'lost';
+        return 'draw';
     }
 
-    String? _optionalResultString(dynamic value) {
+    bool get isPending => status == null || status!.trim().isEmpty;
+    bool get isWon     => status == 'won';
+    bool get isLost    => status == 'lost';
+    bool get isDraw    => status == 'draw';
+    }
+
+    String? _optionalStatusString(dynamic value) {
     if (value == null) return null;
     if (value is! String) return null;
     final s = value.trim();
-    return s.isEmpty ? null : s;
+    if (s.isEmpty) return null;
+    return (s == 'won' || s == 'lost' || s == 'draw') ? s : null;
     }
 
     // ── Head-to-head record against one opponent ──────────────────────────────────

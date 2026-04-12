@@ -192,6 +192,20 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   List<String> get _editableTrackIds =>
       _isAuthorEditor ? widget.versus.artist1TrackIDs : widget.versus.artist2TrackIDs;
 
+  /// Sole author (no invitee): both artists are theirs to edit.
+  bool get _authorEditsBothSides =>
+      _isAuthorEditor &&
+      (widget.versus.collaboratorID?.trim() ?? '').isEmpty;
+
+  /// Open = live for discovery/votes — keep artist IDs stable for rankings/polls.
+  bool get _artistsLocked => widget.versus.isOpen;
+
+  /// Playback / bomb: first column track list, then second (matches [PageView] when author).
+  List<SpotifyTrack> get _pairFirstTracks =>
+      _authorEditsBothSides ? _mySelectedTracks : _user1Tracks;
+  List<SpotifyTrack> get _pairSecondTracks =>
+      _authorEditsBothSides ? _soloSide2SelectedTracks : _mySelectedTracks;
+
   // ── User1 (author) — read-only ─────────────────────────────────────────────
   List<SpotifyTrack> _user1Tracks = [];
   String?            _user1ImageUrl;
@@ -222,6 +236,20 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   List<SpotifyTrack>?         _trackSearchResults;
   bool                        _isSearchingTracks = false;
   String                      _trackFilterQuery  = '';
+
+  // Solo author — second side (artist2 in Firestore)
+  SpotifyArtistDetails? _soloSide2Artist;
+  String?               _soloSide2ImageUrl;
+  List<SpotifyTrack>    _soloSide2TopTracks       = [];
+  List<SpotifyTrack>    _soloSide2SelectedTracks  = [];
+  bool                  _isLoadingSide2Tracks     = false;
+
+  final TextEditingController _trackSearchCtrlSide2 = TextEditingController();
+  final FocusNode             _trackSearchFocusSide2 = FocusNode();
+  Timer?                      _trackDebounceSide2;
+  List<SpotifyTrack>?         _trackSearchResultsSide2;
+  bool                        _isSearchingTracksSide2 = false;
+  String                      _trackFilterQuerySide2  = '';
 
   // Comment
   final TextEditingController _commentCtrl = TextEditingController();
@@ -273,10 +301,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     _slideAnim = CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic);
 
     _trackSearchCtrl.addListener(_onTrackFilterChanged);
+    _trackSearchCtrlSide2.addListener(_onTrackFilterChangedSide2);
     _commentCtrl.addListener(() { if (mounted) setState(() {}); });
 
-    _loadUser1Tracks();
-    _checkPrefilledArtist2();
+    if (_authorEditsBothSides) {
+      unawaited(_loadSoloAuthorBothSides());
+    } else {
+      _loadUser1Tracks();
+      _checkPrefilledArtist2();
+    }
   }
 
   @override
@@ -284,10 +317,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     _nowPlayingSub?.cancel();
     _artistDebounce?.cancel();
     _trackDebounce?.cancel();
+    _trackDebounceSide2?.cancel();
     _artistSearchCtrl.dispose();
     _artistSearchFocus.dispose();
     _trackSearchCtrl.dispose();
     _trackSearchFocus.dispose();
+    _trackSearchCtrlSide2.dispose();
+    _trackSearchFocusSide2.dispose();
     _commentCtrl.dispose();
     _pageCtrl.dispose();
     _shimmerCtrl.dispose();
@@ -359,9 +395,173 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     } catch (_) {}
   }
 
+  Future<void> _loadSoloAuthorBothSides() async {
+    setState(() {
+      _isLoadingUser1 = false;
+      _user1Tracks = [];
+      _user1ImageUrl = null;
+    });
+    final id1 = widget.versus.artist1ID.trim();
+    final name1 = widget.versus.artist1Name.trim();
+    final ids1 = widget.versus.artist1TrackIDs
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final id2 = widget.versus.artist2ID.trim();
+    final name2 = widget.versus.artist2Name.trim();
+    final ids2 = widget.versus.artist2TrackIDs
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    _commentCtrl.text = (widget.versus.authorComment ?? '').trim();
+
+    try {
+      final r = await Future.wait([
+        id1.isNotEmpty ? _api.getArtistDetails(id1) : Future<SpotifyArtistDetails?>.value(null),
+        id2.isNotEmpty ? _api.getArtistDetails(id2) : Future<SpotifyArtistDetails?>.value(null),
+        ids1.isNotEmpty
+            ? _api.getTracksByIds(ids1)
+            : Future<List<SpotifyTrack>>.value([]),
+        ids2.isNotEmpty
+            ? _api.getTracksByIds(ids2)
+            : Future<List<SpotifyTrack>>.value([]),
+      ]);
+      if (!mounted) return;
+      final d1 = r[0] as SpotifyArtistDetails?;
+      final d2 = r[1] as SpotifyArtistDetails?;
+      final tracks1 = r[2] as List<SpotifyTrack>;
+      final tracks2 = r[3] as List<SpotifyTrack>;
+      setState(() {
+        if (id1.isNotEmpty) {
+          _myArtist = SpotifyArtistDetails(
+            id: id1,
+            name: name1.isNotEmpty ? name1 : (d1?.name ?? id1),
+            imageUrl: d1?.imageUrl,
+          );
+          _myArtistImageUrl = d1?.imageUrl;
+          _mySelectedTracks = tracks1;
+        }
+        if (id2.isNotEmpty) {
+          _soloSide2Artist = SpotifyArtistDetails(
+            id: id2,
+            name: name2.isNotEmpty ? name2 : (d2?.name ?? id2),
+            imageUrl: d2?.imageUrl,
+          );
+          _soloSide2ImageUrl = d2?.imageUrl;
+          _soloSide2SelectedTracks = tracks2;
+        }
+        _artist2PreFilled = id1.isNotEmpty || id2.isNotEmpty;
+      });
+      if (id1.isNotEmpty) unawaited(_fetchMyTopTracks(id1));
+      if (id2.isNotEmpty) unawaited(_fetchSide2TopTracks(id2));
+      _slideCtrl.forward(from: 0);
+    } catch (_) {
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _fetchSide2TopTracks(String artistId) async {
+    if (_isLoadingSide2Tracks) return;
+    setState(() => _isLoadingSide2Tracks = true);
+    try {
+      final tracks = await _api.getArtistTopTracks(artistId);
+      if (!mounted) return;
+      setState(() => _soloSide2TopTracks = tracks);
+      _slideCtrl.forward(from: 0);
+    } finally {
+      if (mounted) setState(() => _isLoadingSide2Tracks = false);
+    }
+  }
+
+  void _onTrackFilterChangedSide2() {
+    final q = _trackSearchCtrlSide2.text.trim();
+    if (q == _trackFilterQuerySide2) return;
+    setState(() => _trackFilterQuerySide2 = q);
+    _trackDebounceSide2?.cancel();
+    if (q.isEmpty) {
+      setState(() {
+        _trackSearchResultsSide2 = null;
+        _isSearchingTracksSide2 = false;
+      });
+      return;
+    }
+    setState(() => _isSearchingTracksSide2 = true);
+    _trackDebounceSide2 = Timer(const Duration(milliseconds: 420), () async {
+      final artist = _soloSide2Artist;
+      if (artist == null || !mounted) return;
+      final results = await _api.searchTracksByArtists(
+        q,
+        artist1Id: artist.id,
+        artist1Name: artist.name,
+        artist2Id: '',
+        artist2Name: '',
+        limitPerArtist: 20,
+      );
+      if (!mounted) return;
+      setState(() {
+        _trackSearchResultsSide2 = results[artist.id] ?? [];
+        _isSearchingTracksSide2 = false;
+      });
+      _slideCtrl.forward(from: 0);
+    });
+  }
+
+  void _toggleSide2Track(SpotifyTrack track) {
+    setState(() {
+      final idx = _soloSide2SelectedTracks.indexWhere((t) => t.id == track.id);
+      if (idx >= 0) {
+        _soloSide2SelectedTracks.removeAt(idx);
+      } else {
+        _soloSide2SelectedTracks.add(track);
+      }
+    });
+  }
+
+  void _removeSide2Track(String trackId) {
+    setState(() =>
+        _soloSide2SelectedTracks.removeWhere((t) => t.id == trackId));
+  }
+
+  void _reorderSide2SelectedTracks(int oldIndex, int newIndex) {
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= _soloSide2SelectedTracks.length ||
+        newIndex > _soloSide2SelectedTracks.length) {
+      return;
+    }
+    setState(() {
+      if (newIndex > oldIndex) newIndex -= 1;
+      final item = _soloSide2SelectedTracks.removeAt(oldIndex);
+      _soloSide2SelectedTracks.insert(newIndex, item);
+    });
+  }
+
+  List<SpotifyTrack> get _side2VisibleTracks {
+    if (_trackFilterQuerySide2.isNotEmpty &&
+        _trackSearchResultsSide2 != null) {
+      return _trackSearchResultsSide2!;
+    }
+    return _soloSide2TopTracks;
+  }
+
   // ── Artist search (user2) ──────────────────────────────────────────────────
 
   void _onArtistSearchChanged(String query) {
+    if (_artistsLocked) {
+      _artistDebounce?.cancel();
+      if (query.trim().isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _artistSearchCtrl.clear();
+          setState(() {
+            _artistResults = [];
+            _isSearchingArtist = false;
+            _lastArtistQuery = '';
+          });
+        });
+      }
+      return;
+    }
     _artistDebounce?.cancel();
     final q = query.trim();
     if (q == _lastArtistQuery) return;
@@ -379,6 +579,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   }
 
   void _selectMyArtist(SpotifyArtistDetails artist) {
+    if (_artistsLocked) return;
     setState(() {
       _myArtist         = artist;
       _myArtistImageUrl = artist.imageUrl;
@@ -393,6 +594,28 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       _lastArtistQuery  = '';
     });
     _fetchMyTopTracks(artist.id);
+  }
+
+  void _selectArtistFromSearch(SpotifyArtistDetails artist) {
+    if (_artistsLocked) return;
+    if (_authorEditsBothSides && _currentPage == 1) {
+      setState(() {
+        _soloSide2Artist = artist;
+        _soloSide2ImageUrl = artist.imageUrl;
+        _soloSide2TopTracks = [];
+        _soloSide2SelectedTracks = [];
+        _trackSearchResultsSide2 = null;
+        _trackSearchCtrlSide2.clear();
+        _trackFilterQuerySide2 = '';
+        _artistSearchCtrl.clear();
+        _artistResults = [];
+        _isSearchingArtist = false;
+        _lastArtistQuery = '';
+      });
+      _fetchSide2TopTracks(artist.id);
+    } else {
+      _selectMyArtist(artist);
+    }
   }
 
   Future<void> _fetchMyTopTracks(String artistId) async {
@@ -479,11 +702,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   /// If user2 has no track at index i, fall back to user1[i] again
   /// (so it still plays something for that round).
   Future<void> _handlePlay() async {
-    if (_user1Tracks.isEmpty) return;
-    final t1 = _user1Tracks.elementAtOrNull(_activeRound);
+    if (_pairFirstTracks.isEmpty) return;
+    final t1 = _pairFirstTracks.elementAtOrNull(_activeRound);
     if (t1 == null || t1.id.isEmpty) return;
 
-    final t2 = _mySelectedTracks.elementAtOrNull(_activeRound);
+    final t2 = _pairSecondTracks.elementAtOrNull(_activeRound);
     // If user2 has no track at this round, play t1 twice (back-to-back).
     final uri2 = (t2 != null && t2.id.isNotEmpty) ? t2.uri : t1.uri;
     final id2  = (t2 != null && t2.id.isNotEmpty) ? t2.id  : t1.id;
@@ -518,7 +741,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       if (trackId == rt2) { _roundTrack2Started = true; return; }
 
       if (_roundTrack2Started && trackId != rt2) {
-        final total = math.max(_user1Tracks.length, _mySelectedTracks.length);
+        final total = math.max(
+            _pairFirstTracks.length, _pairSecondTracks.length);
         if (_activeRound < total - 1) {
           setState(() { _activeRound++; _playingRound = null; });
         } else {
@@ -533,15 +757,16 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   }
 
   Future<void> _handleBomb() async {
-    if (_isBombLoading || _user1Tracks.isEmpty) return;
-    final total = math.max(_user1Tracks.length, _mySelectedTracks.length);
+    if (_isBombLoading || _pairFirstTracks.isEmpty) return;
+    final total =
+        math.max(_pairFirstTracks.length, _pairSecondTracks.length);
     if (_activeRound >= total - 1) return;
 
     setState(() => _isBombLoading = true);
     try {
       for (int i = _activeRound + 1; i < total; i++) {
-        final t1   = _user1Tracks.elementAtOrNull(i);
-        final t2   = _mySelectedTracks.elementAtOrNull(i);
+        final t1   = _pairFirstTracks.elementAtOrNull(i);
+        final t2   = _pairSecondTracks.elementAtOrNull(i);
         if (t1 == null) break;
         final uri2 = (t2 != null && t2.id.isNotEmpty) ? t2.uri : t1.uri;
         final ok   = await _api.queueRoundTracks(t1.uri, uri2);
@@ -570,14 +795,37 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   int get _authorSideTrackCount => _readOnlyTrackIds.length;
 
   bool get _canSubmit {
-    if (_myArtist == null || !_isKnownEditor) return false;
+    if (!_isKnownEditor) return false;
+    if (_authorEditsBothSides) {
+      if (_myArtist == null || _soloSide2Artist == null) return false;
+      if (_mySelectedTracks.isEmpty || _soloSide2SelectedTracks.isEmpty) {
+        return false;
+      }
+      return _mySelectedTracks.length == _soloSide2SelectedTracks.length;
+    }
+    if (_myArtist == null) return false;
     if (_mySelectedTracks.isEmpty) return false;
     return _mySelectedTracks.length >= _authorSideTrackCount;
   }
 
   String? get _submitHint {
-    if (_myArtist == null) return null;
     if (!_isKnownEditor) return 'You do not have permission to edit this versus';
+    if (_authorEditsBothSides) {
+      if (_myArtist == null || _soloSide2Artist == null) {
+        return 'Pick both artists';
+      }
+      final n1 = _mySelectedTracks.length;
+      final n2 = _soloSide2SelectedTracks.length;
+      if (n1 == 0 || n2 == 0) {
+        return 'Select tracks on both sides';
+      }
+      if (n1 != n2) {
+        final d = (n1 - n2).abs();
+        return 'Both sides need the same number of tracks ($d off)';
+      }
+      return null;
+    }
+    if (_myArtist == null) return null;
     final need = _authorSideTrackCount;
     final have = _mySelectedTracks.length;
     if (need == 0) {
@@ -599,6 +847,18 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   String get _submitLabel {
     if (!_isKnownEditor) return 'NO EDIT PERMISSION';
+    if (_authorEditsBothSides) {
+      if (_myArtist == null || _soloSide2Artist == null) {
+        return 'PICK BOTH ARTISTS';
+      }
+      if (_mySelectedTracks.isEmpty || _soloSide2SelectedTracks.isEmpty) {
+        return 'SELECT TRACKS ON BOTH SIDES';
+      }
+      if (_mySelectedTracks.length != _soloSide2SelectedTracks.length) {
+        return 'MATCH TRACK COUNTS';
+      }
+      return 'CONFIRM & GO LIVE';
+    }
     if (_myArtist == null) return 'PICK YOUR ARTIST FIRST';
     if (_mySelectedTracks.isEmpty) return 'SELECT YOUR TRACKS FIRST';
     if (_mySelectedTracks.length < _authorSideTrackCount) {
@@ -670,7 +930,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     if (!_canSubmit || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
-      final hasLongerTracks = _mySelectedTracks.length > _authorSideTrackCount;
+      final hasLongerTracks = _authorEditsBothSides
+          ? false
+          : _mySelectedTracks.length > _authorSideTrackCount;
       // When this succeeds with both artists and live status, [FirebaseService]
       // creates ranking stubs for both entities (see _ensureRankingStubsForVersusDocIfLive).
       await FirebaseService.acceptCollaborationInvite(
@@ -683,6 +945,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             : _commentCtrl.text.trim(),
         editorUsername: widget.currentUser.username.trim(),
         editorAvatarPath: widget.currentUser.avatarPath.trim(),
+        editedArtist2ID: _authorEditsBothSides ? _soloSide2Artist!.id : null,
+        editedArtist2Name: _authorEditsBothSides ? _soloSide2Artist!.name : null,
+        editedArtist2TrackIDs: _authorEditsBothSides
+            ? _soloSide2SelectedTracks.map((t) => t.id).toList()
+            : null,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -737,6 +1004,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     final showArtistOverlay = _artistSearchCtrl.text.trim().isNotEmpty ||
         _isSearchingArtist;
     final editablePageIndex = _editableOnLeft ? 0 : 1;
+    final artistSearchOverlayVisible = _authorEditsBothSides
+        ? (_currentPage == 0 || _currentPage == 1)
+        : _currentPage == editablePageIndex;
 
     return Container(
       decoration: const BoxDecoration(
@@ -757,18 +1027,25 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               PageView(
                 controller: _pageCtrl,
                 onPageChanged: _onPageChanged,
-                children: _editableOnLeft
+                children: _authorEditsBothSides
                     ? [
                         _buildMyTrackList(),
-                        _buildUser1TrackList(),
+                        _buildSoloSide2TrackList(),
                       ]
-                    : [
-                        _buildUser1TrackList(),
-                        _buildMyTrackList(),
-                      ],
+                    : _editableOnLeft
+                        ? [
+                            _buildMyTrackList(),
+                            _buildUser1TrackList(),
+                          ]
+                        : [
+                            _buildUser1TrackList(),
+                            _buildMyTrackList(),
+                          ],
               ),
-              // Artist search overlay on top of page 1
-              if (showArtistOverlay && _currentPage == editablePageIndex)
+              // Artist search overlay on top of editable page(s)
+              if (showArtistOverlay &&
+                  artistSearchOverlayVisible &&
+                  !_artistsLocked)
                 Positioned.fill(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -782,7 +1059,10 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 ),
             ]),
           ),
-          if (_myArtist != null) _buildSubmitBar(),
+          if (_authorEditsBothSides
+              ? (_myArtist != null && _soloSide2Artist != null)
+              : _myArtist != null)
+            _buildSubmitBar(),
         ]),
       ),
     );
@@ -834,7 +1114,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           ),
         ),
         if (_myArtist != null &&
-            (_authorSideTrackCount > 0 || _mySelectedTracks.isNotEmpty)) ...[
+            (_authorEditsBothSides
+                ? (_soloSide2Artist != null &&
+                    (_mySelectedTracks.isNotEmpty ||
+                        _soloSide2SelectedTracks.isNotEmpty))
+                : (_authorSideTrackCount > 0 ||
+                    _mySelectedTracks.isNotEmpty))) ...[
           const SizedBox(width: 8),
           _buildTrackCountBadge(),
         ],
@@ -846,8 +1131,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   /// Host track count vs yours — mirrors artist lockeroom balance chip.
   Widget _buildTrackCountBadge() {
-    final c1 = _authorSideTrackCount;
-    final c2 = _mySelectedTracks.length;
+    final c1 = _authorEditsBothSides
+        ? _mySelectedTracks.length
+        : _authorSideTrackCount;
+    final c2 = _authorEditsBothSides
+        ? _soloSide2SelectedTracks.length
+        : _mySelectedTracks.length;
     final balanced = c1 == c2 && c1 > 0;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -947,6 +1236,77 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     final leftPageIndex = 0;
     final rightPageIndex = 1;
 
+    if (_authorEditsBothSides) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Row(children: [
+          Expanded(
+            child: _SlotChip(
+              artist: _myArtist != null
+                  ? _SlotArtistData(
+                      name: _myArtist!.name,
+                      imageUrl: _myArtistImageUrl,
+                    )
+                  : null,
+              label: 'ARTIST 1',
+              accentColor: _kPink,
+              isActive: _currentPage == leftPageIndex,
+              trackCount: _mySelectedTracks.length,
+              isReadOnly: _artistsLocked,
+              onTap: () => _goToPage(leftPageIndex),
+              onRemove: (_myArtist == null || _artistsLocked)
+                  ? null
+                  : () => setState(() {
+                        _myArtist = null;
+                        _myArtistImageUrl = null;
+                        _myTopTracks = [];
+                        _mySelectedTracks = [];
+                        _trackSearchResults = null;
+                        _trackFilterQuery = '';
+                        _trackSearchCtrl.clear();
+                        _artist2PreFilled = false;
+                      }),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('VS', style: TextStyle(
+              color: Colors.white.withOpacity(0.6), fontSize: 13,
+              fontWeight: FontWeight.w900, letterSpacing: 2,
+            )),
+          ),
+          Expanded(
+            child: _SlotChip(
+              artist: _soloSide2Artist != null
+                  ? _SlotArtistData(
+                      name: _soloSide2Artist!.name,
+                      imageUrl: _soloSide2ImageUrl,
+                    )
+                  : null,
+              label: 'ARTIST 2',
+              accentColor: _kPurple,
+              isActive: _currentPage == rightPageIndex,
+              trackCount: _soloSide2SelectedTracks.length,
+              isReadOnly: _artistsLocked,
+              onTap: () => _goToPage(rightPageIndex),
+              onRemove: (_soloSide2Artist == null || _artistsLocked)
+                  ? null
+                  : () => setState(() {
+                        _soloSide2Artist = null;
+                        _soloSide2ImageUrl = null;
+                        _soloSide2TopTracks = [];
+                        _soloSide2SelectedTracks = [];
+                        _trackSearchResultsSide2 = null;
+                        _trackFilterQuerySide2 = '';
+                        _trackSearchCtrlSide2.clear();
+                        _artist2PreFilled = false;
+                      }),
+            ),
+          ),
+        ]),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(children: [
@@ -964,9 +1324,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                   accentColor: _kPink,
                   isActive: _currentPage == leftPageIndex,
                   trackCount: _mySelectedTracks.length,
-                  isReadOnly: false,
+                  isReadOnly: _artistsLocked,
                   onTap: () => _goToPage(leftPageIndex),
-                  onRemove: _myArtist == null
+                  onRemove: (_myArtist == null || _artistsLocked)
                       ? null
                       : () => setState(() {
                             _myArtist = null;
@@ -1028,9 +1388,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                       accentColor: _kPink,
                       isActive: _currentPage == rightPageIndex,
                       trackCount: _mySelectedTracks.length,
-                      isReadOnly: false,
+                      isReadOnly: _artistsLocked,
                       onTap: () => _goToPage(rightPageIndex),
-                      onRemove: () => setState(() {
+                      onRemove: _artistsLocked
+                          ? null
+                          : () => setState(() {
                         _myArtist = null;
                         _myArtistImageUrl = null;
                         _myTopTracks = [];
@@ -1047,7 +1409,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                       accentColor: _kPink,
                       isActive: _currentPage == rightPageIndex,
                       trackCount: 0,
-                      isReadOnly: false,
+                      isReadOnly: _artistsLocked,
                       onTap: () => _goToPage(rightPageIndex),
                     ),
         ),
@@ -1058,7 +1420,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // ── Playback bar ───────────────────────────────────────────────────────────
 
   Widget _buildPlaybackBar() {
-    final canPlay = _user1Tracks.isNotEmpty;
+    final canPlay = _pairFirstTracks.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Row(children: [
@@ -1153,6 +1515,10 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   Widget _buildSliderDots() {
     final leftPageIndex = 0;
     final rightPageIndex = 1;
+    final leftDotColor =
+        _authorEditsBothSides || _editableOnLeft ? _kPink : _kPurple;
+    final rightDotColor =
+        _authorEditsBothSides || _editableOnLeft ? _kPurple : _kPink;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1160,7 +1526,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           onTap: () => _goToPage(leftPageIndex),
           child: _SwipeDot(
             isActive: _currentPage == leftPageIndex,
-            color: _editableOnLeft ? _kPink : _kPurple,
+            color: leftDotColor,
           ),
         ),
         const SizedBox(width: 6),
@@ -1168,7 +1534,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           onTap: () => _goToPage(rightPageIndex),
           child: _SwipeDot(
             isActive: _currentPage == rightPageIndex,
-            color: _editableOnLeft ? _kPurple : _kPink,
+            color: rightDotColor,
           ),
         ),
       ]),
@@ -1271,17 +1637,34 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          _buildMyArtistSearchBar(),
+          if (!_artistsLocked) _buildMyArtistSearchBar(),
           const SizedBox(height: 24),
-          Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.person_search_rounded,
-                color: Colors.white.withOpacity(0.25), size: 44),
-            const SizedBox(height: 10),
-            Text('Search for your artist above',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.4), fontSize: 13,
-                  fontWeight: FontWeight.w500)),
-          ])),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _artistsLocked
+                      ? Icons.lock_outline_rounded
+                      : Icons.person_search_rounded,
+                  color: Colors.white.withOpacity(0.25),
+                  size: 44,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _artistsLocked
+                      ? 'This versus is live. Artists are locked — you can only change track lists.'
+                      : 'Search for your artist above',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       );
     }
@@ -1307,10 +1690,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         _buildTrackListHeader(
           name:        _myArtist!.name,
           imageUrl:    _myArtistImageUrl,
-          roleLabel:   'YOUR TRACKS',
+          roleLabel:   _authorEditsBothSides ? 'SIDE 1' : 'YOUR TRACKS',
           accentColor: _kPink,
           alignRight:  !_editableOnLeft,
-          trailing: GestureDetector(
+          trailing: _artistsLocked
+              ? null
+              : GestureDetector(
             onTap: () {
               setState(() {
                 _myArtist         = null;
@@ -1365,6 +1750,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 key: ValueKey('selected-${track.id}'),
                 track: track,
                 accentColor: _kPink,
+                onSelectRound: _authorEditsBothSides
+                    ? () => _onTrackTapped(i)
+                    : null,
                 reorderHandle: ReorderableDragStartListener(
                   index: i,
                   child: Container(
@@ -1452,6 +1840,228 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     );
   }
 
+  Widget _buildSoloSide2TrackList() {
+    if (_soloSide2Artist == null) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        children: [
+          if (!_artistsLocked) _buildSoloSide2ArtistSearchBar(),
+          const SizedBox(height: 24),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _artistsLocked
+                      ? Icons.lock_outline_rounded
+                      : Icons.person_search_rounded,
+                  color: Colors.white.withOpacity(0.25),
+                  size: 44,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _artistsLocked
+                      ? 'This versus is live. Artists are locked — you can only change track lists.'
+                      : 'Search for the second artist above',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_isLoadingSide2Tracks) {
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: 8,
+        itemBuilder: (_, i) => _ShimmerTrackRow(
+            shimmerController: _shimmerCtrl, accentColor: _kPurple),
+      );
+    }
+
+    final tracks       = _side2VisibleTracks;
+    final picked       = _soloSide2SelectedTracks;
+    final isSearchMode = _trackFilterQuerySide2.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _buildTrackListHeader(
+          name: _soloSide2Artist!.name,
+          imageUrl: _soloSide2ImageUrl,
+          roleLabel: 'SIDE 2',
+          accentColor: _kPurple,
+          alignRight: true,
+          trailing: _artistsLocked
+              ? null
+              : GestureDetector(
+            onTap: () {
+              setState(() {
+                _soloSide2Artist = null;
+                _soloSide2ImageUrl = null;
+                _soloSide2TopTracks = [];
+                _soloSide2SelectedTracks = [];
+                _trackSearchResultsSide2 = null;
+                _trackFilterQuerySide2 = '';
+                _trackSearchCtrlSide2.clear();
+                _artist2PreFilled = false;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(99),
+                color: _kPurple.withOpacity(0.18),
+                border: Border.all(
+                    color: _kPurple.withOpacity(0.40), width: 0.8),
+              ),
+              child: Text(
+                'change',
+                style: TextStyle(
+                  color: _kPurple.withOpacity(0.9),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+        ),
+        _buildSoloSide2ArtistSearchBar(),
+        const SizedBox(height: 4),
+        _buildSide2TrackSearchBar(),
+        const SizedBox(height: 10),
+
+        if (picked.isNotEmpty) ...[
+          _buildSectionLabel(
+            icon: Icons.playlist_add_check_rounded,
+            label: 'SELECTED',
+            count: picked.length,
+            accentColor: _kPurple,
+          ),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: picked.length,
+            onReorder: _reorderSide2SelectedTracks,
+            itemBuilder: (context, i) {
+              final track = picked[i];
+              return _SelectedTrackTile(
+                key: ValueKey('side2-selected-${track.id}'),
+                track: track,
+                accentColor: _kPurple,
+                onSelectRound: () => _onTrackTapped(i),
+                reorderHandle: ReorderableDragStartListener(
+                  index: i,
+                  child: Container(
+                    width: 24,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(7),
+                      color: _kPurple.withOpacity(0.16),
+                      border: Border.all(
+                        color: _kPurple.withOpacity(0.34),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.drag_indicator_rounded,
+                      color: Colors.white,
+                      size: 15,
+                    ),
+                  ),
+                ),
+                onRemove: () => _removeSide2Track(track.id),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: Container(
+                height: 0.8,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    _kPurple.withOpacity(0.0),
+                    _kPurple.withOpacity(0.4),
+                    _kPurple.withOpacity(0.0),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+        ],
+
+        if (tracks.isNotEmpty)
+          _buildSectionLabel(
+            icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
+            label: isSearchMode ? 'RESULTS' : 'TOP TRACKS',
+            count: tracks.length,
+            accentColor: _kPurple,
+            dimmed: picked.isNotEmpty,
+          ),
+
+        if (tracks.isEmpty && isSearchMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Center(
+              child: Text(
+                'No tracks found for "${_soloSide2Artist!.name}"',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.4), fontSize: 13),
+              ),
+            ),
+          )
+        else if (tracks.isEmpty && !isSearchMode && !_isLoadingSide2Tracks)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Center(
+              child: Text(
+                'No top tracks available',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.35), fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ...tracks.asMap().entries.map((entry) {
+            final i = entry.key;
+            final track = entry.value;
+            final alreadyPicked = picked.any((t) => t.id == track.id);
+            return AnimatedBuilder(
+              animation: _slideAnim,
+              builder: (_, child) => Transform.translate(
+                offset: Offset(0,
+                    20 * (1 - _slideAnim.value) * math.max(0, 1 - i * 0.06)),
+                child: Opacity(
+                    opacity: _slideAnim.value.clamp(0.0, 1.0), child: child),
+              ),
+              child: _SelectableTrackRow(
+                track: track,
+                accentColor: _kPurple,
+                isLast: i == tracks.length - 1,
+                dimmed: alreadyPicked || picked.isNotEmpty,
+                isSelected: alreadyPicked,
+                onAdd: alreadyPicked
+                    ? null
+                    : () => _toggleSide2Track(track),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
   // ── Artist search results overlay ──────────────────────────────────────────
 
   Widget _buildArtistSearchResults() {
@@ -1484,11 +2094,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       itemCount: _artistResults.length,
       itemBuilder: (context, i) {
         final artist = _artistResults[i];
-        final isSelected = _myArtist?.id == artist.id;
+        final side2Pick = _authorEditsBothSides && _currentPage == 1;
+        final isSelected = side2Pick
+            ? _soloSide2Artist?.id == artist.id
+            : _myArtist?.id == artist.id;
         return _ArtistGridCard(
-          artist: artist, isSelected: isSelected,
-          accentColor: _kPink,
-          onTap: () => _selectMyArtist(artist),
+          artist: artist,
+          isSelected: isSelected,
+          accentColor: side2Pick ? _kPurple : _kPink,
+          onTap: () => _selectArtistFromSearch(artist),
         );
       },
     );
@@ -1528,6 +2142,55 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 suffixIcon: _artistSearchCtrl.text.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _artistSearchCtrl.clear(); _onArtistSearchChanged(''); },
+                        child: Icon(Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.4), size: 18),
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSoloSide2ArtistSearchBar() {
+    if (_artistsLocked) return const SizedBox.shrink();
+    if (_soloSide2Artist != null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withOpacity(0.12),
+              border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+            ),
+            child: TextField(
+              controller: _artistSearchCtrl,
+              focusNode: _artistSearchFocus,
+              onChanged: _onArtistSearchChanged,
+              autofocus: _soloSide2Artist == null && _myArtist != null,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+              cursorColor: _kPurple,
+              decoration: InputDecoration(
+                hintText: 'Search second artist...',
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.35), fontSize: 15),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.5), size: 20),
+                suffixIcon: _artistSearchCtrl.text.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          _artistSearchCtrl.clear();
+                          _onArtistSearchChanged('');
+                        },
                         child: Icon(Icons.close_rounded,
                             color: Colors.white.withOpacity(0.4), size: 18),
                       )
@@ -1591,6 +2254,80 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 suffixIcon: _trackFilterQuery.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _trackSearchCtrl.clear(); _trackSearchFocus.unfocus(); },
+                        child: Icon(Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.35), size: 16),
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                isDense: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSide2TrackSearchBar() {
+    final inSearchMode = _trackFilterQuerySide2.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              color: inSearchMode
+                  ? Colors.white.withOpacity(0.14)
+                  : Colors.white.withOpacity(0.09),
+              border: Border.all(
+                color: inSearchMode
+                    ? Colors.white.withOpacity(0.28)
+                    : Colors.white.withOpacity(0.14),
+                width: 0.8,
+              ),
+            ),
+            child: TextField(
+              controller: _trackSearchCtrlSide2,
+              focusNode: _trackSearchFocusSide2,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+              cursorColor: _kPurple,
+              decoration: InputDecoration(
+                hintText: inSearchMode
+                    ? 'Searching Spotify...'
+                    : 'Search this artist\'s tracks...',
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.3), fontSize: 13),
+                prefixIcon: _isSearchingTracksSide2
+                    ? Padding(
+                        padding: const EdgeInsets.all(11),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.8,
+                            color: Colors.white.withOpacity(0.5),
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        inSearchMode
+                            ? Icons.manage_search_rounded
+                            : Icons.queue_music_rounded,
+                        color: Colors.white.withOpacity(0.4),
+                        size: 18,
+                      ),
+                suffixIcon: _trackFilterQuerySide2.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          _trackSearchCtrlSide2.clear();
+                          _trackSearchFocusSide2.unfocus();
+                        },
                         child: Icon(Icons.close_rounded,
                             color: Colors.white.withOpacity(0.35), size: 16),
                       )
@@ -1831,7 +2568,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
   Widget _buildSubmitBar() {
     final hint = _submitHint;
-    final need = _authorSideTrackCount;
+    final need = _authorEditsBothSides
+        ? _soloSide2SelectedTracks.length
+        : _authorSideTrackCount;
     final have = _mySelectedTracks.length;
 
     return SafeArea(
@@ -2200,6 +2939,7 @@ class _SelectedTrackTile extends StatelessWidget {
   final Color        accentColor;
   final Widget       reorderHandle;
   final VoidCallback onRemove;
+  final VoidCallback? onSelectRound;
 
   const _SelectedTrackTile({
     super.key,
@@ -2207,10 +2947,42 @@ class _SelectedTrackTile extends StatelessWidget {
     required this.accentColor,
     required this.reorderHandle,
     required this.onRemove,
+    this.onSelectRound,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(track.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1)),
+        if (track.artistName.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(track.artistName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: accentColor.withOpacity(0.8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500)),
+        ],
+      ],
+    );
+    if (onSelectRound != null) {
+      title = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onSelectRound,
+        child: title,
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: ClipRRect(
@@ -2243,23 +3015,7 @@ class _SelectedTrackTile extends StatelessWidget {
                       child: Image.network(track.albumArtUrl!, fit: BoxFit.cover),
                     ),
                   ),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(track.name,
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white,
-                          fontSize: 13, fontWeight: FontWeight.w700,
-                          letterSpacing: -0.1)),
-                    if (track.artistName.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(track.artistName,
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: accentColor.withOpacity(0.8),
-                            fontSize: 11, fontWeight: FontWeight.w500)),
-                    ],
-                  ],
-                )),
+                Expanded(child: title),
                 const SizedBox(width: 6),
                 reorderHandle,
                 const SizedBox(width: 8),

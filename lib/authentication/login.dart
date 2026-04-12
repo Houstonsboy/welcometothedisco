@@ -15,38 +15,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _isRegister = false;
   String _errorMessage = '';
-
-  Future<void> _handleEmailAuth() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-    try {
-      if (_isRegister) {
-        await _authService.registerWithEmail(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
-      } else {
-        await _authService.signInWithEmail(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e is String ? e : e.toString();
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
   Future<void> _handleGoogleSignIn() async {
     setState(() {
@@ -55,27 +26,48 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.signInWithGoogle();
+      final result = await _authService.signInWithGoogleFromLoginScreen();
+
+      if (!mounted) return;
+
+      switch (result.kind) {
+        case GoogleLoginScreenResultKind.success:
+          if (FirebaseAuth.instance.currentUser != null) {
+            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+          } else {
+            setState(() => _isLoading = false);
+          }
+          return;
+        case GoogleLoginScreenResultKind.needsRegistration:
+          setState(() => _isLoading = false);
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => SignupScreen(
+                initialEmail: result.signupEmail,
+                initialDisplayName: result.signupDisplayName,
+              ),
+            ),
+          );
+          return;
+        case GoogleLoginScreenResultKind.usePasswordInstead:
+          setState(() {
+            _isLoading = false;
+            _errorMessage =
+                'This email is tied to an older sign-in method. Use the Google account you registered with, or try a different Google account.';
+          });
+          return;
+        case GoogleLoginScreenResultKind.cancelled:
+          setState(() => _isLoading = false);
+          return;
+      }
     } catch (e) {
-      // Only show an error if the sign-in genuinely failed (user is still logged out).
       if (mounted && FirebaseAuth.instance.currentUser == null) {
         setState(() {
           _isLoading = false;
           _errorMessage = e is String ? e : e.toString();
         });
       }
-      return;
-    }
-
-    // Check currentUser directly — it is set synchronously by signInWithCredential
-    // regardless of what the Future return value looks like (covers Android edge cases).
-    if (!mounted) return;
-    if (FirebaseAuth.instance.currentUser != null) {
-      // Re-push '/' so _AuthGateState.initState() reads currentUser synchronously
-      // without relying on authStateChanges() emitting (known Android timing issue).
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-    } else {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -115,11 +107,11 @@ class _LoginScreenState extends State<LoginScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           title: const Text(
-            'Welcome to the Disco',
-            style: TextStyle(
-              fontSize: 25.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: AppTheme.titleAccent,
+            "Welcome to the Disco",
+                style: TextStyle(
+                  fontSize: 15.0,
+                  fontFamily: AppTheme.fontHeader,
+                  color: Color(0xFF17B5EE),
             ),
           ),
         ),
@@ -141,40 +133,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white.withOpacity(0.95),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: TextStyle(color: Colors.white.withOpacity(0.95)),
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                          ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.8)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        style: TextStyle(color: Colors.white.withOpacity(0.95)),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                          enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                          ),
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.8)),
-                          ),
+                      const SizedBox(height: 10),
+                      Text(
+                        ' New users will set a username and avatar next.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: Colors.white.withOpacity(0.65),
                         ),
                       ),
                       if (_errorMessage.isNotEmpty) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
                           _errorMessage,
                           style: TextStyle(
@@ -184,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ],
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
                       SizedBox(
                         width: double.infinity,
                         child: _isLoading
@@ -193,79 +163,48 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: AppTheme.titleAccent,
                                 ),
                               )
-                            : Material(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(50),
-                                child: InkWell(
-                                  onTap: _handleEmailAuth,
-                                  borderRadius: BorderRadius.circular(50),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    child: Center(
-                                      child: Text(
-                                        _isRegister ? 'Register' : 'Login',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
+                            : OutlinedButton.icon(
+                                onPressed: _handleGoogleSignIn,
+                                icon: Icon(
+                                  Icons.g_mobiledata_rounded,
+                                  color: Colors.white.withOpacity(0.9),
+                                  size: 28,
+                                ),
+                                label: Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: Colors.white.withOpacity(0.45),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
                                   ),
                                 ),
                               ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 20),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SignupScreen()),
-                          );
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const SignupScreen(),
+                                  ),
+                                );
+                              },
                         child: Text(
-                          'No account? Register',
+                          'New here? Create an account',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Divider(color: Colors.white.withOpacity(0.3)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'or',
-                              style: TextStyle(color: Colors.white.withOpacity(0.6)),
-                            ),
-                          ),
-                          Expanded(
-                            child: Divider(color: Colors.white.withOpacity(0.3)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _handleGoogleSignIn,
-                          icon: Icon(
-                            Icons.g_mobiledata_rounded,
-                            color: Colors.white.withOpacity(0.9),
-                            size: 24,
-                          ),
-                          label: Text(
-                            'Continue with Google',
-                            style: TextStyle(color: Colors.white.withOpacity(0.95)),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.white.withOpacity(0.4)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),

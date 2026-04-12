@@ -1,5 +1,6 @@
 // lib/services/firebase_service.dart
 import 'dart:async';
+import 'dart:math' show min;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +11,17 @@ import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
+
+/// Thrown when [FirebaseService.reconcileRankingBatch] reads the two ranking
+/// docs in a transaction and one or both are missing (e.g. stubs still
+/// writing). Callers may retry after a short delay.
+class RankingStubsMissingException implements Exception {
+  final String message;
+  const RankingStubsMissingException(this.message);
+
+  @override
+  String toString() => 'RankingStubsMissingException: $message';
+}
 
 class FirebaseService {
   static final _firestore = FirebaseFirestore.instance;
@@ -453,13 +465,13 @@ class FirebaseService {
   }
 
   /// Dot-path fields for `opponents.{oid}.versus.{versusDocId}` when the session
-  /// is not finished yet (`entity_votes` / `opponent_votes` only; no `result`).
+  /// is not finished yet (`entity_votes` / `opponent_votes` only; no `status`).
   static Map<String, dynamic> _pendingVersusSubdocFields(
     String opponentsOidPrefix,
     String versusDocId,
   ) {
     final base = '$opponentsOidPrefix.versus.$versusDocId';
-    return {
+      return {
       '$base.entity_votes': 0,
       '$base.opponent_votes': 0,
     };
@@ -470,7 +482,7 @@ class FirebaseService {
   /// increments root [versus_count] and either adds [opponents.opponentId] with
   /// [versus_count] 1 or increments that nested [versus_count] for rematches.
   ///
-  /// Always writes `opponents.*.versus.{versusId}` with pending vote/result rows
+  /// Always writes `opponents.*.versus.{versusId}` with pending vote/status rows
   /// for the Firestore versus doc that triggered this link.
   static Future<void> _ensureRankingEntityOpponentLink({
     required String entityId,
@@ -652,6 +664,229 @@ class FirebaseService {
         versusId: vid,
       ),
     ]);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RANKINGS — poll reconciliation  (Function 7)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Called by _reconcileRankingNow() in ArtistVersusPlayground every time a
+  // checkpoint is crossed, the user navigates away, or the app is backgrounded.
+  //
+  // Algorithm (replace-and-recount, never delta-increment for votes):
+  //   1. Read BOTH ranking docs in a transaction.
+  //   2. Replace versus entry votes + status for this versusId in each doc.
+  //   3. Recount opponent-level tallies by scanning all versus under that opponent.
+  //   4. Recount root-level tallies by scanning all opponents.
+  //   5. Write both ranking docs + update poll's last_reconciled_pct atomically.
+  //
+  // This function will move to a Cloud Function in production. The call
+  // signature stays identical — only the invocation location changes.
+
+  static Future<void> reconcileRankingBatch({
+    required String entity1Id, // artist1ID / album1ID — their ranking doc ID
+    required String entity2Id, // artist2ID / album2ID — their ranking doc ID
+    required String versusId, // the versus doc ID
+    required String voterId, // used to locate the poll doc
+    required int currentEntity1Votes, // artist1's current vote total from local state
+    required int currentEntity2Votes, // artist2's current vote total from local state
+    required double currentPct, // completion_percentage from _buildVoteTemplateDoc()
+  }) async {
+    final e1 = entity1Id.trim();
+    final e2 = entity2Id.trim();
+    final vid = versusId.trim();
+    final uid = voterId.trim();
+
+    if (e1.isEmpty || e2.isEmpty || vid.isEmpty || uid.isEmpty) {
+      debugPrint('[reconcileRankingBatch] skipped — missing IDs');
+      return;
+    }
+
+    final ranking1Ref = _firestore.collection('rankings').doc(e1);
+    final ranking2Ref = _firestore.collection('rankings').doc(e2);
+    final pollRef = _firestore.collection('polls').doc('${vid}_$uid');
+
+    try {
+      await _firestore.runTransaction((tx) async {
+        // ── 1. Read both ranking docs ──────────────────────────────────────
+        final snap1 = await tx.get(ranking1Ref);
+        final snap2 = await tx.get(ranking2Ref);
+
+        if (!snap1.exists || !snap2.exists) {
+          debugPrint(
+            '[reconcileRankingBatch] ranking doc(s) missing — '
+            'stubs may still be writing (rankings/$e1 exists=${snap1.exists}, '
+            'rankings/$e2 exists=${snap2.exists})',
+          );
+          throw RankingStubsMissingException(
+            'rankings/$e1 exists=${snap1.exists}, '
+            'rankings/$e2 exists=${snap2.exists}',
+          );
+        }
+
+        // ── 2. Build updated versus entry for each doc ─────────────────────
+        // Entity1 perspective: entity1 votes are "entity", entity2 are "opponent"
+        final status1 = VersusResultModel.computeStatus(
+          currentEntity1Votes,
+          currentEntity2Votes,
+        );
+        // Entity2 perspective: mirror
+        final status2 = VersusResultModel.computeStatus(
+          currentEntity2Votes,
+          currentEntity1Votes,
+        );
+
+        // ── 3. Recount helper — runs entirely on in-memory doc data ────────
+        // Mutates the rawOpponents map in place with the new versus entry,
+        // then recounts all opponent-level and root-level fields.
+        Map<String, dynamic> buildRankingUpdate({
+          required Map<String, dynamic> existingData,
+          required String opponentId,
+          required int myVotes,
+          required int theirVotes,
+          required String myStatus,
+        }) {
+          // Deep-copy opponents map so we can mutate safely
+          final rawOpponents = Map<String, dynamic>.from(
+            (existingData['opponents'] as Map<String, dynamic>? ?? {}),
+          );
+
+          // Ensure opponent entry exists
+          final rawOpp = Map<String, dynamic>.from(
+            (rawOpponents[opponentId] as Map<String, dynamic>? ?? {}),
+          );
+
+          // Ensure versus sub-map exists and replace this versus entry
+          final rawVersus = Map<String, dynamic>.from(
+            (rawOpp['versus'] as Map<String, dynamic>? ?? {}),
+          );
+          rawVersus[vid] = {
+            'entity_votes': myVotes,
+            'opponent_votes': theirVotes,
+            'status': myStatus,
+            'played_at': FieldValue.serverTimestamp(),
+          };
+          rawOpp['versus'] = rawVersus;
+
+          // Recount opponent-level fields from all versus entries
+          var oppWins = 0;
+          var oppLosses = 0;
+          var oppDraws = 0;
+          var oppEntityVotesTotal = 0;
+          var oppOpponentVotesTotal = 0;
+          for (final vEntry in rawVersus.values) {
+            final vMap = vEntry as Map<String, dynamic>;
+            final s = (vMap['status'] as String?) ?? '';
+            final ev = (vMap['entity_votes'] as num?)?.toInt() ?? 0;
+            final ov = (vMap['opponent_votes'] as num?)?.toInt() ?? 0;
+            if (s == 'won') oppWins++;
+            if (s == 'lost') oppLosses++;
+            if (s == 'draw') oppDraws++;
+            oppEntityVotesTotal += ev;
+            oppOpponentVotesTotal += ov;
+          }
+
+          rawOpp['wins_against'] = oppWins;
+          rawOpp['losses_to'] = oppLosses;
+          rawOpp['draws'] = oppDraws;
+          rawOpp['versus_count'] = rawVersus.length;
+          rawOpp['total_entity_votes'] = oppEntityVotesTotal;
+          rawOpp['total_opponent_votes'] = oppOpponentVotesTotal;
+          rawOpp['last_played'] = FieldValue.serverTimestamp();
+          rawOpponents[opponentId] = rawOpp;
+
+          // Recount root-level fields from all opponent entries
+          var rootWins = 0;
+          var rootLosses = 0;
+          var rootDraws = 0;
+          var rootVersusCount = 0;
+          var rootTotalVotes = 0;
+          for (final oEntry in rawOpponents.values) {
+            final oMap = oEntry as Map<String, dynamic>;
+            rootWins += (oMap['wins_against'] as num?)?.toInt() ?? 0;
+            rootLosses += (oMap['losses_to'] as num?)?.toInt() ?? 0;
+            rootDraws += (oMap['draws'] as num?)?.toInt() ?? 0;
+            rootVersusCount += (oMap['versus_count'] as num?)?.toInt() ?? 0;
+            rootTotalVotes += (oMap['total_entity_votes'] as num?)?.toInt() ?? 0;
+          }
+
+          final winRate =
+              rootVersusCount == 0 ? 0.0 : rootWins / rootVersusCount;
+
+          // Return the full Firestore update map using dot-notation for nested fields
+          final update = <String, dynamic>{
+            'wins': rootWins,
+            'losses': rootLosses,
+            'draws': rootDraws,
+            'versus_count': rootVersusCount,
+            'total_votes': rootTotalVotes,
+            'win_rate': winRate,
+            'last_updated': FieldValue.serverTimestamp(),
+          };
+
+          // Write each opponent and versus field via dot-notation to avoid
+          // overwriting sibling opponents not touched in this transaction
+          final oppPrefix = 'opponents.$opponentId';
+          update['$oppPrefix.wins_against'] = rawOpp['wins_against'];
+          update['$oppPrefix.losses_to'] = rawOpp['losses_to'];
+          update['$oppPrefix.draws'] = rawOpp['draws'];
+          update['$oppPrefix.versus_count'] = rawOpp['versus_count'];
+          update['$oppPrefix.total_entity_votes'] = rawOpp['total_entity_votes'];
+          update['$oppPrefix.total_opponent_votes'] =
+              rawOpp['total_opponent_votes'];
+          update['$oppPrefix.last_played'] = FieldValue.serverTimestamp();
+          // One field path for the whole versus row — avoids clients only updating
+          // status while entity_votes/opponent_votes fail to merge on nested paths.
+          update['$oppPrefix.versus.$vid'] = <String, dynamic>{
+            'entity_votes': myVotes,
+            'opponent_votes': theirVotes,
+            'status': myStatus,
+            'played_at': FieldValue.serverTimestamp(),
+          };
+
+          return update;
+        }
+
+        final update1 = buildRankingUpdate(
+          existingData: snap1.data()!,
+          opponentId: e2,
+          myVotes: currentEntity1Votes,
+          theirVotes: currentEntity2Votes,
+          myStatus: status1,
+        );
+
+        final update2 = buildRankingUpdate(
+          existingData: snap2.data()!,
+          opponentId: e1,
+          myVotes: currentEntity2Votes,
+          theirVotes: currentEntity1Votes,
+          myStatus: status2,
+        );
+
+        // ── 4. Write both ranking docs + stamp poll ────────────────────────
+        tx.update(ranking1Ref, update1);
+        tx.update(ranking2Ref, update2);
+
+        // Stamp the poll doc with last_reconciled_pct so gap-fill on restore
+        // knows how far reconciliation reached. merge: true creates the doc if
+        // the first reconcile runs before any upsertArtistPoll (e.g. checkpoint
+        // during debounce).
+        tx.set(
+          pollRef,
+          {'last_reconciled_pct': currentPct},
+          SetOptions(merge: true),
+        );
+      });
+
+      debugPrint(
+        '[reconcileRankingBatch] ✓ versusId=$vid '
+        'e1=$e1($currentEntity1Votes) e2=$e2($currentEntity2Votes) pct=$currentPct',
+      );
+    } on RankingStubsMissingException {
+      rethrow;
+    } catch (e, st) {
+      debugPrint('[reconcileRankingBatch] failed: $e\n$st');
+    }
   }
 
   /// Ensures ranking stubs for **both** artists on a versus document only when the
@@ -1183,6 +1418,10 @@ class FirebaseService {
     String? editedComment,
     String? editorUsername,
     String? editorAvatarPath,
+    /// When [collaboratorID] is empty, the author may set both sides in one update.
+    String? editedArtist2ID,
+    String? editedArtist2Name,
+    List<String>? editedArtist2TrackIDs,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1229,6 +1468,16 @@ class FirebaseService {
         if (av.isNotEmpty) {
           update['author_avatar'] = av;
         }
+        final noCollaborator = collab.isEmpty;
+        final a2id = (editedArtist2ID ?? '').trim();
+        if (noCollaborator &&
+            a2id.isNotEmpty &&
+            editedArtist2TrackIDs != null) {
+          update['artist2ID'] = a2id;
+          update['artist2Name'] = (editedArtist2Name ?? '').trim();
+          update['artist2TrackIDs'] =
+              editedArtist2TrackIDs.map((e) => e.trim()).toList();
+        }
       } else {
         update['artist2ID'] = editedArtistID.trim();
         update['artist2Name'] = editedArtistName.trim();
@@ -1256,6 +1505,8 @@ class FirebaseService {
     _scheduleRankingWritesAfterVersus(
       () => _ensureRankingStubsForVersusDocIfLive(versusID),
     );
+
+    unawaited(recalculatePollsAfterVersusTrackListChange(versusID));
   }
 
   // ── Author finalizes tracks after invite (stays incomplete until collaborator) ─
@@ -1289,6 +1540,7 @@ class FirebaseService {
         '[FirebaseService] openCollaborationVersus → $versusID (author tracks; status stays incomplete)');
     // Versus remains incomplete — no ranking stubs until collaborator confirms
     // and [acceptCollaborationInvite] sets status open|active.
+    unawaited(recalculatePollsAfterVersusTrackListChange(versusID));
   }
 
   // ── Update status ─────────────────────────────────────────────────────────
@@ -1318,6 +1570,90 @@ class FirebaseService {
   // ══════════════════════════════════════════════════════════════════════════
   // POLLS
   // ══════════════════════════════════════════════════════════════════════════
+
+  /// When [artist1TrackIDs]/[artist2TrackIDs] change on the versus doc, every
+  /// voter's poll must refresh [completion_percentage], vote tallies, and align
+  /// [last_reconciled_pct] with that completion so checkpoint / gap logic works.
+  static Future<void> recalculatePollsAfterVersusTrackListChange(
+    String versusID,
+  ) async {
+    final vId = versusID.trim();
+    if (vId.isEmpty) return;
+
+    try {
+      final vsSnap = await _firestore.collection('versus').doc(vId).get();
+      if (!vsSnap.exists || vsSnap.data() == null) return;
+      final vd = vsSnap.data()!;
+      final list1 = vd['artist1TrackIDs'];
+      final list2 = vd['artist2TrackIDs'];
+      final len1 = list1 is List ? list1.length : 0;
+      final len2 = list2 is List ? list2.length : 0;
+      final paired = min(len1, len2);
+
+      final qs = await _firestore
+          .collection('polls')
+          .where('versus_id', isEqualTo: vId)
+          .get();
+
+      for (final doc in qs.docs) {
+        final d = doc.data();
+        final td = d['track_details'] as Map<String, dynamic>? ?? {};
+
+        var e1Votes = 0;
+        var e2Votes = 0;
+        var votedPaired = 0;
+
+        for (var i = 0; i < paired; i++) {
+          final round = td['$i'] as Map<String, dynamic>?;
+          if (round == null) continue;
+          if (round['isBonus'] == true) continue;
+          final w = (round['Winner'] as String?)?.trim() ?? '';
+          final a1 = (round['artist1trackID'] as String?)?.trim() ?? '';
+          final a2 = (round['artist2trackID'] as String?)?.trim() ?? '';
+          if (w.isEmpty || a1.isEmpty || a2.isEmpty) continue;
+          votedPaired++;
+          if (w == a1) {
+            e1Votes++;
+          } else if (w == a2) {
+            e2Votes++;
+          }
+        }
+
+        if (len1 != len2 && votedPaired >= paired && paired > 0) {
+          if (len1 > len2) {
+            e1Votes++;
+          } else {
+            e2Votes++;
+          }
+        }
+
+        final completion = paired == 0
+            ? 0.0
+            : ((votedPaired / paired) * 100).clamp(0, 100).toDouble();
+        final unvoted = paired > votedPaired ? paired - votedPaired : 0;
+
+        await doc.reference.update({
+          'completion_percentage': completion,
+          'unvoted_count': unvoted,
+          'artist1Vote': e1Votes,
+          'artist2Vote': e2Votes,
+          // Align with poll completion so gap / checkpoint logic is not stuck
+          // after rounds are added or completion drops.
+          'last_reconciled_pct': completion,
+        });
+      }
+
+      debugPrint(
+        '[FirebaseService] recalculatePollsAfterVersusTrackListChange → '
+        '${qs.docs.length} poll(s) for versus $vId (paired=$paired)',
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[FirebaseService] recalculatePollsAfterVersusTrackListChange failed: '
+        '$e\n$st',
+      );
+    }
+  }
 
   /// Upserts a poll document for an artist versus session.
   ///
@@ -1617,13 +1953,13 @@ class FirebaseService {
     required String uid,
     required String email,
     required String username,
-    required String bio,
     required String avatarPath,
+    String bio = '',
   }) async {
     await _firestore.collection('users').doc(uid).set({
       'email': email,
       'username': username.trim().toLowerCase(),
-      'bio': bio,
+      'bio': bio.trim(),
       'avatar_path': avatarPath,
     }, SetOptions(merge: true));
     if (_auth.currentUser?.uid == uid) {
