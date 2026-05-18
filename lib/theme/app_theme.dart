@@ -28,7 +28,7 @@ abstract final class AppTheme {
   static const String fontHeader = 'JraotHollow';
 
   /// Use for standard UI/body text.
-  static const String fontBody = 'Qabrown';
+  static const String fontBody = 'Satoshi';
 
   /// Default color for body typography (matches Stories friend username green).
   static const Color fontBodyColor = createGreen;

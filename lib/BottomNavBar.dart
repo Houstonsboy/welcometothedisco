@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+
+class _NavIconSpec {
+  final String asset;
+  final bool svg;
+
+  const _NavIconSpec({required this.asset, required this.svg});
+}
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -12,12 +20,32 @@ class BottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  final List<IconData> _icons = const [
-    Icons.nightlight_round,
-    Icons.music_note_rounded,
-    Icons.spa_rounded,
-    Icons.sports_mma_rounded,
+  static const List<_NavIconSpec> _items = [
+    _NavIconSpec(asset: 'assets/images/icons8-homepage.svg', svg: true),
+    _NavIconSpec(asset: 'assets/images/icons8-search.svg', svg: true),
+    _NavIconSpec(asset: 'assets/images/icons8-friends-50.png', svg: false),
   ];
+
+  static const double _iconSize = 26;
+
+  Widget _icon(_NavIconSpec spec, Color color) {
+    if (spec.svg) {
+      return SvgPicture.asset(
+        spec.asset,
+        width: _iconSize,
+        height: _iconSize,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    return Image.asset(
+      spec.asset,
+      width: _iconSize,
+      height: _iconSize,
+      color: color,
+      colorBlendMode: BlendMode.srcIn,
+      filterQuality: FilterQuality.high,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +63,10 @@ class BottomNavBar extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(34),
                 gradient: AppTheme.glassNavGradient(),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.14),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.35),
@@ -45,9 +77,13 @@ class BottomNavBar extends StatelessWidget {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(_icons.length, (index) {
+                children: List.generate(_items.length, (index) {
                   final bool isSelected = selectedIndex == index;
+                  final Color iconColor = isSelected
+                      ? AppTheme.navSelectedIcon
+                      : Colors.white.withOpacity(0.55);
                   return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () => onTap(index),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
@@ -55,23 +91,20 @@ class BottomNavBar extends StatelessWidget {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.10)
+                            : Colors.transparent,
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.gradientEnd.withOpacity(0.6),
-                                  blurRadius: 16,
-                                  spreadRadius: 1,
+                                  color: AppTheme.gradientEnd.withOpacity(0.55),
+                                  blurRadius: 14,
+                                  spreadRadius: 0,
                                 ),
                               ]
                             : null,
                       ),
-                      child: Icon(
-                        _icons[index],
-                        size: 28,
-                        color: isSelected
-                            ? AppTheme.navSelectedIcon
-                            : Colors.white.withOpacity(0.55),
-                      ),
+                      child: _icon(_items[index], iconColor),
                     ),
                   );
                 }),

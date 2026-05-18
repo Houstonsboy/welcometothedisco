@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +7,7 @@ import 'package:welcometothedisco/authentication/login.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/auth_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
 const _kBlue = AppTheme.gradientStart;
@@ -46,12 +48,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _hydrateFromUser(UserModel? user) {
     if (user == null) return;
     if (_editing) return;
-
-    // Prevent cursor jumps while typing by only hydrating when source user changes.
     final key = '${user.id}:${user.username}:${user.bio}:${user.avatarPath}';
     if (_lastHydratedUserId == key) return;
     _lastHydratedUserId = key;
-
     _usernameController.text = user.username;
     _bioController.text = user.bio;
     _selectedAvatar = user.avatarPath;
@@ -102,8 +101,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
       if (!mounted) return;
       setState(() => _editing = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Profile updated.'),
+        const SnackBar(
+          content: Text('Profile updated.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -121,17 +120,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
-  // ── Logout ──────────────────────────────────────────────────────────────────
   Future<void> _handleLogout() async {
     if (_loggingOut) return;
     setState(() => _loggingOut = true);
     try {
-      // Signs out Firebase and Google session. Spotify tokens are kept so
-      // the user doesn't have to re-authenticate with Spotify on next login.
       await AuthService().signOut();
       if (!mounted) return;
-      // Replace the entire route stack with LoginScreen so the user cannot
-      // press Back to re-enter the app without authenticating.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (_) => false,
@@ -150,12 +144,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return 'assets/images/$p';
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // ── Auth guard ─────────────────────────────────────────────────────────────
-    // If somehow the session was cleared while this page is open, redirect
-    // immediately to login so the user cannot view a stale profile screen.
     if (FirebaseAuth.instance.currentUser == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -182,19 +172,56 @@ class _UserProfilePageState extends State<UserProfilePage> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(
-              Icons.arrow_back_ios_new,
+              Icons.arrow_back_ios_new_rounded,
               color: Colors.white.withOpacity(0.9),
+              size: 18,
             ),
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(
             'Welcome to the Disco',
             style: TextStyle(
-              fontSize: 22.0,
+              fontSize: 14.0,
               fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
               color: AppTheme.titleAccent,
             ),
           ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: GestureDetector(
+                onTap: _loggingOut ? null : _handleLogout,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.22),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: Center(
+                    child: _loggingOut
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                          )
+                        : Icon(
+                            Icons.logout_rounded,
+                            color: Colors.white.withOpacity(0.85),
+                            size: 17,
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         body: SafeArea(
           child: StreamBuilder<UserModel?>(
@@ -206,18 +233,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
               _hydrateFromUser(user);
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildProfileCard(user, loading),
-                    const SizedBox(height: 16),
-                    if (user != null) ...[
-                      _buildStatsRow(user),
-                      const SizedBox(height: 32),
+                    if (_editing && user != null) ...[
+                      const SizedBox(height: 14),
+                      _buildEditActions(user),
                     ],
-                    _buildEditActions(user),
-                    const SizedBox(height: 12),
-                    _buildLogoutButton(),
+                    const SizedBox(height: 16),
+                    // Favorite albums — keyed by user id so it resets on load
+                    _FavoriteAlbumsWidget(
+                      key: ValueKey(user?.id ?? ''),
+                      initialAlbums: user?.favoriteAlbums ?? const [],
+                    ),
                   ],
                 ),
               );
@@ -230,141 +260,226 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   // ── Profile card ─────────────────────────────────────────────────────────────
   Widget _buildProfileCard(UserModel? user, bool loading) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _kBlue.withOpacity(0.45),
+                    _kPink.withOpacity(0.45),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.18),
+                  width: 0.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+              child: loading
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white.withOpacity(0.6),
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  : _buildCardContent(user),
+            ),
+          ),
+        ),
+        // ── Edit pen bubble — top-right corner of card ─────────────────────
+        if (!loading)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: _editing ? null : () => _startEditing(user),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _editing
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.white.withOpacity(0.18),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.28),
+                    width: 0.9,
+                  ),
+                ),
+                child: Icon(
+                  Icons.edit_rounded,
+                  size: 15,
+                  color: Colors.white.withOpacity(_editing ? 0.35 : 0.9),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCardContent(UserModel? user) {
     final sourceAvatar =
         _editing ? (_selectedAvatar ?? '') : (user?.avatarPath ?? '');
     final assetPath = _assetPath(sourceAvatar);
+    final displayName = user?.username.isNotEmpty == true
+        ? user!.username
+        : (FirebaseAuth.instance.currentUser?.displayName ?? 'User');
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final friendCount = user?.friends.length ?? 0;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _kBlue.withOpacity(0.45),
-                _kPink.withOpacity(0.45),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-          child: loading
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white.withOpacity(0.6),
-                      strokeWidth: 2,
-                    ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    // ── Avatar ───────────────────────────────────────────────
-                    Container(
-                      width: 104,
-                      height: 104,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
-                          width: 2.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _kPink.withOpacity(0.35),
-                            blurRadius: 22,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: assetPath != null
-                            ? Image.asset(
-                                assetPath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _avatarFallback(),
-                              )
-                            : _avatarFallback(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ── Username ─────────────────────────────────────────────
-                    _editing
-                        ? _glassInput(
-                            controller: _usernameController,
-                            label: 'Username',
-                          )
-                        : Text(
-                            user?.username.isNotEmpty == true
-                                ? user!.username
-                                : (FirebaseAuth.instance.currentUser
-                                        ?.displayName ??
-                                    'User'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 23,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-
-                    const SizedBox(height: 5),
-
-                    // ── Email (subtle) ───────────────────────────────────────
-                    Text(
-                      FirebaseAuth.instance.currentUser?.email ?? '',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.42),
-                        fontSize: 12,
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-                    Divider(
-                      color: Colors.white.withOpacity(0.12),
-                      height: 1,
-                    ),
-                    const SizedBox(height: 16),
-                    if (_editing) ...[
-                      _buildAvatarPicker(),
-                      const SizedBox(height: 14),
-                      _glassInput(
-                        controller: _bioController,
-                        label: 'Bio',
-                        maxLines: 2,
-                      ),
-                    ] else if (user?.bio.isNotEmpty == true) ...[
-                      Text(
-                        user!.bio,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          height: 1.55,
-                        ),
-                      ),
-                    ],
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.35),
+                  width: 2.2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kPink.withOpacity(0.32),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: assetPath != null
+                    ? Image.asset(
+                        assetPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _avatarFallback(),
+                      )
+                    : _avatarFallback(),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _editing
+                      ? _glassInput(
+                          controller: _usernameController,
+                          label: 'Username',
+                        )
+                      : Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                  const SizedBox(height: 10),
+                  _statPill(
+                    value: '$friendCount',
+                    label: friendCount == 1 ? 'friend' : 'friends',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        const SizedBox(height: 14),
+        if (_editing) ...[
+          _buildAvatarPicker(),
+          const SizedBox(height: 14),
+          _glassInput(
+            controller: _bioController,
+            label: 'Bio',
+            maxLines: 2,
+          ),
+        ] else ...[
+          if (email.isNotEmpty)
+            Text(
+              email,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.38),
+                fontSize: 11,
+              ),
+            ),
+          if (user?.bio.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            Text(
+              user!.bio,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.78),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                height: 1.55,
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _statPill({required String value, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.18),
+          width: 0.8,
+        ),
+      ),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '$value ',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            TextSpan(
+              text: label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -375,7 +490,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         child: Icon(
           Icons.person_rounded,
           color: Colors.white.withOpacity(0.65),
-          size: 48,
+          size: 40,
         ),
       );
 
@@ -451,139 +566,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  // ── Stats row ────────────────────────────────────────────────────────────────
-  Widget _buildStatsRow(UserModel user) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatTile(
-            icon: Icons.people_rounded,
-            label: 'Friends',
-            value: '${user.friends.length}',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatTile({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white.withOpacity(0.08),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.14),
-              width: 0.8,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: Colors.white.withOpacity(0.5), size: 20),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Logout button ────────────────────────────────────────────────────────────
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: GestureDetector(
-        onTap: _loggingOut ? null : _handleLogout,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white.withOpacity(_loggingOut ? 0.05 : 0.10),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.20),
-              width: 0.8,
-            ),
-          ),
-          child: Center(
-            child: _loggingOut
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white.withOpacity(0.55),
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.logout_rounded,
-                        color: Colors.white.withOpacity(0.7),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Log out',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditActions(UserModel? user) {
-    if (user == null) return const SizedBox.shrink();
-    if (!_editing) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: () => _startEditing(user),
-          icon: const Icon(Icons.edit_rounded, size: 18, color: Colors.white),
-          label: const Text('Edit profile'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-            side: BorderSide(color: Colors.white.withOpacity(0.25)),
-            padding: const EdgeInsets.symmetric(vertical: 13),
-          ),
-        ),
-      );
-    }
-
+  Widget _buildEditActions(UserModel user) {
     return Row(
       children: [
         Expanded(
@@ -614,6 +597,1007 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white.withOpacity(0.75),
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Friend Profile Page — read-only view of another user's profile
+// ══════════════════════════════════════════════════════════════════════════════
+
+class FriendProfilePage extends StatefulWidget {
+  final String uid;
+  final String? initialUsername;
+  final String? initialAvatarPath;
+
+  const FriendProfilePage({
+    super.key,
+    required this.uid,
+    this.initialUsername,
+    this.initialAvatarPath,
+  });
+
+  @override
+  State<FriendProfilePage> createState() => _FriendProfilePageState();
+}
+
+class _FriendProfilePageState extends State<FriendProfilePage> {
+  UserModel? _user;
+  bool _loading = true;
+  bool _notFound = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _notFound = false;
+    });
+    final user = await FirebaseService.getUserById(widget.uid);
+    if (!mounted) return;
+    setState(() {
+      _user = user;
+      _loading = false;
+      _notFound = user == null;
+    });
+  }
+
+  static String? _assetPath(String avatarPath) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    if (p.startsWith('/')) return p.substring(1);
+    return 'assets/images/$p';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_kBlue, _kPink],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white.withOpacity(0.9),
+              size: 18,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            _user?.username.isNotEmpty == true
+                ? _user!.username
+                : (widget.initialUsername ?? 'Profile'),
+            style: const TextStyle(
+              fontSize: 14.0,
+              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
+              color: AppTheme.titleAccent,
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : _notFound
+                  ? Center(
+                      child: Text(
+                        'Profile not found.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.75),
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildProfileCard(),
+                          const SizedBox(height: 16),
+                          _FriendFavoriteAlbumsWidget(
+                            key: ValueKey(_user!.id),
+                            albums: _user!.favoriteAlbums,
+                          ),
+                        ],
+                      ),
+                    ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileCard() {
+    final user = _user!;
+    final assetPath = _assetPath(user.avatarPath);
+    final friendCount = user.friends.length;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                _kBlue.withOpacity(0.45),
+                _kPink.withOpacity(0.45),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.18),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar
+                  Container(
+                    width: 82,
+                    height: 82,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.35),
+                        width: 2.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _kPink.withOpacity(0.32),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: assetPath != null
+                          ? Image.asset(
+                              assetPath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _avatarFallback(),
+                            )
+                          : _avatarFallback(),
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  // Name + friends pill
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.username.isNotEmpty ? user.username : 'User',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _statPill(
+                          value: '$friendCount',
+                          label: friendCount == 1 ? 'friend' : 'friends',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Divider(color: Colors.white.withOpacity(0.12), height: 1),
+              const SizedBox(height: 14),
+              if (user.bio.isNotEmpty)
+                Text(
+                  user.bio,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.78),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    height: 1.55,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statPill({required String value, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+      ),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '$value ',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            TextSpan(
+              text: label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.65),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarFallback() => Container(
+        color: _kBlue.withOpacity(0.35),
+        child: Icon(
+          Icons.person_rounded,
+          color: Colors.white.withOpacity(0.65),
+          size: 40,
+        ),
+      );
+}
+
+// ── Read-only favourite albums display for a friend's profile ─────────────────
+class _FriendFavoriteAlbumsWidget extends StatelessWidget {
+  final List<FavoriteAlbumEntry> albums;
+
+  const _FriendFavoriteAlbumsWidget({
+    super.key,
+    required this.albums,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                _kBlue.withOpacity(0.35),
+                _kPink.withOpacity(0.35),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.16),
+              width: 0.8,
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'FAVORITE ALBUMS',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.8,
+                ),
+              ),
+              const SizedBox(height: 14),
+              albums.isEmpty
+                  ? Text(
+                      'No favourite albums added yet.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.45),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: albums.asMap().entries.map((e) {
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: e.key < albums.length - 1 ? 8 : 0,
+                            ),
+                            child: _albumTile(e.value),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _albumTile(FavoriteAlbumEntry entry) {
+    final hasImage = (entry.imageUrl ?? '').trim().isNotEmpty;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: hasImage
+                ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
+                : Container(
+                    color: Colors.white.withOpacity(0.12),
+                    child: Icon(
+                      Icons.album_rounded,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          entry.albumTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Favorite Albums Widget
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _FavoriteAlbumsWidget extends StatefulWidget {
+  final List<FavoriteAlbumEntry> initialAlbums;
+
+  const _FavoriteAlbumsWidget({
+    super.key,
+    required this.initialAlbums,
+  });
+
+  @override
+  State<_FavoriteAlbumsWidget> createState() => _FavoriteAlbumsWidgetState();
+}
+
+class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
+  final SpotifyApi _api = SpotifyApi();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  Timer? _debounce;
+
+  bool _editing = false;
+  bool _saving = false;
+  bool _isSearching = false;
+  List<FavoriteAlbumEntry> _selected = [];
+  List<SpotifyAlbumDetails> _results = [];
+  String _lastQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List.from(widget.initialAlbums);
+  }
+
+  @override
+  void didUpdateWidget(_FavoriteAlbumsWidget old) {
+    super.didUpdateWidget(old);
+    if (!_editing) {
+      _selected = List.from(widget.initialAlbums);
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _startEditing() {
+    setState(() {
+      _selected = List.from(widget.initialAlbums);
+      _editing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _searchFocus.requestFocus(),
+    );
+  }
+
+  void _cancelEditing() {
+    _debounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _editing = false;
+      _selected = List.from(widget.initialAlbums);
+      _results = [];
+      _isSearching = false;
+      _lastQuery = '';
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    final q = query.trim();
+    _lastQuery = q;
+    if (q.isEmpty) {
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
+      return;
+    }
+    setState(() => _isSearching = true);
+    _debounce = Timer(const Duration(milliseconds: 420), () async {
+      final albums = await _api.searchAlbums(q, limit: 12);
+      if (!mounted || _lastQuery != q) return;
+      setState(() {
+        _results = albums;
+        _isSearching = false;
+      });
+    });
+  }
+
+  void _selectAlbum(SpotifyAlbumDetails album) {
+    if (_selected.length >= 5) return;
+    if (_selected.any((e) => e.albumId == album.id)) return;
+    setState(() {
+      _selected.add(FavoriteAlbumEntry(
+        albumId: album.id,
+        albumTitle: album.title,
+        artistName: album.artistName,
+        imageUrl: album.imageUrl,
+      ));
+      _results = [];
+      _searchController.clear();
+      _lastQuery = '';
+      _isSearching = false;
+    });
+  }
+
+  void _removeAlbum(int i) => setState(() => _selected.removeAt(i));
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseService.updateFavoriteAlbums(_selected);
+      if (!mounted) return;
+      setState(() => _editing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Favourite albums saved.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not save: $e'),
+          backgroundColor: _kPink.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _kBlue.withOpacity(0.35),
+                    _kPink.withOpacity(0.35),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.16),
+                  width: 0.8,
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 14),
+                  _buildAlbumRow(),
+                  if (_editing) ...[
+                    if (_results.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      _buildResults(),
+                    ],
+                    const SizedBox(height: 14),
+                    _buildSaveCancel(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Search bubble — only shown in view mode (editing uses inline bar)
+        if (!_editing)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: _startEditing,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.16),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.26),
+                    width: 0.9,
+                  ),
+                ),
+                child: Icon(
+                  Icons.search_rounded,
+                  size: 16,
+                  color: Colors.white.withOpacity(0.88),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    if (!_editing) {
+      return Row(
+        children: [
+          Text(
+            'FAVORITE ALBUMS',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+            ),
+          ),
+          // Reserve space so title doesn't overlap the positioned bubble
+          const SizedBox(width: 44),
+        ],
+      );
+    }
+
+    // Editing mode: search bar slides in
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      child: Row(
+        key: const ValueKey('search-bar'),
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    onChanged: _onSearchChanged,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    cursorColor: _kPink,
+                    decoration: InputDecoration(
+                      hintText: _selected.length >= 5
+                          ? 'Max 5 albums selected'
+                          : 'Search albums…',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.38),
+                        fontSize: 14,
+                      ),
+                      prefixIcon: _isSearching
+                          ? Padding(
+                              padding: const EdgeInsets.all(11),
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.8,
+                                  color: Colors.white.withOpacity(0.6),
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.search_rounded,
+                              color: Colors.white.withOpacity(0.5),
+                              size: 18,
+                            ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                              },
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: Colors.white.withOpacity(0.4),
+                                size: 16,
+                              ),
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumRow() {
+    if (_selected.isEmpty && !_editing) {
+      return Text(
+        'No favourite albums yet — tap 🔍 to add some.',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.45),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
+    if (_editing) {
+      if (_selected.isEmpty) {
+        return Text(
+          'Search and add up to 5 albums.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.45),
+            fontSize: 12,
+          ),
+        );
+      }
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(_selected.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: _albumTileEditing(_selected[i], i),
+            );
+          }),
+        ),
+      );
+    }
+
+    // View mode: equal-width tiles filling the full row
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _selected.asMap().entries.map((e) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: e.key < _selected.length - 1 ? 8 : 0,
+            ),
+            child: _albumTileView(e.value),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _albumTileView(FavoriteAlbumEntry entry) {
+    final hasImage = (entry.imageUrl ?? '').trim().isNotEmpty;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: hasImage
+                ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
+                : Container(
+                    color: Colors.white.withOpacity(0.12),
+                    child: Icon(
+                      Icons.album_rounded,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          entry.albumTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _albumTileEditing(FavoriteAlbumEntry entry, int i) {
+    const tileSize = 68.0;
+    final hasImage = (entry.imageUrl ?? '').trim().isNotEmpty;
+    return SizedBox(
+      width: tileSize,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: hasImage
+                    ? Image.network(
+                        entry.imageUrl!,
+                        width: tileSize,
+                        height: tileSize,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: tileSize,
+                        height: tileSize,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.album_rounded,
+                          color: Colors.white.withOpacity(0.5),
+                          size: 28,
+                        ),
+                      ),
+              ),
+              Positioned(
+                top: -7,
+                right: -7,
+                child: GestureDetector(
+                  onTap: () => _removeAlbum(i),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _kPink.withOpacity(0.9),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.55),
+                        width: 0.9,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            entry.albumTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResults() {
+    final atMax = _selected.length >= 5;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        const SizedBox(height: 10),
+        if (atMax)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Maximum 5 albums selected.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.55),
+                fontSize: 11,
+              ),
+            ),
+          ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 0.78,
+          ),
+          itemCount: _results.length,
+          itemBuilder: (_, i) {
+            final album = _results[i];
+            final alreadySelected =
+                _selected.any((e) => e.albumId == album.id);
+            final disabled = atMax || alreadySelected;
+            return GestureDetector(
+              onTap: disabled ? null : () => _selectAlbum(album),
+              child: Opacity(
+                opacity: disabled ? 0.35 : 1.0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: (album.imageUrl ?? '').trim().isNotEmpty
+                            ? Image.network(
+                                album.imageUrl!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                              )
+                            : Container(
+                                color: Colors.white.withOpacity(0.1),
+                                child: Icon(
+                                  Icons.album_rounded,
+                                  color: Colors.white.withOpacity(0.4),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      album.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaveCancel() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _saving ? null : _cancelEditing,
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.white.withOpacity(0.2)),
+              foregroundColor: Colors.white.withOpacity(0.85),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+            ),
+            child: const Text('Cancel'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.18),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 11),
+            ),
+            child: _saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
                   )
                 : const Text(

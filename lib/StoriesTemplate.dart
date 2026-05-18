@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/userprofile.dart';
 
 const _kBlue  = AppTheme.gradientStart;
 const _kPink  = AppTheme.gradientEnd;
@@ -127,57 +128,68 @@ class _FriendBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = _assetPath(friend.avatarPath);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // ── Avatar circle ──────────────────────────────────────────────
-            ClipOval(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                child: Container(
-                  height: 72,
-                  width: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 12,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => FriendProfilePage(
+            uid: friend.uid,
+            initialUsername: friend.username,
+            initialAvatarPath: friend.avatarPath,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
+        child: SizedBox(
+          width: 72,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // ── Avatar circle ────────────────────────────────────────────
+              ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: Container(
+                    height: 72,
+                    width: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: path != null
+                        ? Image.asset(
+                            path,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _fallbackAvatar(),
+                          )
+                        : _fallbackAvatar(),
                   ),
-                  child: path != null
-                      ? Image.asset(
-                          path,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _fallbackAvatar(),
-                        )
-                      : _fallbackAvatar(),
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            // ── Username label ─────────────────────────────────────────────
-            Text(
-              friend.username.isNotEmpty ? friend.username : '—',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _kGreen,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.2,
+              const SizedBox(height: 6),
+              // ── Username label ───────────────────────────────────────────
+              Text(
+                friend.username.isNotEmpty ? friend.username : '—',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _kGreen,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -192,3 +204,4 @@ class _FriendBubble extends StatelessWidget {
         ),
       );
 }
+

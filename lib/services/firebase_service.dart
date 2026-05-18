@@ -10,6 +10,7 @@ import 'package:welcometothedisco/models/inbox_versus_entry.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 
 /// Thrown when [FirebaseService.reconcileRankingBatch] reads the two ranking
@@ -666,6 +667,106 @@ class FirebaseService {
     ]);
   }
 
+  /// Fetch ranking profile for one entity from `rankings/{entityId}`.
+  ///
+  /// Returns null when the ID is empty or the document does not exist.
+  static Future<RankingModel?> getRankingProfile(String entityId) async {
+    final id = entityId.trim();
+    if (id.isEmpty) return null;
+
+    try {
+      final doc = await _firestore.collection('rankings').doc(id).get();
+      if (!doc.exists || doc.data() == null) {
+        debugPrint('[getRankingProfile] no doc for $id');
+        return null;
+      }
+      final model = RankingModel.fromFirestore(doc.data()!, doc.id);
+      debugPrint(
+        '[getRankingProfile] $id → ${model.opponents.length} opponent(s)',
+      );
+      return model;
+    } catch (e) {
+      debugPrint('[getRankingProfile] $id failed: $e');
+      return null;
+    }
+  }
+
+  /// Resolves missing opponent images from Spotify for display use.
+  ///
+  /// This does not write back to Firestore; it returns a rebuilt model.
+  static Future<RankingModel> resolveRankingOpponentImages(
+    RankingModel ranking,
+    SpotifyApi spotifyApi,
+  ) async {
+    final toResolve = ranking.opponents.entries
+        .where((e) => e.value.opponentImage.trim().isEmpty)
+        .map((e) => e.key)
+        .toList();
+
+    if (toResolve.isEmpty) return ranking;
+
+    final resolved = <String, String>{};
+    await Future.wait(
+      toResolve.map((opponentId) async {
+        try {
+          final details = await spotifyApi.getArtistDetails(opponentId);
+          final url = details?.imageUrl?.trim() ?? '';
+          if (url.isNotEmpty) {
+            resolved[opponentId] = url;
+          }
+        } catch (e) {
+          debugPrint(
+            '[resolveRankingOpponentImages] failed for $opponentId: $e',
+          );
+        }
+      }),
+    );
+
+    if (resolved.isEmpty) return ranking;
+
+    final updatedOpponents = <String, OpponentModel>{
+      for (final entry in ranking.opponents.entries)
+        entry.key: resolved.containsKey(entry.key)
+            ? _rebuildOpponentWithImage(entry.value, resolved[entry.key]!)
+            : entry.value,
+    };
+
+    return RankingModel(
+      entityId: ranking.entityId,
+      entityType: ranking.entityType,
+      entityName: ranking.entityName,
+      entityImage: ranking.entityImage,
+      totalVotes: ranking.totalVotes,
+      versusCount: ranking.versusCount,
+      wins: ranking.wins,
+      losses: ranking.losses,
+      draws: ranking.draws,
+      winRate: ranking.winRate,
+      createdAt: ranking.createdAt,
+      lastUpdated: ranking.lastUpdated,
+      opponents: updatedOpponents,
+    );
+  }
+
+  static OpponentModel _rebuildOpponentWithImage(
+    OpponentModel opp,
+    String newImage,
+  ) {
+    return OpponentModel(
+      opponentId: opp.opponentId,
+      opponentName: opp.opponentName,
+      opponentImage: newImage,
+      versusCount: opp.versusCount,
+      winsAgainst: opp.winsAgainst,
+      lossesTo: opp.lossesTo,
+      draws: opp.draws,
+      totalentityVotes: opp.totalentityVotes,
+      totalopponentVotes: opp.totalopponentVotes,
+      lastPlayed: opp.lastPlayed,
+      versus: opp.versus,
+    );
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // RANKINGS — poll reconciliation  (Function 7)
   // ══════════════════════════════════════════════════════════════════════════
@@ -1271,6 +1372,24 @@ class FirebaseService {
     } catch (e) {
       debugPrint(
           '[FirebaseService] getArtistVersusById($documentId) failed: $e');
+      return null;
+    }
+  }
+
+  // ── Fetch single album versus by doc ID ───────────────────────────────────
+  static Future<VersusModel?> getAlbumVersusById(String documentId) async {
+    final id = documentId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final doc = await _firestore.collection('versus').doc(id).get();
+      if (!doc.exists || doc.data() == null) return null;
+      final data = doc.data()!;
+      final type = (data['type'] as String?)?.trim().toLowerCase() ?? '';
+      if (type != 'album') return null;
+      final model = VersusModel.fromFirestore(data, doc.id);
+      return model;
+    } catch (e) {
+      debugPrint('[FirebaseService] getAlbumVersusById($id) failed: $e');
       return null;
     }
   }
@@ -1955,12 +2074,14 @@ class FirebaseService {
     required String username,
     required String avatarPath,
     String bio = '',
+    List<FavoriteAlbumEntry>? favoriteAlbums,
   }) async {
     await _firestore.collection('users').doc(uid).set({
       'email': email,
       'username': username.trim().toLowerCase(),
       'bio': bio.trim(),
       'avatar_path': avatarPath,
+      'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
     }, SetOptions(merge: true));
     if (_auth.currentUser?.uid == uid) {
       await _fetchCurrentUserFromFirestore(uid);
@@ -1972,15 +2093,47 @@ class FirebaseService {
     required String username,
     required String bio,
     required String avatarPath,
+    List<FavoriteAlbumEntry>? favoriteAlbums,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
 
-    await _firestore.collection('users').doc(uid).set({
+    final data = <String, dynamic>{
       'username': username.trim().toLowerCase(),
       'bio': bio.trim(),
       'avatar_path': avatarPath.trim(),
-    }, SetOptions(merge: true));
+      if (favoriteAlbums != null)
+        'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
+    };
+
+    await _firestore.collection('users').doc(uid).set(
+      data,
+      SetOptions(merge: true),
+    );
+    await _fetchCurrentUserFromFirestore(uid);
+  }
+
+  static List<Map<String, dynamic>> _serializeFavoriteAlbums(
+    List<FavoriteAlbumEntry>? favoriteAlbums,
+  ) {
+    return (favoriteAlbums ?? const <FavoriteAlbumEntry>[])
+        .where((album) => album.albumId.trim().isNotEmpty)
+        .take(5)
+        .map((album) => album.toMap())
+        .toList();
+  }
+
+  // ── Update only the favorite_albums field for the current user ────────────
+  static Future<void> updateFavoriteAlbums(
+    List<FavoriteAlbumEntry> albums,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('User not logged in');
+
+    await _firestore.collection('users').doc(uid).set(
+      {'favorite_albums': _serializeFavoriteAlbums(albums)},
+      SetOptions(merge: true),
+    );
     await _fetchCurrentUserFromFirestore(uid);
   }
 }

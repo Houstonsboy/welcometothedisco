@@ -32,6 +32,7 @@ dependencies:
     sdk: flutter
   google_fonts: ^6.2.1  # Updated from ^2.1.0
   google_nav_bar: ^5.0.6
+  flutter_svg: ^2.0.17
   http: ^1.2.2
   crypto: ^3.0.6
   url_launcher: ^6.3.2
@@ -95,6 +96,12 @@ flutter:
     - family: Qabrown
       fonts:
         - asset: assets/fonts/qabrown/Qabrown.ttf
+
+    - family: Satoshi
+      fonts:
+        - asset: assets/fonts/Satoshi-Variable.ttf
+        - asset: assets/fonts/Satoshi-VariableItalic.ttf
+          style: italic
 
     
 flutter_launcher_icons:

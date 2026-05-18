@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:app_links/app_links.dart';
@@ -15,7 +16,6 @@ import 'package:welcometothedisco/Inbox.dart';
 import 'package:welcometothedisco/SpotifyAPIplayer.dart';
 import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/friends/friendrequest.dart';
-import 'package:welcometothedisco/dev.dart';
 import 'package:welcometothedisco/userprofile.dart';
 import 'package:welcometothedisco/notification/notification.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
@@ -24,6 +24,7 @@ import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/Ranking/entity_search.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -145,11 +146,20 @@ class _AppShellState extends State<_AppShell> {
   bool _spotifyLoading = true;
   bool _spotifyConnecting = false;
   int _selectedIndex = 0;
+  DateTime? _lastBackExitPrompt;
+  bool _exitHintVisible = false;
+  Timer? _exitHintTimer;
 
   @override
   void initState() {
     super.initState();
     _initSpotify();
+  }
+
+  @override
+  void dispose() {
+    _exitHintTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initSpotify() async {
@@ -185,62 +195,105 @@ class _AppShellState extends State<_AppShell> {
     setState(() => _selectedIndex = index);
   }
 
+  void _goToHomeTab() {
+    setState(() => _selectedIndex = 0);
+  }
+
+  /// System back: pop any overlay route first; then leave search/friends for home;
+  /// on home, require a second back within 2s to exit (Android-style).
+  void _onShellPopInvoked(bool didPop, dynamic result) {
+    if (didPop) return;
+
+    if (Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    if (_selectedIndex != 0) {
+      setState(() => _selectedIndex = 0);
+      _lastBackExitPrompt = null;
+      return;
+    }
+
+    final now = DateTime.now();
+    final last = _lastBackExitPrompt;
+    if (last == null || now.difference(last) > const Duration(seconds: 2)) {
+      _lastBackExitPrompt = now;
+      _showGlassExitHint();
+      return;
+    }
+
+    SystemNavigator.pop();
+  }
+
+  void _showGlassExitHint() {
+    _exitHintTimer?.cancel();
+    setState(() => _exitHintVisible = true);
+    _exitHintTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _exitHintVisible = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: AppTheme.backgroundDecoration,
-      child: Stack(
-        children: [
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _onShellPopInvoked,
+      child: Container(
+        decoration: AppTheme.backgroundDecoration,
+        child: Stack(
+          children: [
+            Scaffold(
               backgroundColor: Colors.transparent,
-              elevation: 0,
-              title: const Text(
-                "Welcome to the Disco",
-                style: TextStyle(
-                  fontSize: 12.0,
-                  fontFamily: AppTheme.fontHeader,
-                  color: Color(0xFF17B5EE),
-                ),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const _NotificationBell(),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const UserProfilePage(),
-                          ),
-                        ),
-                        child: _FirebaseHeader(compact: true),
-                      ),
-                    ],
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: const Text(
+                  "Welcome to the Disco",
+                  style: TextStyle(
+                    fontSize: 11.0,
+                    fontFamily: AppTheme.fontHeader,
+                    color: Color(0xFF17B5EE),
                   ),
                 ),
-              ],
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _NotificationBell(),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const UserProfilePage(),
+                            ),
+                          ),
+                          child: _FirebaseHeader(compact: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              body: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  const HomeScreenContent(),
+                  EntityHistoryScreen(onBackToHome: _goToHomeTab),
+                  const FriendRequest(),
+                ],
+              ),
+              bottomNavigationBar: BottomNavBar(
+                selectedIndex: _selectedIndex,
+                onTap: _onTabTapped,
+              ),
             ),
-            body: IndexedStack(
-              index: _selectedIndex,
-              children: const [
-                HomeScreenContent(),
-                SpotifyAPIplayer(embedded: true),
-                FriendRequest(),
-                DevPage(),
-              ],
-            ),
-            bottomNavigationBar: BottomNavBar(
-              selectedIndex: _selectedIndex,
-              onTap: _onTabTapped,
-            ),
-          ),
-          if (_spotifyConnecting) _spotifyConnectingOverlay(),
-        ],
+            _GlassExitHintOverlay(visible: _exitHintVisible),
+            if (_spotifyConnecting) _spotifyConnectingOverlay(),
+          ],
+        ),
       ),
     );
   }
@@ -274,6 +327,146 @@ class _AppShellState extends State<_AppShell> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small glass pill above the bottom nav — double-back exit hint.
+class _GlassExitHintOverlay extends StatelessWidget {
+  final bool visible;
+
+  const _GlassExitHintOverlay({required this.visible});
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // BottomNavBar: SafeArea + ~18 bottom padding + ~68 bar height + gap.
+    final lift = bottomInset + 96;
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        // Visual-only popup — must not steal taps from the shell beneath.
+        ignoring: true,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            // Clip scaled fade so transforms cannot paint past chip bounds (avoids
+            // stray overflow stripes below the banner during animation).
+            return ClipRect(
+              child: FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  alignment: Alignment.bottomCenter,
+                  scale: Tween<double>(begin: 0.92, end: 1).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: child,
+                ),
+              ),
+            );
+          },
+          child: visible
+              ? Align(
+                  key: const ValueKey('exit-hint-on'),
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(40, 0, 40, lift),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          clipBehavior: Clip.antiAlias,
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(22),
+                                gradient:
+                                    AppTheme.glassNavGradient(opacity: 0.38),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.20),
+                                  width: 0.85,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.22),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: SizedBox(
+                                  height: 20,
+                                  child: ClipRect(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_back_ios_new_rounded,
+                                          size: 13,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.72),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Press back again to exit',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            softWrap: false,
+                                            textHeightBehavior:
+                                                const TextHeightBehavior(
+                                              applyHeightToFirstAscent: false,
+                                              applyHeightToLastDescent: false,
+                                              leadingDistribution:
+                                                  TextLeadingDistribution
+                                                      .proportional,
+                                            ),
+                                            strutStyle: StrutStyle(
+                                              fontFamily: AppTheme.fontBody,
+                                              fontSize: 12.5,
+                                              height: 1.0,
+                                              fontWeight: FontWeight.w600,
+                                              forceStrutHeight: true,
+                                              leading: 0,
+                                            ),
+                                            style: TextStyle(
+                                              fontFamily: AppTheme.fontBody,
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.12,
+                                              height: 1.0,
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.92),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('exit-hint-off')),
         ),
       ),
     );
@@ -387,7 +580,10 @@ class _FirebaseHeader extends StatelessWidget {
         final user = snapshot.data;
         final displayName = (user?.username.trim().isNotEmpty ?? false)
             ? user!.username.trim()
-            : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty ?? false)
+            : (FirebaseAuth.instance.currentUser?.displayName
+                        ?.trim()
+                        .isNotEmpty ??
+                    false)
                 ? FirebaseAuth.instance.currentUser!.displayName!.trim()
                 : 'Profile';
         final subtitle = (user?.email.trim().isNotEmpty ?? false)
@@ -396,8 +592,9 @@ class _FirebaseHeader extends StatelessWidget {
         final assetPath = _assetPathFromAvatar(user?.avatarPath ?? '');
 
         return Padding(
-          padding:
-              compact ? EdgeInsets.zero : const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          padding: compact
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(16, 0, 16, 0),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(compact ? 20 : 16),
             child: BackdropFilter(
@@ -421,7 +618,8 @@ class _FirebaseHeader extends StatelessWidget {
                 ),
                 child: snapshot.connectionState == ConnectionState.waiting
                     ? Row(
-                        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+                        mainAxisSize:
+                            compact ? MainAxisSize.min : MainAxisSize.max,
                         children: [
                           SizedBox(
                             width: compact ? 16 : 20,
@@ -443,7 +641,8 @@ class _FirebaseHeader extends StatelessWidget {
                         ],
                       )
                     : Row(
-                        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+                        mainAxisSize:
+                            compact ? MainAxisSize.min : MainAxisSize.max,
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(size / 2),

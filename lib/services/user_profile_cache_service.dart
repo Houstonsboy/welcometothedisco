@@ -22,6 +22,7 @@ class UserProfileCacheService {
       'bio': user.bio,
       'avatar_path': user.avatarPath,
       'friends': user.friends.map((f) => f.toMap()).toList(),
+      'favorite_albums': user.favoriteAlbums.map((a) => a.toMap()).toList(),
       'cached_at': DateTime.now().toIso8601String(),
     };
     await _storage.write(key: _cachedUserKey, value: jsonEncode(payload));
@@ -47,6 +48,13 @@ class UserProfileCacheService {
           .map(FriendEntry.fromMap)
           .toList();
 
+      final rawFavoriteAlbums =
+          decoded['favorite_albums'] as List<dynamic>? ?? const [];
+      final favoriteAlbums = rawFavoriteAlbums
+          .whereType<Map<String, dynamic>>()
+          .map(FavoriteAlbumEntry.fromMap)
+          .toList();
+
       return UserModel(
         id: id,
         username: (decoded['username'] as String?) ?? '',
@@ -54,6 +62,7 @@ class UserProfileCacheService {
         bio: (decoded['bio'] as String?) ?? '',
         avatarPath: (decoded['avatar_path'] as String?) ?? '',
         friends: friends,
+        favoriteAlbums: favoriteAlbums,
       );
     } catch (e) {
       debugPrint('[UserProfileCacheService] readUser parse error: $e');
