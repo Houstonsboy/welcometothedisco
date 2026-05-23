@@ -4,10 +4,15 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
 class _NavIconSpec {
-  final String asset;
+  final String? asset;
   final bool svg;
+  final IconData? materialIcon;
 
-  const _NavIconSpec({required this.asset, required this.svg});
+  const _NavIconSpec.asset(this.asset, {this.svg = false}) : materialIcon = null;
+
+  const _NavIconSpec.material(this.materialIcon)
+      : asset = null,
+        svg = false;
 }
 
 class BottomNavBar extends StatelessWidget {
@@ -20,25 +25,30 @@ class BottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
+  /// Home · Search · Posts · Friends
   static const List<_NavIconSpec> _items = [
-    _NavIconSpec(asset: 'assets/images/icons8-homepage.svg', svg: true),
-    _NavIconSpec(asset: 'assets/images/icons8-search.svg', svg: true),
-    _NavIconSpec(asset: 'assets/images/icons8-friends-50.png', svg: false),
+    _NavIconSpec.asset('assets/images/icons8-homepage.svg', svg: true),
+    _NavIconSpec.asset('assets/images/icons8-search.svg', svg: true),
+    _NavIconSpec.material(Icons.menu_book_rounded),
+    _NavIconSpec.asset('assets/images/icons8-friends-50.png'),
   ];
 
   static const double _iconSize = 26;
 
   Widget _icon(_NavIconSpec spec, Color color) {
+    if (spec.materialIcon != null) {
+      return Icon(spec.materialIcon, size: _iconSize, color: color);
+    }
     if (spec.svg) {
       return SvgPicture.asset(
-        spec.asset,
+        spec.asset!,
         width: _iconSize,
         height: _iconSize,
         colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
       );
     }
     return Image.asset(
-      spec.asset,
+      spec.asset!,
       width: _iconSize,
       height: _iconSize,
       color: color,
@@ -59,7 +69,7 @@ class BottomNavBar extends StatelessWidget {
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
               height: 68,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(34),
                 gradient: AppTheme.glassNavGradient(),

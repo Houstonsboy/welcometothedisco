@@ -25,6 +25,7 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/Ranking/entity_search.dart';
+import 'package:welcometothedisco/posts/view_posts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -282,6 +283,7 @@ class _AppShellState extends State<_AppShell> {
                 children: [
                   const HomeScreenContent(),
                   EntityHistoryScreen(onBackToHome: _goToHomeTab),
+                  const ViewPostsScreen(),
                   const FriendRequest(),
                 ],
               ),

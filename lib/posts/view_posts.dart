@@ -1,0 +1,642 @@
+// lib/screens/view_posts_screen.dart
+
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:welcometothedisco/models/post_model.dart';
+import 'package:welcometothedisco/posts/create_post.dart';
+import 'package:welcometothedisco/theme/app_theme.dart';
+
+const _kBlue        = AppTheme.gradientStart;
+const _kPink        = AppTheme.gradientEnd;
+const _kGreen       = AppTheme.createGreen;
+const _kCreateCyan  = Color(0xFF17B5EE);
+const _kTextPrimary = Colors.white;
+const _kTextMuted   = Color(0x8CFFFFFF);
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+final _mockPosts = [
+  PostModel(
+    id: '1',
+    authorID: 'uid_jeff',
+    authorName: 'Jeff',
+    authorAvatar: 'https://i.pravatar.cc/150?img=11',
+    artistID: 'spotify:artist:lana',
+    artistName: 'Lana Del Rey',
+    artistImageUrl: 'https://i.scdn.co/image/ab6761610000e5eb4c5e1234567890abcdef1234',
+    description:
+        'There are artists whose music feels less like entertainment and more like '
+        'weather — something that just descends on you. Lana Del Rey is that artist for '
+        'me. These five tracks have become the soundtrack to every long drive, late '
+        'night, and moment where the feelings are too big to fit in a room. '
+        'Video Games still hits like the first time, a slow-motion widescreen ache. '
+        'Young and Beautiful is grief dressed up as a love song. '
+        'Summertime Sadness wraps melancholy in a chorus so anthemic it almost tricks '
+        'you into feeling okay. Born To Die is the thesis statement: beautiful, doomed, '
+        'completely self-aware. Every wash, every spin through the playlist lands '
+        'differently depending on where you are in your life.',
+    shareCount: 2100,
+    remixCount: 2300,
+    tracklist: [
+      TrackItem(spotifyID: 'trk1', trackName: 'Video Games',         trackCover: 'https://i.pravatar.cc/150?img=1',  trackArtist: 'Lana Del Rey'),
+      TrackItem(spotifyID: 'trk2', trackName: 'Young and Beautiful', trackCover: 'https://i.pravatar.cc/150?img=2',  trackArtist: 'Lana Del Rey'),
+      TrackItem(spotifyID: 'trk3', trackName: 'Summertime Sadness',  trackCover: 'https://i.pravatar.cc/150?img=3',  trackArtist: 'Lana Del Rey'),
+      TrackItem(spotifyID: 'trk4', trackName: 'Born To Die',         trackCover: 'https://i.pravatar.cc/150?img=4',  trackArtist: 'Lana Del Rey'),
+    ],
+  ),
+  PostModel(
+    id: '2',
+    authorID: 'uid_maya',
+    authorName: 'Maya',
+    authorAvatar: 'https://i.pravatar.cc/150?img=47',
+    artistID: 'spotify:artist:frank',
+    artistName: 'Frank Ocean',
+    artistImageUrl: 'https://i.scdn.co/image/ab6761610000e5eb9876543210fedcba98765432',
+    description:
+        'Frank Ocean makes you feel things that do not have names yet. '
+        'Blonde as an album is the closest thing to a conversation happening '
+        'inside your own head — fragmented, honest, searching. '
+        'Nights is the centrepiece: a track that literally splits in two and '
+        'becomes a completely different song halfway through, like a memory '
+        'shifting as you revisit it. Self Control is a quiet devastation, '
+        'understated in a way that makes it cut deeper. Pink + White floats '
+        'above everything, a Sunday morning in sound. These are the tracks '
+        'I return to when I need music to sit still with me rather than hype me up.',
+    shareCount: 4400,
+    remixCount: 890,
+    tracklist: [
+      TrackItem(spotifyID: 'trk5', trackName: 'Nights',       trackCover: 'https://i.pravatar.cc/150?img=5',  trackArtist: 'Frank Ocean'),
+      TrackItem(spotifyID: 'trk6', trackName: 'Self Control', trackCover: 'https://i.pravatar.cc/150?img=6',  trackArtist: 'Frank Ocean'),
+      TrackItem(spotifyID: 'trk7', trackName: 'Pink + White', trackCover: 'https://i.pravatar.cc/150?img=7',  trackArtist: 'Frank Ocean'),
+    ],
+  ),
+];
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+class ViewPostsScreen extends StatefulWidget {
+  const ViewPostsScreen({super.key});
+
+  @override
+  State<ViewPostsScreen> createState() => _ViewPostsScreenState();
+}
+
+class _ViewPostsScreenState extends State<ViewPostsScreen> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            controller: _scroll,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              const SliverToBoxAdapter(child: _PostsHeader()),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _PostCard(post: _mockPosts[index]),
+                    ),
+                    childCount: _mockPosts.length,
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
+          ),
+          const Positioned(bottom: 24, right: 20, child: _CreatePostFAB()),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Header (unchanged) ───────────────────────────────────────────────────────
+class _PostsHeader extends StatelessWidget {
+  const _PostsHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'POSTS',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.95),
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tracklists & remixes from the disco',
+                style: TextStyle(
+                  color: _kTextMuted,
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: _kGreen.withOpacity(0.85), width: 1.6),
+              boxShadow: [BoxShadow(color: _kPink.withOpacity(0.35), blurRadius: 10)],
+              image: const DecorationImage(
+                image: NetworkImage('https://i.pravatar.cc/150?img=33'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Post Card ────────────────────────────────────────────────────────────────
+class _PostCard extends StatelessWidget {
+  const _PostCard({required this.post});
+  final PostModel post;
+
+  String _fmt(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
+
+  String _relativeTime() {
+    final created = post.createdAt?.toDate();
+    if (created == null) return 'now';
+
+    final diff = DateTime.now().difference(created);
+    if (diff.inDays >= 365) return '${diff.inDays ~/ 365}y';
+    if (diff.inDays >= 30) return '${diff.inDays ~/ 30}mo';
+    if (diff.inDays >= 1) return '${diff.inDays}d';
+    if (diff.inHours >= 1) return '${diff.inHours}h';
+    if (diff.inMinutes >= 1) return '${diff.inMinutes}m';
+    return 'now';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: AppTheme.glassPanelGradient(opacity: 0.38),
+            border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.9),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.22),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // ── Row 1: X-style creator header ───────────────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: _kBlue.withOpacity(0.35),
+                    backgroundImage: NetworkImage(post.authorAvatar),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            post.authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _kTextPrimary,
+                              fontFamily: AppTheme.fontBody,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '· ${_relativeTime()}',
+                          style: const TextStyle(
+                            color: _kTextMuted,
+                            fontFamily: AppTheme.fontBody,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.more_horiz_rounded,
+                      color: Colors.white.withOpacity(0.55), size: 20),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // ── Row 2: description paragraph (left) + artist (right) ────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Description — fills remaining width
+                  Expanded(
+                    child: _PostDescriptionBody(text: post.description),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  // Artist circle + name — fixed width column
+                  SizedBox(
+                    width: 66,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 66,
+                          height: 66,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.28),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _kPink.withOpacity(0.22),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.network(
+                              post.artistImageUrl,
+                              width: 66,
+                              height: 66,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: _kBlue.withOpacity(0.35),
+                                child: Icon(Icons.music_note_rounded,
+                                    color: _kPink.withOpacity(0.9), size: 28),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          post.artistName,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _kTextMuted,
+                            fontFamily: AppTheme.fontBody,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // ── Row 3: tracklist circles ─────────────────────────────────
+              _OverlappingTrackCovers(tracklist: post.tracklist),
+
+              const SizedBox(height: 10),
+
+              // ── Row 4: remix pill + share count ─────────────────────────
+              Row(
+                children: [
+                  _StatPill(
+                    label: 'remix ${_fmt(post.remixCount)}',
+                    color: _kGreen,
+                    onTap: () {},
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {},
+                    child: Row(
+                      children: [
+                        Icon(Icons.reply_rounded,
+                            color: Colors.white.withOpacity(0.55), size: 18),
+                        const SizedBox(width: 4),
+                        Text(
+                          _fmt(post.shareCount),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontFamily: AppTheme.fontBody,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Description with preview + show more (max 600 words) ───────────────────
+class _PostDescriptionBody extends StatefulWidget {
+  const _PostDescriptionBody({required this.text});
+  final String text;
+
+  static const int _previewWords = 60;
+  static const int _maxWords = 600;
+
+  @override
+  State<_PostDescriptionBody> createState() => _PostDescriptionBodyState();
+}
+
+class _PostDescriptionBodyState extends State<_PostDescriptionBody> {
+  bool _expanded = false;
+
+  static List<String> _words(String text) =>
+      text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+
+  static String _joinWords(List<String> words) => words.join(' ');
+
+  @override
+  Widget build(BuildContext context) {
+    final words = _words(widget.text);
+    final total = words.length;
+    final needsMore = total > _PostDescriptionBody._previewWords;
+
+    final visibleWords = _expanded
+        ? words.take(_PostDescriptionBody._maxWords).toList()
+        : words.take(_PostDescriptionBody._previewWords).toList();
+
+    final bodyStyle = TextStyle(
+      color: Colors.white.withOpacity(0.82),
+      fontFamily: AppTheme.fontBody,
+      fontSize: 13.5,
+      height: 1.55,
+      fontWeight: FontWeight.w400,
+    );
+
+    final linkStyle = TextStyle(
+      color: _kCreateCyan,
+      fontFamily: AppTheme.fontBody,
+      fontSize: 13.5,
+      fontWeight: FontWeight.w600,
+    );
+
+    final truncatedAtMax =
+        _expanded && total > _PostDescriptionBody._maxWords;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: _joinWords(visibleWords), style: bodyStyle),
+              if (!_expanded && needsMore)
+                TextSpan(text: '…', style: bodyStyle),
+            ],
+          ),
+        ),
+        if (needsMore) ...[
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Text(
+              _expanded ? 'Show less' : 'Show more',
+              style: linkStyle,
+            ),
+          ),
+        ],
+        if (truncatedAtMax) ...[
+          const SizedBox(height: 4),
+          Text(
+            '…',
+            style: bodyStyle,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── Overlapping track cover circles ─────────────────────────────────────────
+class _OverlappingTrackCovers extends StatelessWidget {
+  const _OverlappingTrackCovers({required this.tracklist});
+  final List<TrackItem> tracklist;
+
+  static const double _size    = 35.2;   // circle diameter (39.1 × 0.90)
+  static const double _overlap = 10.7;   // overlap scaled with diameter
+
+  @override
+  Widget build(BuildContext context) {
+    final items = tracklist.take(5).toList(); // cap at 5
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    // Total width so the Row knows how much space this stack occupies
+    final totalWidth = _size + (_size - _overlap) * (items.length - 1);
+
+    return SizedBox(
+      height: _size,
+      width: totalWidth,
+      child: Stack(
+        children: List.generate(items.length, (i) {
+          return Positioned(
+            left: i * (_size - _overlap),
+            child: _TrackCircle(
+              url: items[i].trackCover,
+              // later circles sit on top
+              zIndex: i.toDouble(),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _TrackCircle extends StatelessWidget {
+  const _TrackCircle({required this.url, required this.zIndex});
+  final String url;
+  final double zIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _OverlappingTrackCovers._size,
+      height: _OverlappingTrackCovers._size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: _kBlue.withOpacity(0.35),
+            child: Icon(Icons.album_rounded,
+                color: _kPink.withOpacity(0.85), size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Stat pill (unchanged) ────────────────────────────────────────────────────
+class _StatPill extends StatelessWidget {
+  const _StatPill({required this.label, required this.color, required this.onTap});
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.55), width: 0.9),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontFamily: AppTheme.fontBody,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreatePostFAB extends StatefulWidget {
+  const _CreatePostFAB();
+
+  @override
+  State<_CreatePostFAB> createState() => _CreatePostFABState();
+}
+
+class _CreatePostFABState extends State<_CreatePostFAB>
+    with SingleTickerProviderStateMixin {
+  static const double _size = 52;
+
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const CreatePostScreen(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        _onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _kCreateCyan,
+            border: Border.all(
+              color: Colors.white.withOpacity(0.35),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _kCreateCyan.withOpacity(0.45),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.add_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -9,6 +9,7 @@ import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/playable_album_cover.dart';
 
 const _kPurple       = AppTheme.gradientStart;
 const _kPink         = AppTheme.gradientEnd;
@@ -275,6 +276,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   String? _roundTrack2Id;
   bool    _roundTrack2Started = false;
 
+  /// Single-track preview (tap cover on selected / read-only lists).
+  String? _previewPlayingTrackId;
+  String? _previewLoadingTrackId;
+  StreamSubscription<NowPlaying?>? _previewNowPlayingSub;
+
   // ── Page / animation ───────────────────────────────────────────────────────
   late final PageController      _pageCtrl;
   late final AnimationController _shimmerCtrl;
@@ -315,6 +321,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   @override
   void dispose() {
     _nowPlayingSub?.cancel();
+    _previewNowPlayingSub?.cancel();
     _artistDebounce?.cancel();
     _trackDebounce?.cancel();
     _trackDebounceSide2?.cancel();
@@ -701,10 +708,113 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   /// Play algorithm: at each round index, pick user1[i] and user2[i].
   /// If user2 has no track at index i, fall back to user1[i] again
   /// (so it still plays something for that round).
+  String _spotifyUriFor(SpotifyTrack track) {
+    final uri = track.uri.trim();
+    if (uri.isNotEmpty) return uri;
+    final id = track.id.trim();
+    if (id.isNotEmpty) return 'spotify:track:$id';
+    return '';
+  }
+
+  void _stopPreviewPlayback({bool clearUi = true}) {
+    _previewNowPlayingSub?.cancel();
+    _previewNowPlayingSub = null;
+    if (clearUi && mounted) {
+      setState(() {
+        _previewPlayingTrackId = null;
+        _previewLoadingTrackId = null;
+      });
+    }
+  }
+
+  void _startPreviewNowPlayingTracking() {
+    _previewNowPlayingSub?.cancel();
+    _previewNowPlayingSub = _api
+        .pollNowPlaying(interval: const Duration(seconds: 2))
+        .listen((np) {
+      if (!mounted) return;
+      final previewId = _previewPlayingTrackId;
+      if (previewId == null) return;
+      if (np == null ||
+          !np.isPlaying ||
+          (np.trackId != null && np.trackId != previewId)) {
+        _stopPreviewPlayback();
+      }
+    });
+  }
+
+  void _showSpotifyPlaybackSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  /// Tap album cover on a track row — play on Spotify, tap again to pause.
+  Future<void> _toggleTrackPreview(SpotifyTrack track) async {
+    final uri = _spotifyUriFor(track);
+    if (track.id.isEmpty || uri.isEmpty) return;
+
+    if (_previewPlayingTrackId == track.id) {
+      setState(() => _previewLoadingTrackId = track.id);
+      try {
+        final paused = await _api.pause();
+        if (!mounted) return;
+        if (paused) {
+          _stopPreviewPlayback();
+        } else {
+          _showSpotifyPlaybackSnack(
+            'Could not pause — open Spotify on a device and try again.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _previewLoadingTrackId = null);
+      }
+      return;
+    }
+
+    setState(() => _previewLoadingTrackId = track.id);
+    try {
+      final played = await _api.play(uri);
+      if (!mounted) return;
+      if (!played) {
+        _showSpotifyPlaybackSnack(
+          'Open Spotify on a phone, speaker, or desktop, then try again.',
+        );
+        return;
+      }
+      _nowPlayingSub?.cancel();
+      _nowPlayingSub = null;
+      _advanceOnTrackId = null;
+      _roundTrack1Id = null;
+      _roundTrack2Id = null;
+      _roundTrack2Started = false;
+      setState(() {
+        _previewPlayingTrackId = track.id;
+        _playingRound = null;
+      });
+      _startPreviewNowPlayingTracking();
+    } catch (e) {
+      debugPrint('[CollaboratorAcceptScreen] preview play error: $e');
+      if (mounted) {
+        _showSpotifyPlaybackSnack('Playback failed. Check Spotify is active.');
+      }
+    } finally {
+      if (mounted) setState(() => _previewLoadingTrackId = null);
+    }
+  }
+
   Future<void> _handlePlay() async {
     if (_pairFirstTracks.isEmpty) return;
     final t1 = _pairFirstTracks.elementAtOrNull(_activeRound);
     if (t1 == null || t1.id.isEmpty) return;
+
+    _stopPreviewPlayback();
 
     final t2 = _pairSecondTracks.elementAtOrNull(_activeRound);
     // If user2 has no track at this round, play t1 twice (back-to-back).
@@ -1622,6 +1732,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 isPast:     isPast,
                 isLast:     isLast,
                 onTap:      () => _onTrackTapped(i),
+                onCoverTap: () => _toggleTrackPreview(track),
+                isPreviewPlaying: _previewPlayingTrackId == track.id,
+                isPreviewLoading: _previewLoadingTrackId == track.id,
               ),
             );
           }),
@@ -1750,6 +1863,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 key: ValueKey('selected-${track.id}'),
                 track: track,
                 accentColor: _kPink,
+                onCoverTap: () => _toggleTrackPreview(track),
+                isPreviewPlaying: _previewPlayingTrackId == track.id,
+                isPreviewLoading: _previewLoadingTrackId == track.id,
                 onSelectRound: _authorEditsBothSides
                     ? () => _onTrackTapped(i)
                     : null,
@@ -1959,6 +2075,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 key: ValueKey('side2-selected-${track.id}'),
                 track: track,
                 accentColor: _kPurple,
+                onCoverTap: () => _toggleTrackPreview(track),
+                isPreviewPlaying: _previewPlayingTrackId == track.id,
+                isPreviewLoading: _previewLoadingTrackId == track.id,
                 onSelectRound: () => _onTrackTapped(i),
                 reorderHandle: ReorderableDragStartListener(
                   index: i,
@@ -2820,22 +2939,28 @@ class _SlotChip extends StatelessWidget {
 }
 
 /// Read-only track row for user1's side — shows active/past/locked state
-/// and is tappable to set the active round.
+/// and is tappable to set the active round. Album cover plays on Spotify.
 class _ReadOnlyTrackRow extends StatelessWidget {
   final SpotifyTrack track;
   final int          index;
   final Color        accentColor;
   final bool         isActive, isPast, isLast;
   final VoidCallback onTap;
+  final VoidCallback onCoverTap;
+  final bool         isPreviewPlaying;
+  final bool         isPreviewLoading;
 
   const _ReadOnlyTrackRow({
     required this.track,
     required this.index,
     required this.accentColor,
     required this.onTap,
+    required this.onCoverTap,
     this.isActive = false,
     this.isPast   = false,
     this.isLast   = false,
+    this.isPreviewPlaying = false,
+    this.isPreviewLoading = false,
   });
 
   @override
@@ -2879,17 +3004,16 @@ class _ReadOnlyTrackRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (track.albumArtUrl != null && track.albumArtUrl!.isNotEmpty)
-                Container(
-                  width: 40, height: 40,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [BoxShadow(
-                        color: Colors.black.withOpacity(0.2), blurRadius: 5)],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(track.albumArtUrl!, fit: BoxFit.cover),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: PlayableAlbumCover(
+                    imageUrl: track.albumArtUrl!,
+                    size: 40,
+                    borderRadius: 6,
+                    accentColor: accentColor,
+                    isPlaying: isPreviewPlaying,
+                    isLoading: isPreviewLoading,
+                    onTap: onCoverTap,
                   ),
                 ),
               Expanded(child: Column(
@@ -2939,6 +3063,9 @@ class _SelectedTrackTile extends StatelessWidget {
   final Color        accentColor;
   final Widget       reorderHandle;
   final VoidCallback onRemove;
+  final VoidCallback onCoverTap;
+  final bool         isPreviewPlaying;
+  final bool         isPreviewLoading;
   final VoidCallback? onSelectRound;
 
   const _SelectedTrackTile({
@@ -2947,6 +3074,9 @@ class _SelectedTrackTile extends StatelessWidget {
     required this.accentColor,
     required this.reorderHandle,
     required this.onRemove,
+    required this.onCoverTap,
+    this.isPreviewPlaying = false,
+    this.isPreviewLoading = false,
     this.onSelectRound,
   });
 
@@ -3002,17 +3132,16 @@ class _SelectedTrackTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               child: Row(children: [
                 if (track.albumArtUrl != null && track.albumArtUrl!.isNotEmpty)
-                  Container(
-                    width: 38, height: 38,
-                    margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                          color: accentColor.withOpacity(0.3), width: 1),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: Image.network(track.albumArtUrl!, fit: BoxFit.cover),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: PlayableAlbumCover(
+                      imageUrl: track.albumArtUrl!,
+                      size: 38,
+                      borderRadius: 6,
+                      accentColor: accentColor,
+                      isPlaying: isPreviewPlaying,
+                      isLoading: isPreviewLoading,
+                      onTap: onCoverTap,
                     ),
                   ),
                 Expanded(child: title),
