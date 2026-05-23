@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/posts/create_post.dart';
+import 'package:welcometothedisco/posts/post_view.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
 const _kBlue        = AppTheme.gradientStart;
@@ -12,64 +14,6 @@ const _kGreen       = AppTheme.createGreen;
 const _kCreateCyan  = Color(0xFF17B5EE);
 const _kTextPrimary = Colors.white;
 const _kTextMuted   = Color(0x8CFFFFFF);
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-final _mockPosts = [
-  PostModel(
-    id: '1',
-    authorID: 'uid_jeff',
-    authorName: 'Jeff',
-    authorAvatar: 'https://i.pravatar.cc/150?img=11',
-    artistID: 'spotify:artist:lana',
-    artistName: 'Lana Del Rey',
-    artistImageUrl: 'https://i.scdn.co/image/ab6761610000e5eb4c5e1234567890abcdef1234',
-    description:
-        'There are artists whose music feels less like entertainment and more like '
-        'weather — something that just descends on you. Lana Del Rey is that artist for '
-        'me. These five tracks have become the soundtrack to every long drive, late '
-        'night, and moment where the feelings are too big to fit in a room. '
-        'Video Games still hits like the first time, a slow-motion widescreen ache. '
-        'Young and Beautiful is grief dressed up as a love song. '
-        'Summertime Sadness wraps melancholy in a chorus so anthemic it almost tricks '
-        'you into feeling okay. Born To Die is the thesis statement: beautiful, doomed, '
-        'completely self-aware. Every wash, every spin through the playlist lands '
-        'differently depending on where you are in your life.',
-    shareCount: 2100,
-    remixCount: 2300,
-    tracklist: [
-      TrackItem(spotifyID: 'trk1', trackName: 'Video Games',         trackCover: 'https://i.pravatar.cc/150?img=1',  trackArtist: 'Lana Del Rey'),
-      TrackItem(spotifyID: 'trk2', trackName: 'Young and Beautiful', trackCover: 'https://i.pravatar.cc/150?img=2',  trackArtist: 'Lana Del Rey'),
-      TrackItem(spotifyID: 'trk3', trackName: 'Summertime Sadness',  trackCover: 'https://i.pravatar.cc/150?img=3',  trackArtist: 'Lana Del Rey'),
-      TrackItem(spotifyID: 'trk4', trackName: 'Born To Die',         trackCover: 'https://i.pravatar.cc/150?img=4',  trackArtist: 'Lana Del Rey'),
-    ],
-  ),
-  PostModel(
-    id: '2',
-    authorID: 'uid_maya',
-    authorName: 'Maya',
-    authorAvatar: 'https://i.pravatar.cc/150?img=47',
-    artistID: 'spotify:artist:frank',
-    artistName: 'Frank Ocean',
-    artistImageUrl: 'https://i.scdn.co/image/ab6761610000e5eb9876543210fedcba98765432',
-    description:
-        'Frank Ocean makes you feel things that do not have names yet. '
-        'Blonde as an album is the closest thing to a conversation happening '
-        'inside your own head — fragmented, honest, searching. '
-        'Nights is the centrepiece: a track that literally splits in two and '
-        'becomes a completely different song halfway through, like a memory '
-        'shifting as you revisit it. Self Control is a quiet devastation, '
-        'understated in a way that makes it cut deeper. Pink + White floats '
-        'above everything, a Sunday morning in sound. These are the tracks '
-        'I return to when I need music to sit still with me rather than hype me up.',
-    shareCount: 4400,
-    remixCount: 890,
-    tracklist: [
-      TrackItem(spotifyID: 'trk5', trackName: 'Nights',       trackCover: 'https://i.pravatar.cc/150?img=5',  trackArtist: 'Frank Ocean'),
-      TrackItem(spotifyID: 'trk6', trackName: 'Self Control', trackCover: 'https://i.pravatar.cc/150?img=6',  trackArtist: 'Frank Ocean'),
-      TrackItem(spotifyID: 'trk7', trackName: 'Pink + White', trackCover: 'https://i.pravatar.cc/150?img=7',  trackArtist: 'Frank Ocean'),
-    ],
-  ),
-];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class ViewPostsScreen extends StatefulWidget {
@@ -80,42 +24,98 @@ class ViewPostsScreen extends StatefulWidget {
 }
 
 class _ViewPostsScreenState extends State<ViewPostsScreen> {
-  final ScrollController _scroll = ScrollController();
+  late Stream<List<PostModel>> _postsStream;
 
   @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _postsStream = FirebaseService.getPostsStream();
+  }
+
+  void _refreshPosts() {
+    setState(() {
+      _postsStream = FirebaseService.getPostsStream();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            controller: _scroll,
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              const SliverToBoxAdapter(child: _PostsHeader()),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _PostCard(post: _mockPosts[index]),
+      body: StreamBuilder<List<PostModel>>(
+        stream: _postsStream,
+        builder: (context, snapshot) {
+          final posts = snapshot.data ?? [];
+          final loading = snapshot.connectionState == ConnectionState.waiting
+              && posts.isEmpty;
+          final error = snapshot.hasError;
+
+          return Stack(
+            children: [
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  const SliverToBoxAdapter(child: _PostsHeader()),
+                  if (loading)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white54,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  else if (error)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          'Could not load posts',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.45),
+                            fontFamily: AppTheme.fontBody,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (posts.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          'No posts yet — be the first!',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.40),
+                            fontFamily: AppTheme.fontBody,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _PostCard(post: posts[index]),
+                          ),
+                          childCount: posts.length,
+                        ),
+                      ),
                     ),
-                    childCount: _mockPosts.length,
-                  ),
-                ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                ],
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              Positioned(
+                bottom: 24,
+                right: 20,
+                child: _CreatePostFAB(onPostCreated: _refreshPosts),
+              ),
             ],
-          ),
-          const Positioned(bottom: 24, right: 20, child: _CreatePostFAB()),
-        ],
+          );
+        },
       ),
     );
   }
@@ -183,6 +183,51 @@ class _PostCard extends StatelessWidget {
 
   String _fmt(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
 
+  Widget _authorAvatar() {
+    final p = post.authorAvatar.trim();
+    const size = 36.0;
+
+    Widget fallback() => Container(
+          width: size,
+          height: size,
+          color: _kBlue.withOpacity(0.35),
+          child: Icon(Icons.person_rounded,
+              color: Colors.white.withOpacity(0.75), size: 18),
+        );
+
+    if (p.isEmpty) {
+      return ClipOval(child: fallback());
+    }
+
+    if (p.startsWith('http://') || p.startsWith('https://')) {
+      return ClipOval(
+        child: Image.network(
+          p,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback(),
+        ),
+      );
+    }
+
+    final asset = p.startsWith('assets/')
+        ? p
+        : p.startsWith('/')
+            ? p.substring(1)
+            : 'assets/images/$p';
+
+    return ClipOval(
+      child: Image.asset(
+        asset,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback(),
+      ),
+    );
+  }
+
   String _relativeTime() {
     final created = post.createdAt?.toDate();
     if (created == null) return 'now';
@@ -196,9 +241,18 @@ class _PostCard extends StatelessWidget {
     return 'now';
   }
 
+  void _openDetail(BuildContext context) {
+    Navigator.of(context).push(
+      slideUpRoute(PostDetailScreen(post: post)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
+    return GestureDetector(
+      onTap: () => _openDetail(context),
+      behavior: HitTestBehavior.opaque,
+      child: ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
@@ -224,11 +278,7 @@ class _PostCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: _kBlue.withOpacity(0.35),
-                    backgroundImage: NetworkImage(post.authorAvatar),
-                  ),
+                  _authorAvatar(),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Row(
@@ -372,6 +422,7 @@ class _PostCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -562,7 +613,9 @@ class _StatPill extends StatelessWidget {
 }
 
 class _CreatePostFAB extends StatefulWidget {
-  const _CreatePostFAB();
+  const _CreatePostFAB({required this.onPostCreated});
+
+  final VoidCallback onPostCreated;
 
   @override
   State<_CreatePostFAB> createState() => _CreatePostFABState();
@@ -593,12 +646,15 @@ class _CreatePostFABState extends State<_CreatePostFAB>
     super.dispose();
   }
 
-  void _onTap() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
+  Future<void> _onTap() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => const CreatePostScreen(),
       ),
     );
+    if (created == true && mounted) {
+      widget.onPostCreated();
+    }
   }
 
   @override

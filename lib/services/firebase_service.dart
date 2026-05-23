@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
+import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
@@ -2135,5 +2136,60 @@ class FirebaseService {
       SetOptions(merge: true),
     );
     await _fetchCurrentUserFromFirestore(uid);
+  }
+
+  // ── Posts ─────────────────────────────────────────────────────────────────
+
+  /// Creates a new document in the `posts` collection.
+  /// [authorID], [authorName], [authorAvatar] are resolved from the current
+  /// Firebase user + cached Firestore profile automatically.
+  /// [artistID], [artistName], [artistImageUrl], [description], [tracklist]
+  /// come from the create-post screen.
+  /// Returns the new document ID.
+  static Future<String> createPost({
+    required String artistID,
+    required String artistName,
+    required String artistImageUrl,
+    required String description,
+    required List<Map<String, dynamic>> tracklist,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('Not logged in');
+
+    final profile = await getCurrentUser();
+    final authorName = (profile?.username.trim().isNotEmpty ?? false)
+        ? profile!.username.trim()
+        : (_auth.currentUser?.displayName?.trim().isNotEmpty ?? false
+            ? _auth.currentUser!.displayName!.trim()
+            : (_auth.currentUser?.email?.split('@').first ?? 'User'));
+    final authorAvatar = profile?.avatarPath.trim() ?? '';
+
+    final now = FieldValue.serverTimestamp();
+    final ref = await _firestore.collection('posts').add({
+      'authorID':         uid,
+      'authorName':       authorName,
+      'Author_avatar':    authorAvatar,
+      'artistID':         artistID,
+      'Artistname':       artistName,
+      'Artist_image_url': artistImageUrl,
+      'Description':      description.trim(),
+      'Sharecount':       0,
+      'Remixcount':       0,
+      'Tracklist':        tracklist,
+      'Created_at':       now,
+      'modified_at':      now,
+    });
+    return ref.id;
+  }
+
+  /// Live stream of all posts, ordered by newest first.
+  static Stream<List<PostModel>> getPostsStream() {
+    return _firestore
+        .collection('posts')
+        .orderBy('Created_at', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => PostModel.fromFirestore(d.data(), d.id))
+            .toList());
   }
 }
