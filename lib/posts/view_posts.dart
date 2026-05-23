@@ -129,48 +129,15 @@ class _PostsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'POSTS',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.95),
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Tracklists & remixes from the disco',
-                style: TextStyle(
-                  color: _kTextMuted,
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _kGreen.withOpacity(0.85), width: 1.6),
-              boxShadow: [BoxShadow(color: _kPink.withOpacity(0.35), blurRadius: 10)],
-              image: const DecorationImage(
-                image: NetworkImage('https://i.pravatar.cc/150?img=33'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        'POSTS',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.95),
+          fontFamily: AppTheme.fontBody,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2.4,
+        ),
       ),
     );
   }
@@ -389,32 +356,43 @@ class _PostCard extends StatelessWidget {
 
               const SizedBox(height: 10),
 
-              // ── Row 4: remix pill + share count ─────────────────────────
+              // ── Row 4: remix + share stats (X-style icon + number) ──────
               Row(
                 children: [
-                  _StatPill(
-                    label: 'remix ${_fmt(post.remixCount)}',
-                    color: _kGreen,
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Row(
-                      children: [
-                        Icon(Icons.reply_rounded,
-                            color: Colors.white.withOpacity(0.55), size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          _fmt(post.shareCount),
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
-                            fontFamily: AppTheme.fontBody,
-                            fontSize: 13,
-                          ),
+                  // Remix stat
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.loop_rounded,
+                          color: _kGreen.withOpacity(0.75), size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _fmt(post.remixCount),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.55),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 13,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 18),
+                  // Share stat
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.reply_rounded,
+                          color: Colors.white.withOpacity(0.55), size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _fmt(post.shareCount),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.55),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -573,38 +551,6 @@ class _TrackCircle extends StatelessWidget {
             color: _kBlue.withOpacity(0.35),
             child: Icon(Icons.album_rounded,
                 color: _kPink.withOpacity(0.85), size: 22),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Stat pill (unchanged) ────────────────────────────────────────────────────
-class _StatPill extends StatelessWidget {
-  const _StatPill({required this.label, required this.color, required this.onTap});
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.55), width: 0.9),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontFamily: AppTheme.fontBody,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
           ),
         ),
       ),
