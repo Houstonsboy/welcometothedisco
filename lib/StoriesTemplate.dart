@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
-import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/friends/friendprofile.dart';
 
 const _kBlue  = AppTheme.gradientStart;
 const _kPink  = AppTheme.gradientEnd;

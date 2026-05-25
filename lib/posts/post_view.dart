@@ -1,11 +1,14 @@
 // lib/posts/post_view.dart
 
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/userprofile.dart';
 
 const _kGreen      = AppTheme.createGreen;
 const _kPink       = AppTheme.gradientEnd;
@@ -415,43 +418,74 @@ class _AuthorRow extends StatelessWidget {
     );
   }
 
+  void _openAuthorProfile(BuildContext context) {
+    final uid = post.authorID.trim();
+    if (uid.isEmpty) return;
+
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && uid == currentUid) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const UserProfilePage()),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FriendProfilePage(
+          uid: uid,
+          initialUsername: post.authorName,
+          initialAvatarPath: post.authorAvatar,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                  color: _kGreen.withOpacity(0.5), width: 1.5),
+          GestureDetector(
+            onTap: () => _openAuthorProfile(context),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: _kGreen.withOpacity(0.5), width: 1.5),
+                  ),
+                  child: _avatar(),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: const TextStyle(
+                        color: _kTextPrimary,
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _relativeTime(post.createdAt?.toDate()),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.35),
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: _avatar(),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                post.authorName,
-                style: const TextStyle(
-                  color: _kTextPrimary,
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _relativeTime(post.createdAt?.toDate()),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 11,
-                ),
-              ),
-            ],
           ),
           const Spacer(),
           _FollowPill(),
