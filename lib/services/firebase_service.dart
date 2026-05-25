@@ -2192,4 +2192,30 @@ class FirebaseService {
             .map((d) => PostModel.fromFirestore(d.data(), d.id))
             .toList());
   }
+
+  /// Live stream of posts by one author, ordered by newest first.
+  static Stream<List<PostModel>> getPostsByAuthorStream(String authorId) {
+    final uid = authorId.trim();
+    if (uid.isEmpty) return Stream.value(const <PostModel>[]);
+
+    return _firestore
+        .collection('posts')
+        .where('authorID', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
+      final posts = snap.docs
+          .map((d) => PostModel.fromFirestore(d.data(), d.id))
+          .where((p) => p.authorID.trim() == uid)
+          .toList();
+      posts.sort((a, b) {
+        final aDate = a.createdAt?.toDate();
+        final bDate = b.createdAt?.toDate();
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+      return posts;
+    });
+  }
 }

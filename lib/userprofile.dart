@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/authentication/login.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/auth_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
@@ -248,6 +249,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       key: ValueKey(user?.id ?? ''),
                       initialAlbums: user?.favoriteAlbums ?? const [],
                     ),
+                    if ((user?.id ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      ProfilePostsSection(authorUid: user!.id),
+                    ],
                   ],
                 ),
               );

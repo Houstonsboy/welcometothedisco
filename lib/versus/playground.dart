@@ -19,6 +19,7 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/playable_album_cover.dart';
 import 'package:welcometothedisco/widgets/versus_share_card.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
@@ -106,11 +107,11 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   int  _selectedAlbum    = 0;
   int  _activeTrackIndex = 0;
   int? _playingTrackIndex;
-  int  _leadAlbumIndex   = 0;
 
   // ── Playback ──────────────────────────────────────────────────────────────
-  bool _isPlayLoading = false;
   bool _isBombLoading = false;
+  bool _hasVersusPlaybackStarted = false;
+  int? _coverLoadingRoundIndex;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
   String? _advanceOnTrackId;
   String? _currentRoundTrack1Id;
@@ -628,46 +629,106 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _slideController.forward(from: 0);
   }
 
-  void _onTrackTapped(int trackIndex, int albumIndex) {
+  void _stopPlaybackTracking() {
     _nowPlayingSub?.cancel();
-    _nowPlayingSub        = null;
-    _advanceOnTrackId     = null;
+    _nowPlayingSub = null;
+    _advanceOnTrackId = null;
     _currentRoundTrack1Id = null;
     _currentRoundTrack2Id = null;
-    _roundTrack2Started   = false;
+    _roundTrack2Started = false;
+  }
+
+  void _showPlaybackSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.black.withOpacity(0.88),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  String _spotifyUriFor(SpotifyAlbumTrack track) {
+    final uri = track.uri.trim();
+    if (uri.isNotEmpty) return uri;
+    final id = track.id.trim();
+    if (id.isNotEmpty) return 'spotify:track:$id';
+    return '';
+  }
+
+  void _onTitleTap(int trackIndex, int _) {
     setState(() {
-      _activeTrackIndex  = trackIndex;
-      _leadAlbumIndex    = albumIndex;
-      _playingTrackIndex = null;
+      _activeTrackIndex = trackIndex;
     });
   }
 
   // ── Playback ──────────────────────────────────────────────────────────────
-  Future<void> _handlePlay() async {
+  Future<bool> _playRoundAtIndex(int index) async {
+    final albums = _albums;
+    if (albums == null || albums.length < 2) return false;
+    final t1 = albums[0]?.tracks.elementAtOrNull(index);
+    final t2 = albums[1]?.tracks.elementAtOrNull(index);
+    if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) {
+      return false;
+    }
+    final uri1 = _spotifyUriFor(t1);
+    final uri2 = _spotifyUriFor(t2);
+    if (uri1.isEmpty || uri2.isEmpty) return false;
+
+    setState(() => _coverLoadingRoundIndex = index);
+    try {
+      final played = await _api.playRoundTracks(uri1, uri2);
+      if (!played) {
+        _showPlaybackSnack(
+          'Open Spotify on a phone, speaker, or desktop, then try again.',
+        );
+        return false;
+      }
+      _hasVersusPlaybackStarted = true;
+      _currentRoundTrack1Id = t1.id;
+      _currentRoundTrack2Id = t2.id;
+      _roundTrack2Started = false;
+      _advanceOnTrackId = t2.id;
+      _startNowPlayingIndexTracking();
+      if (mounted) setState(() => _playingTrackIndex = index);
+      return true;
+    } catch (e) {
+      debugPrint('[VersusPlayground] _playRoundAtIndex error: $e');
+      _showPlaybackSnack('Playback failed. Check Spotify is active.');
+      return false;
+    } finally {
+      if (mounted) setState(() => _coverLoadingRoundIndex = null);
+    }
+  }
+
+  Future<void> _onCoverTap(int trackIndex, int _) async {
     final albums = _albums;
     if (albums == null || albums.length < 2) return;
-    final roundIndex  = _activeTrackIndex;
-    final leadAlbum   = _leadAlbumIndex;
-    final followAlbum = leadAlbum == 0 ? 1 : 0;
-    final tLead   = albums[leadAlbum]?.tracks.elementAtOrNull(roundIndex);
-    final tFollow = albums[followAlbum]?.tracks.elementAtOrNull(roundIndex);
-    if (tLead == null || tFollow == null || tLead.id.isEmpty || tFollow.id.isEmpty) return;
 
-    setState(() => _isPlayLoading = true);
-    try {
-      final played = await _api.playRoundTracks(tLead.uri, tFollow.uri);
-      if (!played) return;
-      _currentRoundTrack1Id = tLead.id;
-      _currentRoundTrack2Id = tFollow.id;
-      _roundTrack2Started   = false;
-      _advanceOnTrackId     = tFollow.id;
-      _startNowPlayingIndexTracking();
-      if (mounted) setState(() => _playingTrackIndex = roundIndex);
-    } catch (e) {
-      debugPrint('[VersusPlayground] _handlePlay error: $e');
-    } finally {
-      if (mounted) setState(() => _isPlayLoading = false);
+    final playIndex = _hasVersusPlaybackStarted ? trackIndex : 0;
+
+    if (_playingTrackIndex == playIndex) {
+      setState(() => _coverLoadingRoundIndex = playIndex);
+      try {
+        final paused = await _api.pause();
+        if (!mounted) return;
+        if (paused) {
+          _stopPlaybackTracking();
+          setState(() => _playingTrackIndex = null);
+        } else {
+          _showPlaybackSnack(
+            'Could not pause — open Spotify on a device and try again.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _coverLoadingRoundIndex = null);
+      }
+      return;
     }
+
+    await _playRoundAtIndex(playIndex);
   }
 
   void _startNowPlayingIndexTracking() {
@@ -685,8 +746,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         } else {
           setState(() => _playingTrackIndex = null);
         }
-        _advanceOnTrackId = null; _currentRoundTrack1Id = null;
-        _currentRoundTrack2Id = null; _roundTrack2Started = false;
+        _stopPlaybackTracking();
       }
     });
   }
@@ -697,7 +757,10 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final t1 = a[0]?.tracks.elementAtOrNull(index);
     final t2 = a[1]?.tracks.elementAtOrNull(index);
     if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) return false;
-    return _api.queueRoundTracks(t1.uri, t2.uri);
+    final uri1 = _spotifyUriFor(t1);
+    final uri2 = _spotifyUriFor(t2);
+    if (uri1.isEmpty || uri2.isEmpty) return false;
+    return _api.queueRoundTracks(uri1, uri2);
   }
 
   Future<void> _handleBomb() async {
@@ -705,10 +768,20 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final a = _albums;
     if (a == null || a.length < 2) return;
     final total = math.min(a[0]?.tracks.length ?? 0, a[1]?.tracks.length ?? 0);
-    if (total <= 0 || _activeTrackIndex >= total - 1) return;
+    if (total <= 0) return;
     setState(() => _isBombLoading = true);
     try {
-      for (int i = _activeTrackIndex + 1; i < total; i++) {
+      int queueFrom;
+      if (!_hasVersusPlaybackStarted || _playingTrackIndex == null) {
+        final started = await _playRoundAtIndex(0);
+        if (!started) return;
+        queueFrom = 1;
+      } else {
+        if (_activeTrackIndex >= total - 1) return;
+        queueFrom = _activeTrackIndex + 1;
+      }
+
+      for (int i = queueFrom; i < total; i++) {
         if (!await _queueRoundAtIndex(i)) break;
       }
     } catch (e) {
@@ -808,44 +881,41 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                     child: isLoading
                         ? Center(child: CircularProgressIndicator(color: _color1))
                         : Column(children: [
-                            // ── Playback controls ────────────────────────────
+                            // ── Playback status ──────────────────────────────
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                               child: Row(children: [
-                                GestureDetector(
-                                  onTap: _isPlayLoading ? null : _handlePlay,
-                                  child: Container(
-                                    width: 40, height: 40,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _kSpotifyGreen.withOpacity(_isPlayLoading ? 0.12 : 0.25),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(_isPlayLoading ? 0.3 : 0.6), width: 1.2),
-                                    ),
-                                    child: _isPlayLoading
-                                        ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(color: _kSpotifyGreen, strokeWidth: 2))
-                                        : const Icon(Icons.play_arrow_rounded, color: _kSpotifyGreen, size: 24),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 14),
+                                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(0.2),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(0.5), width: 0.8),
+                                      color: _kSpotifyGreen.withOpacity(0.18),
+                                      border: Border.all(color: _kSpotifyGreen.withOpacity(0.45), width: 0.85),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: _kSpotifyGreen)),
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: _playingTrackIndex != null
+                                                ? _kSpotifyGreen
+                                                : Colors.white.withOpacity(0.35),
+                                          ),
+                                        ),
                                         const SizedBox(width: 8),
                                         Text('ROUND ${_activeTrackIndex + 1}',
                                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2)),
                                         if (_playingTrackIndex != null) ...[
-                                          const SizedBox(width: 10),
-                                          Text('PLAY ${_playingTrackIndex! + 1}',
-                                              style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.1)),
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.graphic_eq_rounded,
+                                            size: 14,
+                                            color: _kSpotifyGreen.withOpacity(0.95),
+                                          ),
                                         ],
                                       ],
                                     ),
@@ -865,13 +935,26 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                       if (_isBombLoading)
                                         const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.8, color: _kSpotifyGreen))
                                       else
-                                        const Text('BOMB', style: TextStyle(color: _kSpotifyGreen, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                                        const Text('QUEUE ALL', style: TextStyle(color: _kSpotifyGreen, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.arrow_forward_rounded, color: _kSpotifyGreen, size: 16),
+                                      const Icon(Icons.queue_music_rounded, color: _kSpotifyGreen, size: 16),
                                     ]),
                                   ),
                                 ),
                               ]),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                              child: Text(
+                                'Tap cover to play · tap title to select round & vote',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.42),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
                             ),
 
                             // ── Track PageView ───────────────────────────────
@@ -889,10 +972,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     slideAnim: _slideAnim,
                                     accentColor: _color1,
                                     activeTrackIndex: _activeTrackIndex,
+                                    playingTrackIndex: _playingTrackIndex,
+                                    coverLoadingRoundIndex: _coverLoadingRoundIndex,
                                     votableRoundCount: _pairedRoundCount,
                                     votesByIndex: _votesByIndex,
                                     onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
-                                    onTrackTap: _onTrackTapped,
+                                    onCoverTap: _onCoverTap,
+                                    onTitleTap: _onTitleTap,
                                     getCommentCtrl: _commentCtrlAt,
                                     onCommentChanged: _onCommentChanged,
                                   ),
@@ -905,10 +991,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     slideAnim: _slideAnim,
                                     accentColor: _color2,
                                     activeTrackIndex: _activeTrackIndex,
+                                    playingTrackIndex: _playingTrackIndex,
+                                    coverLoadingRoundIndex: _coverLoadingRoundIndex,
                                     votableRoundCount: _pairedRoundCount,
                                     votesByIndex: _votesByIndex,
                                     onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
-                                    onTrackTap: _onTrackTapped,
+                                    onCoverTap: _onCoverTap,
+                                    onTitleTap: _onTitleTap,
                                     getCommentCtrl: _commentCtrlAt,
                                     onCommentChanged: _onCommentChanged,
                                   ),
@@ -1383,10 +1472,13 @@ class _TrackPage extends StatelessWidget {
   final Animation<double> slideAnim;
   final Color   accentColor;
   final int     activeTrackIndex;
+  final int?    playingTrackIndex;
+  final int?    coverLoadingRoundIndex;
   final int     votableRoundCount;
   final Map<int, int> votesByIndex;
   final void Function(int albumIndex)              onVote;
-  final void Function(int trackIndex, int albumIndex) onTrackTap;
+  final void Function(int trackIndex, int albumIndex) onCoverTap;
+  final void Function(int trackIndex, int albumIndex) onTitleTap;
   final TextEditingController Function(int)        getCommentCtrl;
   final void Function(int roundIndex, String text) onCommentChanged;
 
@@ -1399,10 +1491,13 @@ class _TrackPage extends StatelessWidget {
     required this.slideAnim,
     required this.accentColor,
     required this.activeTrackIndex,
+    this.playingTrackIndex,
+    this.coverLoadingRoundIndex,
     required this.votableRoundCount,
     required this.votesByIndex,
     required this.onVote,
-    required this.onTrackTap,
+    required this.onCoverTap,
+    required this.onTitleTap,
     required this.getCommentCtrl,
     required this.onCommentChanged,
   });
@@ -1460,6 +1555,7 @@ class _TrackPage extends StatelessWidget {
           child: _TrackRow(
             key:               ValueKey('album-$albumIndex-track-$trackIndex'),
             track:             track,
+            albumImageUrl:     album?.imageUrl ?? fallbackImageUrl,
             index:             trackIndex,
             accentColor:       accentColor,
             isLast:            trackIndex == tracks.length - 1,
@@ -1472,7 +1568,10 @@ class _TrackPage extends StatelessWidget {
             commentController: getCommentCtrl(trackIndex),
             onVote:            isActive && !isBonusIndex ? () => onVote(albumIndex) : null,
             onCommentChanged:  (text) => onCommentChanged(trackIndex, text),
-            onTap:             () => onTrackTap(trackIndex, albumIndex),
+            onCoverTap:        () => onCoverTap(trackIndex, albumIndex),
+            onTitleTap:        () => onTitleTap(trackIndex, albumIndex),
+            isRoundPlaying:    playingTrackIndex == trackIndex,
+            isCoverLoading:    coverLoadingRoundIndex == trackIndex,
           ),
         );
       },
@@ -1483,6 +1582,7 @@ class _TrackPage extends StatelessWidget {
 // ── Track Row ─────────────────────────────────────────────────────────────────
 class _TrackRow extends StatelessWidget {
   final SpotifyAlbumTrack          track;
+  final String?                    albumImageUrl;
   final int                        index;
   final Color                      accentColor;
   final bool                       isLast, isActive, isPast, isLocked;
@@ -1490,15 +1590,21 @@ class _TrackRow extends StatelessWidget {
   final TextEditingController      commentController;
   final VoidCallback?              onVote;
   final void Function(String)      onCommentChanged;
-  final VoidCallback?              onTap;
+  final VoidCallback               onCoverTap;
+  final VoidCallback               onTitleTap;
+  final bool                       isRoundPlaying;
+  final bool                       isCoverLoading;
 
   const _TrackRow({
     super.key,
     required this.track,
+    this.albumImageUrl,
     required this.index,
     required this.accentColor,
     required this.commentController,
     required this.onCommentChanged,
+    required this.onCoverTap,
+    required this.onTitleTap,
     this.isLast         = false,
     this.isActive       = false,
     this.isPast         = false,
@@ -1506,59 +1612,120 @@ class _TrackRow extends StatelessWidget {
     this.showVoteButton = false,
     this.isVoted        = false,
     this.isVoteDisabled = false,
+    this.isRoundPlaying = false,
+    this.isCoverLoading = false,
     this.onVote,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final textOpacity = isActive ? 1.0 : isPast ? 0.6 : 0.52;
     final numberColor = isActive
         ? accentColor
         : isPast ? accentColor.withOpacity(0.5) : Colors.white.withOpacity(0.42);
+    final titleOpacity = isPast
+        ? 0.58
+        : isLocked
+            ? 0.46
+            : 0.68;
+    final artistOpacity = titleOpacity * 0.62;
+    final coverImageUrl = albumImageUrl?.trim() ?? '';
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 300),
       opacity: isLocked ? 0.62 : 1.0,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(children: [
-          Container(
-            decoration: isActive ? BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: accentColor.withOpacity(0.42),
-              border: Border.all(color: accentColor.withOpacity(0.65), width: 1.2),
-            ) : null,
-            padding: isActive ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2) : EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
-              child: Column(children: [
-                Row(children: [
-                  // Track number / state icon
-                  SizedBox(width: 32,
-                    child: isPast
-                        ? Icon(Icons.check_rounded, size: 15, color: accentColor.withOpacity(0.5))
-                        : isLocked
-                            ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withOpacity(0.45))
-                            : Text('${track.trackNumber}'.padLeft(2, '0'),
-                                style: TextStyle(color: numberColor, fontSize: 12, fontWeight: FontWeight.w700,
-                                    fontFeatures: const [FontFeature.tabularFigures()])),
-                  ),
-                  const SizedBox(width: 12),
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
+          child: Column(children: [
+            Row(children: [
+              // Track number / state icon
+              SizedBox(width: 32,
+                child: isPast
+                    ? Icon(Icons.check_rounded, size: 15, color: accentColor.withOpacity(0.5))
+                    : isLocked
+                        ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withOpacity(0.45))
+                        : Text('${track.trackNumber}'.padLeft(2, '0'),
+                            style: TextStyle(color: numberColor, fontSize: 12, fontWeight: FontWeight.w700,
+                                fontFeatures: const [FontFeature.tabularFigures()])),
+              ),
+              const SizedBox(width: 8),
 
-                  // Track info
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white.withOpacity(textOpacity), fontSize: 14,
-                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500, letterSpacing: -0.1)),
-                    if (track.artistName.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(track.artistName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withOpacity(textOpacity * 0.6), fontSize: 12, fontWeight: FontWeight.w400)),
-                    ],
-                  ])),
-                  const SizedBox(width: 12),
+              if (coverImageUrl.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: PlayableAlbumCover(
+                    imageUrl: coverImageUrl,
+                    size: 40,
+                    borderRadius: 6,
+                    accentColor: accentColor,
+                    isPlaying: isRoundPlaying,
+                    isLoading: isCoverLoading,
+                    emphasized: isRoundPlaying,
+                    onTap: onCoverTap,
+                  ),
+                ),
+
+              // Title tap selects round for voting/commenting without playback.
+              Expanded(
+                child: GestureDetector(
+                  onTap: onTitleTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isActive ? 10 : 4,
+                      vertical: isActive ? 7 : 4,
+                    ),
+                    decoration: isActive
+                        ? BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                accentColor.withOpacity(0.24),
+                                Colors.white.withOpacity(0.08),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: accentColor.withOpacity(0.50),
+                              width: 0.9,
+                            ),
+                          )
+                        : null,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: isActive ? Colors.white : Colors.white.withOpacity(titleOpacity),
+                              fontSize: isActive ? 15 : 14,
+                              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                              letterSpacing: isActive ? 0 : -0.1,
+                              height: 1.15,
+                              shadows: isActive
+                                  ? [
+                                      Shadow(
+                                        color: accentColor.withOpacity(0.40),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : null)),
+                      if (track.artistName.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(track.artistName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: isActive
+                                    ? accentColor.withOpacity(0.95)
+                                    : Colors.white.withOpacity(artistOpacity),
+                                fontSize: isActive ? 12.5 : 12,
+                                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                                height: 1.1)),
+                      ],
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
 
                   // Vote button
                   if (showVoteButton) ...[
@@ -1608,7 +1775,7 @@ class _TrackRow extends StatelessWidget {
                     )
                   else if (!isActive)
                     Text(track.durationFormatted,
-                        style: TextStyle(color: Colors.white.withOpacity(textOpacity * 0.5), fontSize: 12,
+                        style: TextStyle(color: Colors.white.withOpacity(titleOpacity * 0.5), fontSize: 12,
                             fontWeight: FontWeight.w500, fontFeatures: const [FontFeature.tabularFigures()])),
                 ]),
 
@@ -1638,11 +1805,9 @@ class _TrackRow extends StatelessWidget {
                 ],
               ]),
             ),
-          ),
-          if (!isLast)
-            Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
-        ]),
-      ),
+        if (!isLast)
+          Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
+      ]),
     );
   }
 }

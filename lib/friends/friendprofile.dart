@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
@@ -121,6 +122,8 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                             key: ValueKey(_user!.id),
                             albums: _user!.favoriteAlbums,
                           ),
+                          const SizedBox(height: 16),
+                          ProfilePostsSection(authorUid: _user!.id),
                         ],
                       ),
                     ),
