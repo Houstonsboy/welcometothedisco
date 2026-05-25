@@ -2152,6 +2152,7 @@ class FirebaseService {
     required String artistImageUrl,
     required String description,
     required List<Map<String, dynamic>> tracklist,
+    RemixEnabled remixEnabled = RemixEnabled.same,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Not logged in');
@@ -2175,6 +2176,7 @@ class FirebaseService {
       'Description':      description.trim(),
       'Sharecount':       0,
       'Remixcount':       0,
+      'remixenabled':     remixEnabled.firestoreValue,
       'Tracklist':        tracklist,
       'Created_at':       now,
       'modified_at':      now,

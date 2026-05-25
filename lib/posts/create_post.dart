@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
@@ -51,6 +52,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   bool _trackSectionOpen = false;
   bool _isPublishing = false;
+  RemixEnabled _remixEnabled = RemixEnabled.same;
 
   List<SpotifyTrack> get _visibleTracks =>
       (_trackFilterQuery.isNotEmpty && _trackSearchResults != null)
@@ -209,6 +211,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   'trackartist': t.artistName,
                 })
             .toList(),
+        remixEnabled: _remixEnabled,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -333,6 +336,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         ),
                         const SizedBox(height: 8),
                       ],
+
+                      const SizedBox(height: 24),
+                      _Divider(),
+                      const SizedBox(height: 16),
+
+                      // ── Remix policy (false / same / different) ──────────
+                      _RemixEnabledSelector(
+                        value: _remixEnabled,
+                        onChanged: (v) => setState(() => _remixEnabled = v),
+                      ),
 
                       const SizedBox(height: 24),
                       _Divider(),
@@ -1151,6 +1164,129 @@ class _TrackSection extends StatelessWidget {
         child: Icon(Icons.music_note_rounded,
             color: Colors.white.withOpacity(0.30), size: 18),
       );
+}
+
+// ─── Remix policy selector ────────────────────────────────────────────────────
+class _RemixEnabledSelector extends StatelessWidget {
+  const _RemixEnabledSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final RemixEnabled value;
+  final ValueChanged<RemixEnabled> onChanged;
+
+  static String _subtitle(RemixEnabled v) {
+    switch (v) {
+      case RemixEnabled.disabled:
+        return 'Remixes are not allowed on this post';
+      case RemixEnabled.same:
+        return 'Remixes  use the same artist as this post';
+      case RemixEnabled.different:
+        return 'Remixes can use a different artist than this post';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Remixes',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.85),
+            fontFamily: AppTheme.fontBody,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _subtitle(value),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.35),
+            fontFamily: AppTheme.fontBody,
+            fontSize: 11,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _RemixOption(
+                label: 'false',
+                selected: value == RemixEnabled.disabled,
+                onTap: () => onChanged(RemixEnabled.disabled),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _RemixOption(
+                label: 'same',
+                selected: value == RemixEnabled.same,
+                onTap: () => onChanged(RemixEnabled.same),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _RemixOption(
+                label: 'different',
+                selected: value == RemixEnabled.different,
+                onTap: () => onChanged(RemixEnabled.different),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RemixOption extends StatelessWidget {
+  const _RemixOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? _kGreen.withOpacity(0.18)
+              : Colors.white.withOpacity(0.06),
+          border: Border.all(
+            color: selected
+                ? _kGreen.withOpacity(0.70)
+                : Colors.white.withOpacity(0.12),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? _kGreen : Colors.white.withOpacity(0.65),
+            fontFamily: AppTheme.fontBody,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
