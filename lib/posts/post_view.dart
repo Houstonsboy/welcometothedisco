@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:welcometothedisco/Ranking/entity_profile.dart';
 import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
@@ -543,11 +544,32 @@ class _ArtistBlock extends StatelessWidget {
   const _ArtistBlock({required this.post});
   final PostModel post;
 
+  void _openArtistProfile(BuildContext context) {
+    final artistId = post.artistID.trim();
+    if (artistId.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EntityProfileScreen(
+          entityId: artistId,
+          initialTitle: post.artistName,
+          initialImageUrl: post.artistImageUrl.trim().isNotEmpty
+              ? post.artistImageUrl
+              : null,
+          isArtist: true,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
+      child: GestureDetector(
+        onTap: () => _openArtistProfile(context),
+        behavior: HitTestBehavior.opaque,
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -626,6 +648,7 @@ class _ArtistBlock extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

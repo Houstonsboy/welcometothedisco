@@ -16,16 +16,25 @@ const _kTextMuted = Color(0x8CFFFFFF);
 /// Read-only posts list for a profile, scoped to [authorUid].
 class ProfilePostsSection extends StatelessWidget {
   final String authorUid;
+  final String artistId;
+  final bool _byArtist;
 
   const ProfilePostsSection({
     super.key,
     required this.authorUid,
-  });
+  })  : artistId = '',
+        _byArtist = false;
+
+  const ProfilePostsSection.forArtist({
+    super.key,
+    required this.artistId,
+  })  : authorUid = '',
+        _byArtist = true;
 
   @override
   Widget build(BuildContext context) {
-    final uid = authorUid.trim();
-    if (uid.isEmpty) return const SizedBox.shrink();
+    final id = (_byArtist ? artistId : authorUid).trim();
+    if (id.isEmpty) return const SizedBox.shrink();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -49,10 +58,14 @@ class ProfilePostsSection extends StatelessWidget {
             ),
           ),
           child: StreamBuilder<List<PostModel>>(
-            stream: FirebaseService.getPostsByAuthorStream(uid),
+            stream: _byArtist
+                ? FirebaseService.getPostsByArtistStream(id)
+                : FirebaseService.getPostsByAuthorStream(id),
             builder: (context, snapshot) {
               final posts = (snapshot.data ?? const <PostModel>[])
-                  .where((p) => p.authorID.trim() == uid)
+                  .where((p) => _byArtist
+                      ? p.artistID.trim() == id
+                      : p.authorID.trim() == id)
                   .toList();
               final loading =
                   snapshot.connectionState == ConnectionState.waiting &&

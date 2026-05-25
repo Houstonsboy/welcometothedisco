@@ -2218,4 +2218,75 @@ class FirebaseService {
       return posts;
     });
   }
+
+  /// Live stream of posts for a Spotify artist/entity id.
+  ///
+  /// Firestore filters by `artistID`; ordering is client-side by whichever
+  /// timestamp is newer between `modified_at` and `Created_at`.
+  static Stream<List<PostModel>> getPostsByArtistStream(String artistId) {
+    final id = artistId.trim();
+    if (id.isEmpty) return Stream.value(const <PostModel>[]);
+
+    DateTime? latest(PostModel post) {
+      final created = post.createdAt?.toDate();
+      final modified = post.modifiedAt?.toDate();
+      if (created == null) return modified;
+      if (modified == null) return created;
+      return modified.isAfter(created) ? modified : created;
+    }
+
+    return _firestore
+        .collection('posts')
+        .where('artistID', isEqualTo: id)
+        .snapshots()
+        .map((snap) {
+      final posts = snap.docs
+          .map((d) => PostModel.fromFirestore(d.data(), d.id))
+          .where((p) => p.artistID.trim() == id)
+          .toList();
+      posts.sort((a, b) {
+        final aDate = latest(a);
+        final bDate = latest(b);
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+      return posts;
+    });
+  }
+
+  /// One-time fetch of posts for a Spotify artist/entity id.
+  ///
+  /// Uses the same ordering rule as [getPostsByArtistStream].
+  static Future<List<PostModel>> getPostsByArtistList(String artistId) async {
+    final id = artistId.trim();
+    if (id.isEmpty) return const <PostModel>[];
+
+    DateTime? latest(PostModel post) {
+      final created = post.createdAt?.toDate();
+      final modified = post.modifiedAt?.toDate();
+      if (created == null) return modified;
+      if (modified == null) return created;
+      return modified.isAfter(created) ? modified : created;
+    }
+
+    final snap = await _firestore
+        .collection('posts')
+        .where('artistID', isEqualTo: id)
+        .get();
+    final posts = snap.docs
+        .map((d) => PostModel.fromFirestore(d.data(), d.id))
+        .where((p) => p.artistID.trim() == id)
+        .toList();
+    posts.sort((a, b) {
+      final aDate = latest(a);
+      final bDate = latest(b);
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+    return posts;
+  }
 }

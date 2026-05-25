@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/Ranking/entity_history.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
+import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -33,6 +34,7 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
   RankingModel? _ranking;
   bool _loading = true;
   bool _notFound = false;
+  bool _postsOnlyProfile = false;
 
   @override
   void initState() {
@@ -44,15 +46,31 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
     setState(() {
       _loading = true;
       _notFound = false;
+      _postsOnlyProfile = false;
     });
 
     final fetched = await FirebaseService.getRankingProfile(widget.entityId);
     if (!mounted) return;
 
     if (fetched == null) {
+      if (widget.isArtist) {
+        final posts = await FirebaseService.getPostsByArtistList(widget.entityId);
+        if (!mounted) return;
+        if (posts.isNotEmpty) {
+          setState(() {
+            _ranking = null;
+            _loading = false;
+            _notFound = false;
+            _postsOnlyProfile = true;
+          });
+          return;
+        }
+      }
+
       setState(() {
         _loading = false;
         _notFound = true;
+        _postsOnlyProfile = false;
       });
       return;
     }
@@ -67,6 +85,7 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
       _ranking = resolved;
       _loading = false;
       _notFound = false;
+      _postsOnlyProfile = false;
     });
   }
 
@@ -141,7 +160,7 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
       );
     }
 
-    if (_notFound || _ranking == null) {
+    if (_notFound) {
       return Center(
         child: Text(
           'No ranking profile found for this entity.',
@@ -152,6 +171,29 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
           ),
         ),
       );
+    }
+
+    if (_ranking == null && _postsOnlyProfile) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 22),
+        children: [
+          _ProfileHeroCard(
+            title: widget.initialTitle,
+            imageUrl: widget.initialImageUrl,
+            isArtist: widget.isArtist,
+            totalVotes: 0,
+            versusCount: 0,
+            record: '0W - 0L - 0D',
+            winRate: 0,
+          ),
+          const SizedBox(height: 14),
+          ProfilePostsSection.forArtist(artistId: widget.entityId),
+        ],
+      );
+    }
+
+    if (_ranking == null) {
+      return const SizedBox.shrink();
     }
 
     final ranking = _ranking!;
@@ -171,46 +213,21 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
           winRate: ranking.winRate,
         ),
         const SizedBox(height: 14),
-        Text(
-          'Opponents (${opponents.length})',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+        _CollapsibleOpponentsWidget(
+          opponents: opponents,
+          isArtistType: ranking.entityType == 'artist',
+          onOpponentTap: (opp) => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EntityOpponentHistoryScreen(
+                ranking: ranking,
+                opponent: opp,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        if (opponents.isEmpty)
-          _glassCard(
-            child: Text(
-              'No opponent data yet.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          )
-        else
-          ...opponents.map(
-            (opp) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _OpponentCard(
-                opponent: opp,
-                sameEntityTypeAsSource: ranking.entityType == 'artist',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => EntityOpponentHistoryScreen(
-                        ranking: ranking,
-                        opponent: opp,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+        const SizedBox(height: 14),
+        if (ranking.isArtist)
+          ProfilePostsSection.forArtist(artistId: ranking.entityId),
       ],
     );
   }
@@ -354,147 +371,352 @@ class _ProfileHeroCard extends StatelessWidget {
   }
 }
 
-class _OpponentCard extends StatelessWidget {
-  final OpponentModel opponent;
-  final bool sameEntityTypeAsSource;
-  final VoidCallback onTap;
+// ── Collapsible opponents widget ──────────────────────────────────────────────
+class _CollapsibleOpponentsWidget extends StatefulWidget {
+  final List<OpponentModel> opponents;
+  final bool isArtistType;
+  final void Function(OpponentModel) onOpponentTap;
 
-  const _OpponentCard({
-    required this.opponent,
-    required this.sameEntityTypeAsSource,
-    required this.onTap,
+  const _CollapsibleOpponentsWidget({
+    required this.opponents,
+    required this.isArtistType,
+    required this.onOpponentTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final borderRadius = sameEntityTypeAsSource
-        ? BorderRadius.circular(999)
-        : BorderRadius.circular(12);
-    final image = opponent.opponentImage.trim();
+  State<_CollapsibleOpponentsWidget> createState() =>
+      _CollapsibleOpponentsWidgetState();
+}
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.9),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      borderRadius: borderRadius,
-                      border: Border.all(color: Colors.white.withOpacity(0.34), width: 0.9),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: borderRadius,
-                      child: image.isNotEmpty
-                          ? Image.network(image, fit: BoxFit.cover)
-                          : Container(
-                              color: Colors.white.withOpacity(0.12),
-                              child: Icon(
-                                sameEntityTypeAsSource
-                                    ? Icons.person_rounded
-                                    : Icons.album_rounded,
-                                color: Colors.white.withOpacity(0.72),
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+class _CollapsibleOpponentsWidgetState
+    extends State<_CollapsibleOpponentsWidget>
+    with SingleTickerProviderStateMixin {
+  bool _expanded = false;
+
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      _ctrl.forward();
+    } else {
+      _ctrl.reverse();
+    }
+  }
+
+  static const double _avatarSize = 36.0;
+  static const double _avatarOverlap = 10.0;
+  static const int _previewCount = 7;
+
+  Widget _avatar(OpponentModel opp) {
+    final img = opp.opponentImage.trim();
+    final br = widget.isArtistType
+        ? BorderRadius.circular(999)
+        : BorderRadius.circular(7);
+    return Container(
+      width: _avatarSize,
+      height: _avatarSize,
+      decoration: BoxDecoration(
+        borderRadius: br,
+        border: Border.all(color: Colors.white.withOpacity(0.30), width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.28),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: br,
+        child: img.isNotEmpty
+            ? Image.network(img, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _avatarFallback())
+            : _avatarFallback(),
+      ),
+    );
+  }
+
+  Widget _avatarFallback() => Container(
+        color: _kBlue.withOpacity(0.35),
+        child: Icon(
+          widget.isArtistType ? Icons.person_rounded : Icons.album_rounded,
+          color: Colors.white.withOpacity(0.65),
+          size: _avatarSize * 0.5,
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final opponents = widget.opponents;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.9),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header / collapsed strip ───────────────────────────────
+              GestureDetector(
+                onTap: opponents.isEmpty ? null : _toggle,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Row(
+                    children: [
+                      // Overlapping avatars
+                      if (opponents.isEmpty)
                         Text(
-                          opponent.opponentName.isEmpty
-                              ? 'Unknown opponent'
-                              : opponent.opponentName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                          'No opponents yet.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      else ...[
+                        SizedBox(
+                          height: _avatarSize,
+                          width: _avatarSize +
+                              (_avatarSize - _avatarOverlap) *
+                                  (opponents
+                                          .take(_previewCount)
+                                          .length -
+                                      1).clamp(0, _previewCount - 1),
+                          child: Stack(
+                            children: opponents
+                                .take(_previewCount)
+                                .toList()
+                                .asMap()
+                                .entries
+                                .map((e) => Positioned(
+                                      left: e.key *
+                                          (_avatarSize - _avatarOverlap),
+                                      child: _avatar(e.value),
+                                    ))
+                                .toList(),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        _resultBadge(),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Versus ${opponent.versusCount}  •  Votes ${opponent.totalentityVotes}-${opponent.totalopponentVotes}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.68),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${opponents.length} opponent${opponents.length == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                      if (opponents.isNotEmpty)
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0.0,
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            color: Colors.white.withOpacity(0.55),
+                            size: 22,
+                          ),
+                        ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: Colors.white.withOpacity(0.45),
-                  ),
-                ],
+                ),
               ),
-            ),
+
+              // ── Expanded list ──────────────────────────────────────────
+              SizeTransition(
+                sizeFactor: _anim,
+                axisAlignment: -1,
+                child: Column(
+                  children: [
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.white.withOpacity(0.12),
+                    ),
+                    ...opponents.map((opp) {
+                      final isLast = opp == opponents.last;
+                      return _OpponentListRow(
+                        opponent: opp,
+                        isArtistType: widget.isArtistType,
+                        isLast: isLast,
+                        onTap: () => widget.onOpponentTap(opp),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+class _OpponentListRow extends StatelessWidget {
+  final OpponentModel opponent;
+  final bool isArtistType;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  const _OpponentListRow({
+    required this.opponent,
+    required this.isArtistType,
+    required this.isLast,
+    required this.onTap,
+  });
 
   Widget _resultBadge() {
-    final bool won = opponent.winsAgainst > opponent.lossesTo;
-    final bool lost = opponent.lossesTo > opponent.winsAgainst;
-
-    final Color bgColor = won
+    final won = opponent.winsAgainst > opponent.lossesTo;
+    final lost = opponent.lossesTo > opponent.winsAgainst;
+    final bgColor = won
         ? Colors.green.withOpacity(0.22)
         : lost
             ? Colors.red.withOpacity(0.22)
-            : Colors.white.withOpacity(0.16);
-    final Color borderColor = won
+            : Colors.white.withOpacity(0.14);
+    final borderColor = won
         ? Colors.greenAccent.withOpacity(0.75)
         : lost
             ? Colors.redAccent.withOpacity(0.78)
-            : Colors.white.withOpacity(0.35);
-    final String label = won
-        ? 'Won'
-        : lost
-            ? 'Lost'
-            : 'Draw';
-
+            : Colors.white.withOpacity(0.30);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: borderColor, width: 0.9),
       ),
       child: Text(
-        label,
+        won ? 'Won' : lost ? 'Lost' : 'Draw',
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final img = opponent.opponentImage.trim();
+    final br = isArtistType
+        ? BorderRadius.circular(999)
+        : BorderRadius.circular(8);
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: br,
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.28), width: 0.9),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: br,
+                    child: img.isNotEmpty
+                        ? Image.network(img, fit: BoxFit.cover)
+                        : Container(
+                            color: Colors.white.withOpacity(0.12),
+                            child: Icon(
+                              isArtistType
+                                  ? Icons.person_rounded
+                                  : Icons.album_rounded,
+                              color: Colors.white.withOpacity(0.65),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        opponent.opponentName.isEmpty
+                            ? 'Unknown opponent'
+                            : opponent.opponentName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          _resultBadge(),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${opponent.versusCount}v  •  ${opponent.totalentityVotes}-${opponent.totalopponentVotes}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.55),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: Colors.white.withOpacity(0.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!isLast)
+          Divider(
+            height: 1,
+            thickness: 1,
+            indent: 14,
+            endIndent: 14,
+            color: Colors.white.withOpacity(0.09),
+          ),
+      ],
     );
   }
 }
