@@ -7,9 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/Ranking/entity_profile.dart';
 import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
 
 const _kGreen      = AppTheme.createGreen;
 const _kPink       = AppTheme.gradientEnd;
@@ -165,6 +167,41 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       ));
   }
 
+  // ── Remix tap ──────────────────────────────────────────────────────────────
+  Future<void> _onRemixTap() async {
+    // Remixes disabled on this post
+    if (post.remixEnabled == RemixEnabled.disabled) {
+      _snack('Remixes are disabled for this post.');
+      return;
+    }
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      _snack('Sign in to remix this post.');
+      return;
+    }
+
+    // Cannot remix your own post
+    if (uid == post.authorID) {
+      _snack('You cannot remix your own post.');
+      return;
+    }
+
+    // Load current user profile for the remix screen
+    final user = await FirebaseService.getCurrentUser();
+    if (!mounted) return;
+
+    final username = (user?.username.trim().isNotEmpty == true)
+        ? user!.username.trim()
+        : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
+            ? FirebaseAuth.instance.currentUser!.displayName!.trim()
+            : 'you');
+
+    Navigator.of(context).push(slideUpRoute(
+      PostRemixLockeroom(post: post),
+    ));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -296,6 +333,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             post: post,
                             fmt: _fmt,
                             onQueueAll: _isBusy ? null : _queueAll,
+                            onRemix: _onRemixTap,
                           ),
                         ),
 
@@ -886,10 +924,12 @@ class _FooterActions extends StatelessWidget {
     required this.post,
     required this.fmt,
     required this.onQueueAll,
+    required this.onRemix,
   });
   final PostModel post;
   final String Function(int) fmt;
   final VoidCallback? onQueueAll;
+  final VoidCallback onRemix;
 
   @override
   Widget build(BuildContext context) {
@@ -901,9 +941,11 @@ class _FooterActions extends StatelessWidget {
           _ActionBtn(
             icon: Icons.shuffle_rounded,
             label: 'remix ${fmt(post.remixCount)}',
-            color: _kGreen,
-            filled: true,
-            onTap: () {},
+            color: post.remixEnabled == RemixEnabled.disabled
+                ? Colors.white.withOpacity(0.30)
+                : _kGreen,
+            filled: post.remixEnabled != RemixEnabled.disabled,
+            onTap: onRemix,
           ),
 
           const SizedBox(width: 10),

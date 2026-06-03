@@ -334,7 +334,8 @@ class FirebaseService {
           timestamp: v.timestamp,
           albumVersus: v,
         ));
-      } else if (type == 'artist' || type == 'collaboration') {
+      } else if (type == 'artist' || type == 'collaboration' ||
+          type == 'collaborator') {
         final v = ArtistVersusModel.fromFirestore(data, doc.id);
         if (!v.isEligibleForInboxDisplay) continue;
         artists.add(v);
@@ -1250,6 +1251,73 @@ class FirebaseService {
       artist1ImageUrl: artist1ImageUrl,
       artist2ImageUrl: artist2ImageUrl,
     );
+  }
+
+  // ── Create post-remix versus (type: collaborator, status: open) ──────────
+  /// Saves a remix of an existing post as a versus document.
+  /// artist1 = the original post's locked side; artist2 = the remixer's pick.
+  /// The remixer (current user) is stored as [collaboratorID].
+  static Future<void> createPostRemixVersus({
+    required String sourcePostID,
+    required String postAuthorID,
+    required String artist1ID,
+    required String artist1Name,
+    required String artist1ImageUrl,
+    required List<String> artist1TrackIDs,
+    required String artist2ID,
+    required String artist2Name,
+    required String artist2ImageUrl,
+    required List<String> artist2TrackIDs,
+    required String remixPolicy, // 'same' | 'different'
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('Not logged in');
+
+    // Fetch both users in parallel — remixer (me) + post author
+    final results = await Future.wait([
+      getCurrentUser(),
+      getUserById(postAuthorID),
+    ]);
+    final me         = results[0];
+    final postAuthor = results[1];
+
+    final ref = await _firestore.collection('versus').add({
+      'type':           'collaborator',
+      'status':         'open',
+      'sourcePostID':   sourcePostID,
+      'remixPolicy':    remixPolicy,
+      // artist 1 — original post side (locked)
+      'artist1ID':       artist1ID.trim(),
+      'artist1Name':     artist1Name.trim(),
+      'artist1TrackIDs': artist1TrackIDs,
+      // artist 2 — remixer's pick
+      'artist2ID':       artist2ID.trim(),
+      'artist2Name':     artist2Name.trim(),
+      'artist2TrackIDs': artist2TrackIDs,
+      // ownership: post author is the "author", current user is collaborator
+      'authorID':              postAuthorID,
+      'author_username':       postAuthor?.username ?? '',
+      'author_avatar':         postAuthor?.avatarPath ?? '',
+      'collaboratorID':        uid,
+      'collaborator_username': me?.username ?? '',
+      'collaborator_avatar':   me?.avatarPath ?? '',
+      'timestamp':             FieldValue.serverTimestamp(),
+    });
+
+    // Write ranking stubs so both artists appear in rankings immediately.
+    if (artist1ID.trim().isNotEmpty && artist2ID.trim().isNotEmpty) {
+      _scheduleRankingWritesAfterVersus(
+        () => _ensureRankingStubsForArtists(
+          versusId:    ref.id,
+          artist1ID:   artist1ID.trim(),
+          artist1Name: artist1Name.trim(),
+          artist1Image: artist1ImageUrl,
+          artist2ID:   artist2ID.trim(),
+          artist2Name: artist2Name.trim(),
+          artist2Image: artist2ImageUrl,
+        ),
+      );
+    }
   }
 
   // ── Create collaboration invite versus (status: incomplete) ──────────────
