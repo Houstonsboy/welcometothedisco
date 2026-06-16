@@ -25,11 +25,10 @@ class BottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Posts · Search · Versus · Friends
+  /// Posts · Versus · Friends
   static const List<_NavIconSpec> _items = [
     _NavIconSpec.material(Icons.menu_book_rounded),
     _NavIconSpec.asset('assets/images/icons8-search.svg', svg: true),
-    _NavIconSpec.material(Icons.sports_mma_rounded),
     _NavIconSpec.asset('assets/images/icons8-friends-50.png'),
   ];
 

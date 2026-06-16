@@ -24,7 +24,6 @@ import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
-import 'package:welcometothedisco/Ranking/entity_search.dart';
 import 'package:welcometothedisco/posts/view_posts.dart';
 
 void main() async {
@@ -196,10 +195,6 @@ class _AppShellState extends State<_AppShell> {
     setState(() => _selectedIndex = index);
   }
 
-  void _goToHomeTab() {
-    setState(() => _selectedIndex = 0);
-  }
-
   /// System back: pop any overlay route first; then leave search/friends for home;
   /// on home, require a second back within 2s to exit (Android-style).
   void _onShellPopInvoked(bool didPop, dynamic result) {
@@ -282,7 +277,6 @@ class _AppShellState extends State<_AppShell> {
                 index: _selectedIndex,
                 children: [
                   const ViewPostsScreen(),
-                  EntityHistoryScreen(onBackToHome: _goToHomeTab),
                   const HomeScreenContent(),
                   const FriendRequest(),
                 ],
