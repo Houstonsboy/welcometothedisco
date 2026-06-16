@@ -61,6 +61,11 @@ class VersusModel {
       album2Name: data['album2Name'] ?? '',
       timestamp: (data['createdAt'] ?? data['timestamp']) as Timestamp?,
       status: (data['status'] as String?)?.trim(),
+      // Denormalized at creation time — avoids Spotify API calls on read.
+      album1ImageUrl: (data['album1ImageUrl'] as String?)?.trim(),
+      album1ArtistName: (data['album1ArtistName'] as String?)?.trim(),
+      album2ImageUrl: (data['album2ImageUrl'] as String?)?.trim(),
+      album2ArtistName: (data['album2ArtistName'] as String?)?.trim(),
     );
   }
 

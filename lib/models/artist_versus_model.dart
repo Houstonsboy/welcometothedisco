@@ -125,6 +125,9 @@ class ArtistVersusModel {
       collaboratorComment: (data['collaboratorComment'] as String?)?.trim(),
       collaboratorUsername: (data['collaborator_username'] as String?)?.trim(),
       collaboratorAvatar: (data['collaborator_avatar'] as String?)?.trim(),
+      // Denormalized at creation time — avoids Spotify API calls on read.
+      artist1ImageUrl: (data['artist1ImageUrl'] as String?)?.trim(),
+      artist2ImageUrl: (data['artist2ImageUrl'] as String?)?.trim(),
     );
   }
 
@@ -144,6 +147,12 @@ class ArtistVersusModel {
       'collaboratorID': collaboratorID,
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
+      // Denormalized cover images — stored at creation so inbox never
+      // needs a Spotify API call just to render the artist thumbnail.
+      if (artist1ImageUrl != null && artist1ImageUrl!.trim().isNotEmpty)
+        'artist1ImageUrl': artist1ImageUrl!.trim(),
+      if (artist2ImageUrl != null && artist2ImageUrl!.trim().isNotEmpty)
+        'artist2ImageUrl': artist2ImageUrl!.trim(),
       if (authorComment != null && authorComment!.trim().isNotEmpty)
         'authorComment': authorComment!.trim(),
       if (authorUsername != null && authorUsername!.trim().isNotEmpty)

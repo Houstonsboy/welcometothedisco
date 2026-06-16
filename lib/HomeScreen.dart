@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/Inbox.dart';
 import 'package:welcometothedisco/Searchicon.dart';
 import 'package:welcometothedisco/StoriesTemplate.dart';
+import 'package:welcometothedisco/Ranking/entity_profile.dart';
+import 'package:welcometothedisco/Ranking/entity_search.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
@@ -356,8 +359,118 @@ class HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<HomeScreenContent> {
-  /// null = all (by timestamp), 'album' | 'artist' = filter.
+  // ── versus filter ──────────────────────────────────────────────────────────
   String? _versusTypeFilter;
+
+  // ── search state ───────────────────────────────────────────────────────────
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  final SpotifyApi _searchApi = SpotifyApi();
+  Timer? _searchDebounce;
+  bool _searchLoading = false;
+  String _searchLastQuery = '';
+  List<_VsSearchResult> _searchResults = [];
+  bool _artistMode = true;
+
+  bool get _showResults => _searchLastQuery.isNotEmpty || _searchLoading;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String raw) {
+    _searchDebounce?.cancel();
+    final q = raw.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _searchLastQuery = '';
+        _searchLoading = false;
+      });
+      return;
+    }
+    setState(() {
+      _searchLoading = true;
+      _searchLastQuery = q;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      if (_artistMode) {
+        final artists = await _searchApi.searchArtists(q, limit: 14);
+        if (!mounted || _searchLastQuery != q) return;
+        setState(() {
+          _searchResults = artists
+              .map((a) => _VsSearchResult(
+                    id: a.id,
+                    title: a.name,
+                    subtitle: 'Artist',
+                    imageUrl: a.imageUrl,
+                    isArtist: true,
+                  ))
+              .toList();
+          _searchLoading = false;
+        });
+      } else {
+        final albums = await _searchApi.searchAlbums(q, limit: 14);
+        if (!mounted || _searchLastQuery != q) return;
+        setState(() {
+          _searchResults = albums
+              .map((a) => _VsSearchResult(
+                    id: a.id,
+                    title: a.title,
+                    subtitle: a.artistName.isEmpty ? 'Album' : a.artistName,
+                    imageUrl: a.imageUrl,
+                    isArtist: false,
+                  ))
+              .toList();
+          _searchLoading = false;
+        });
+      }
+    });
+  }
+
+  void _toggleSearchMode() {
+    setState(() {
+      _artistMode = !_artistMode;
+      _searchResults = [];
+      _searchLoading = false;
+    });
+    if (_searchCtrl.text.trim().isNotEmpty) _onSearchChanged(_searchCtrl.text);
+  }
+
+  void _clearSearch() {
+    _searchCtrl.clear();
+    _searchFocus.unfocus();
+    setState(() {
+      _searchResults = [];
+      _searchLastQuery = '';
+      _searchLoading = false;
+    });
+  }
+
+  void _onSelectResult(_VsSearchResult item) {
+    if (item.isArtist) {
+      EntityHistorySelectionStore.selectedArtistId = item.id;
+      EntityHistorySelectionStore.selectedArtistName = item.title;
+    } else {
+      EntityHistorySelectionStore.selectedAlbumId = item.id;
+      EntityHistorySelectionStore.selectedAlbumTitle = item.title;
+    }
+    _clearSearch();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EntityProfileScreen(
+          entityId: item.id,
+          initialTitle: item.title,
+          initialImageUrl: item.imageUrl,
+          isArtist: item.isArtist,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -370,8 +483,19 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         SliverToBoxAdapter(
           child: RepaintBoundary(child: StoriesTemplate()),
         ),
-        SliverToBoxAdapter(child: SizedBox(height: 10.0)),
-        SliverToBoxAdapter(child: SearchIcon()),
+        const SliverToBoxAdapter(child: SizedBox(height: 10.0)),
+        // ── Inline glass search bar ───────────────────────────────────────
+        SliverToBoxAdapter(
+          child: _VersusSearchBar(
+            controller: _searchCtrl,
+            focusNode: _searchFocus,
+            loading: _searchLoading,
+            artistMode: _artistMode,
+            onChanged: _onSearchChanged,
+            onToggleMode: _toggleSearchMode,
+            onClear: _clearSearch,
+          ),
+        ),
         const SliverToBoxAdapter(child: SizedBox(height: 10.0)),
         SliverToBoxAdapter(
           child: _InboxFilterRow(
@@ -380,9 +504,26 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
             createButton: const _CreateButton(),
           ),
         ),
-        SliverToBoxAdapter(child: SizedBox(height: 14.0)),
+        const SliverToBoxAdapter(child: SizedBox(height: 14.0)),
+        // ── Inbox OR search results (in same glass frame) ─────────────────
         SliverToBoxAdapter(
-          child: RepaintBoundary(child: Inbox(typeFilter: _versusTypeFilter)),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: _showResults
+                ? _VersusSearchResults(
+                    key: const ValueKey('vs-results'),
+                    results: _searchResults,
+                    loading: _searchLoading,
+                    lastQuery: _searchLastQuery,
+                    onSelect: _onSelectResult,
+                  )
+                : RepaintBoundary(
+                    key: const ValueKey('vs-inbox'),
+                    child: Inbox(typeFilter: _versusTypeFilter),
+                  ),
+          ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 20.0)),
       ],
@@ -838,6 +979,371 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Inline glass search bar ──────────────────────────────────────────────────
+
+class _VersusSearchBar extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool loading;
+  final bool artistMode;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onToggleMode;
+  final VoidCallback onClear;
+
+  const _VersusSearchBar({
+    required this.controller,
+    required this.focusNode,
+    required this.loading,
+    required this.artistMode,
+    required this.onChanged,
+    required this.onToggleMode,
+    required this.onClear,
+  });
+
+  @override
+  State<_VersusSearchBar> createState() => _VersusSearchBarState();
+}
+
+class _VersusSearchBarState extends State<_VersusSearchBar> {
+  bool _focused = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focused = widget.focusNode.hasFocus;
+    _hasText = widget.controller.text.isNotEmpty;
+    widget.focusNode.addListener(_onFocusChange);
+    widget.controller.addListener(_onTextChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    widget.controller.removeListener(_onTextChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() => _focused = widget.focusNode.hasFocus);
+  }
+
+  void _onTextChange() {
+    final hasText = widget.controller.text.isNotEmpty;
+    if (hasText != _hasText && mounted) setState(() => _hasText = hasText);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(_focused ? 0.16 : 0.12),
+                  Colors.white.withOpacity(_focused ? 0.08 : 0.05),
+                ],
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: widget.controller,
+                    focusNode: widget.focusNode,
+                    onChanged: widget.onChanged,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    cursorColor: AppTheme.gradientEnd,
+                    decoration: InputDecoration(
+                      hintText: widget.artistMode
+                          ? 'Search artists…'
+                          : 'Search albums…',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.32),
+                        fontSize: 15,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      prefixIcon: widget.loading
+                          ? Padding(
+                              padding: const EdgeInsets.all(13),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white.withOpacity(0.50),
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.search_rounded,
+                              color: Colors.white.withOpacity(
+                                  _focused ? 0.60 : 0.38),
+                              size: 20,
+                            ),
+                    ),
+                  ),
+                ),
+                // Artist / Album toggle — visible when focused or has text
+                if (_focused || _hasText) ...[
+                  GestureDetector(
+                    onTap: widget.onToggleMode,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.white.withOpacity(0.12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.artistMode
+                                  ? Icons.person_rounded
+                                  : Icons.album_rounded,
+                              color: Colors.white.withOpacity(0.80),
+                              size: 13,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.artistMode ? 'Artist' : 'Album',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.85),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                // Clear button — only when text is present
+                if (_hasText)
+                  GestureDetector(
+                    onTap: widget.onClear,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12, left: 4),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white.withOpacity(0.38),
+                        size: 18,
+                      ),
+                    ),
+                  )
+                else if (!_focused)
+                  const SizedBox(width: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Data class ───────────────────────────────────────────────────────────────
+
+class _VsSearchResult {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String? imageUrl;
+  final bool isArtist;
+
+  const _VsSearchResult({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.imageUrl,
+    required this.isArtist,
+  });
+}
+
+// ─── Results panel — same glass frame as Inbox ────────────────────────────────
+
+class _VersusSearchResults extends StatelessWidget {
+  final List<_VsSearchResult> results;
+  final bool loading;
+  final String lastQuery;
+  final ValueChanged<_VsSearchResult> onSelect;
+
+  const _VersusSearchResults({
+    super.key,
+    required this.results,
+    required this.loading,
+    required this.lastQuery,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20.0),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20.0),
+              gradient: AppTheme.glassPanelGradient(),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.18),
+                width: 0.8,
+              ),
+            ),
+            child: _buildBody(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (loading && results.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: Colors.white54,
+            strokeWidth: 2,
+          ),
+        ),
+      );
+    }
+    if (results.isEmpty && lastQuery.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Text(
+            'No results for "$lastQuery"',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.40),
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: results.length,
+      separatorBuilder: (_, __) => Divider(
+        height: 0,
+        indent: 16,
+        endIndent: 16,
+        color: Colors.white.withOpacity(0.08),
+      ),
+      itemBuilder: (_, i) {
+        final item = results[i];
+        return GestureDetector(
+          onTap: () => onSelect(item),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            child: Row(
+              children: [
+                _ResultThumb(item: item),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.42),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withOpacity(0.20),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ResultThumb extends StatelessWidget {
+  const _ResultThumb({required this.item});
+  final _VsSearchResult item;
+
+  @override
+  Widget build(BuildContext context) {
+    final br = item.isArtist
+        ? BorderRadius.circular(99)
+        : BorderRadius.circular(8);
+    final hasImg = item.imageUrl != null && item.imageUrl!.isNotEmpty;
+    return ClipRRect(
+      borderRadius: br,
+      child: hasImg
+          ? Image.network(
+              item.imageUrl!,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _fallback(),
+            )
+          : _fallback(),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      width: 44,
+      height: 44,
+      color: AppTheme.gradientStart.withOpacity(0.25),
+      child: Icon(
+        item.isArtist ? Icons.person_rounded : Icons.album_rounded,
+        color: Colors.white.withOpacity(0.50),
+        size: 20,
       ),
     );
   }

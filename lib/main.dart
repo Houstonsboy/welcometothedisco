@@ -281,9 +281,9 @@ class _AppShellState extends State<_AppShell> {
               body: IndexedStack(
                 index: _selectedIndex,
                 children: [
-                  const HomeScreenContent(),
-                  EntityHistoryScreen(onBackToHome: _goToHomeTab),
                   const ViewPostsScreen(),
+                  EntityHistoryScreen(onBackToHome: _goToHomeTab),
+                  const HomeScreenContent(),
                   const FriendRequest(),
                 ],
               ),

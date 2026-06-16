@@ -214,6 +214,8 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
         album2Name: album2.name,
         album1ImageUrl: album1.imageUrl ?? '',
         album2ImageUrl: album2.imageUrl ?? '',
+        album1ArtistName: album1.artistName,
+        album2ArtistName: album2.artistName,
       );
       if (!mounted) return;
 

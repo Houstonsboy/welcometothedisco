@@ -1057,6 +1057,8 @@ class FirebaseService {
     required String album2Name,
     String album1ImageUrl = '',
     String album2ImageUrl = '',
+    String album1ArtistName = '',
+    String album2ArtistName = '',
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1070,6 +1072,11 @@ class FirebaseService {
       'album2ID': album2ID,
       'album2Name': album2Name,
       'timestamp': FieldValue.serverTimestamp(),
+      // Denormalized at creation — inbox renders immediately, no Spotify call needed.
+      if (album1ImageUrl.trim().isNotEmpty) 'album1ImageUrl': album1ImageUrl.trim(),
+      if (album2ImageUrl.trim().isNotEmpty) 'album2ImageUrl': album2ImageUrl.trim(),
+      if (album1ArtistName.trim().isNotEmpty) 'album1ArtistName': album1ArtistName.trim(),
+      if (album2ArtistName.trim().isNotEmpty) 'album2ArtistName': album2ArtistName.trim(),
     });
 
     _scheduleRankingWritesAfterVersus(
@@ -1095,6 +1102,8 @@ class FirebaseService {
     required String album2Name,
     String album1ImageUrl = '',
     String album2ImageUrl = '',
+    String album1ArtistName = '',
+    String album2ArtistName = '',
   }) {
     return createVersus(
       type: 'album',
@@ -1104,6 +1113,8 @@ class FirebaseService {
       album2Name: album2Name.trim(),
       album1ImageUrl: album1ImageUrl,
       album2ImageUrl: album2ImageUrl,
+      album1ArtistName: album1ArtistName,
+      album2ArtistName: album2ArtistName,
     );
   }
 
@@ -1195,6 +1206,10 @@ class FirebaseService {
       authorID: uid,
       status: 'open',
       authorComment: (comment == null || comment.isEmpty) ? null : comment,
+      // Denormalized cover images — written by toFirestore() so inbox renders
+      // immediately without a Spotify API call.
+      artist1ImageUrl: artist1ImageUrl.trim().isNotEmpty ? artist1ImageUrl.trim() : null,
+      artist2ImageUrl: artist2ImageUrl.trim().isNotEmpty ? artist2ImageUrl.trim() : null,
     );
 
     final ref =
@@ -1302,6 +1317,9 @@ class FirebaseService {
       'collaborator_username': me?.username ?? '',
       'collaborator_avatar':   me?.avatarPath ?? '',
       'timestamp':             FieldValue.serverTimestamp(),
+      // Denormalized cover images — inbox renders immediately, no Spotify call.
+      if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
+      if (artist2ImageUrl.trim().isNotEmpty) 'artist2ImageUrl': artist2ImageUrl.trim(),
     });
 
     // Write ranking stubs so both artists appear in rankings immediately.
@@ -1371,6 +1389,11 @@ class FirebaseService {
       if (artist2Name != null && artist2Name.trim().isNotEmpty)
         'artist2Name': artist2Name.trim(),
       'artist2TrackIDs': [],
+
+      // Denormalized cover images — stored now so inbox renders without Spotify calls.
+      if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
+      if (artist2ImageUrl != null && artist2ImageUrl.trim().isNotEmpty)
+        'artist2ImageUrl': artist2ImageUrl.trim(),
 
       // Optional author note
       if (comment != null && comment.isNotEmpty)

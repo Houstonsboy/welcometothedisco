@@ -734,6 +734,14 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
 }
 
   Future<VersusModel> enrichWithSpotifyData(VersusModel versus) async {
+    // Images + artist names were denormalized at creation — skip Spotify call.
+    if ((versus.album1ImageUrl?.isNotEmpty ?? false) &&
+        (versus.album2ImageUrl?.isNotEmpty ?? false)) {
+      versus.album1Title ??= versus.album1Name;
+      versus.album2Title ??= versus.album2Name;
+      return versus;
+    }
+
     final token = await TokenStorageService.getAccessToken();
     if (token == null) return versus;
 
@@ -762,6 +770,12 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
 
   /// Fetches artist images from Spotify and sets artist1ImageUrl / artist2ImageUrl.
   Future<ArtistVersusModel> enrichArtistVersus(ArtistVersusModel versus) async {
+    // Images were denormalized at creation — skip Spotify call.
+    if ((versus.artist1ImageUrl?.isNotEmpty ?? false) &&
+        (versus.artist2ImageUrl?.isNotEmpty ?? false)) {
+      return versus;
+    }
+
     final token = await TokenStorageService.getAccessToken();
     if (token == null) return versus;
 
