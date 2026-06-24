@@ -20,8 +20,8 @@ import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
   // ── Brand gradient (full-screen backgrounds, panels, headers) ───────────
-  static const Color gradientStart = Color(0xFF1E3DE1); // deep blue / purple
-  static const Color gradientEnd   = Color(0xFFf85187); // hot pink
+  static const Color gradientStart = Color(0xFF0A1F5C); // deep navy
+  static const Color gradientEnd   = Color(0xFF081848); // darkest navy
 
   // ── Global typography ─────────────────────────────────────────────────────
   /// Use for decorative/title text (app bars, section headers).
@@ -71,17 +71,31 @@ abstract final class AppTheme {
   /// Full-screen gradient decoration (use as `decoration:` on a `Container`).
   static const BoxDecoration backgroundDecoration = BoxDecoration(
     gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [gradientStart, gradientEnd],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: [0.0, 0.30, 0.45, 0.60, 1.0],
+      colors: [
+        Color(0xFF0A1F5C),
+        Color(0xFF0D3080),
+        Color(0xFF0F3A9A),
+        Color(0xFF0D3080),
+        Color(0xFF081848),
+      ],
     ),
   );
 
   /// Raw gradient (use wherever `Gradient` is expected directly).
   static const LinearGradient backgroundGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [gradientStart, gradientEnd],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.30, 0.45, 0.60, 1.0],
+    colors: [
+      Color(0xFF0A1F5C),
+      Color(0xFF0D3080),
+      Color(0xFF0F3A9A),
+      Color(0xFF0D3080),
+      Color(0xFF081848),
+    ],
   );
 
   /// Glass-panel gradient for cards / headers at [glassPanelOpacity].
