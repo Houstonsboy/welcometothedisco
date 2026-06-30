@@ -132,6 +132,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   String? _currentRoundTrack1Id;
   String? _currentRoundTrack2Id;
   bool _roundTrack2Started = false;
+  // Which artist side started the current round (0 = artist1, 1 = artist2).
+  // Used by bomb-queue so every subsequent round preserves the same lead order.
+  int _playbackLeadArtistIndex = 0;
 
     // ── Vote state ────────────────────────────────────────────────────────────
     /// Map<roundIndex, artistIndex (0 or 1)> — which artist the voter picked per round
@@ -1081,8 +1084,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     );
   }
 
-  /// Plays artist1 + artist2 tracks at the same round index (paired round).
-  Future<bool> _playRoundAtIndex(int index) async {
+  /// Plays both tracks at [index]. [leadArtistIndex] (0 or 1) determines which
+  /// artist's track plays immediately; the other is queued right after.
+  Future<bool> _playRoundAtIndex(int index, {int leadArtistIndex = 0}) async {
     if (_tracks1.isEmpty || _tracks2.isEmpty) return false;
     final t1 = _tracks1.elementAtOrNull(index);
     final t2 = _tracks2.elementAtOrNull(index);
@@ -1094,9 +1098,15 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     final uri2 = _spotifyUriFor(t2);
     if (uri1.isEmpty || uri2.isEmpty) return false;
 
+    // Swap order so the tapped side plays first.
+    final firstUri   = leadArtistIndex == 1 ? uri2 : uri1;
+    final secondUri  = leadArtistIndex == 1 ? uri1 : uri2;
+    final firstId    = leadArtistIndex == 1 ? t2.id : t1.id;
+    final secondId   = leadArtistIndex == 1 ? t1.id : t2.id;
+
     setState(() => _coverLoadingRoundIndex = index);
     try {
-      final played = await _api.playRoundTracks(uri1, uri2);
+      final played = await _api.playRoundTracks(firstUri, secondUri);
       if (!played) {
         _showPlaybackSnack(
           'Open Spotify on a phone, speaker, or desktop, then try again.',
@@ -1105,10 +1115,11 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       }
 
       _hasVersusPlaybackStarted = true;
-      _currentRoundTrack1Id = t1.id;
-      _currentRoundTrack2Id = t2.id;
+      _playbackLeadArtistIndex = leadArtistIndex;
+      _currentRoundTrack1Id = firstId;
+      _currentRoundTrack2Id = secondId;
       _roundTrack2Started = false;
-      _advanceOnTrackId = t2.id;
+      _advanceOnTrackId = secondId;
       _startNowPlayingIndexTracking();
       if (mounted) {
         setState(() => _playingTrackIndex = index);
@@ -1131,14 +1142,12 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     });
   }
 
-  /// Tap album cover only — plays paired round; first session play always starts at index 0.
+  /// Tap album cover — plays the tapped round with the tapped artist's track first.
   Future<void> _onCoverTap(int trackIndex, int artistIndex) async {
     if (_tracks1.isEmpty || _tracks2.isEmpty) return;
 
-    final playIndex = _hasVersusPlaybackStarted ? trackIndex : 0;
-
-    if (_playingTrackIndex == playIndex) {
-      setState(() => _coverLoadingRoundIndex = playIndex);
+    if (_playingTrackIndex == trackIndex) {
+      setState(() => _coverLoadingRoundIndex = trackIndex);
       try {
         final paused = await _api.pause();
         if (!mounted) return;
@@ -1156,7 +1165,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       return;
     }
 
-    await _playRoundAtIndex(playIndex);
+    await _playRoundAtIndex(trackIndex, leadArtistIndex: artistIndex);
   }
 
   void _startNowPlayingIndexTracking() {
@@ -1193,7 +1202,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     });
   }
 
-  Future<bool> _queueRoundAtIndex(int index) async {
+  Future<bool> _queueRoundAtIndex(int index, {int leadArtistIndex = 0}) async {
     final t1 = _tracks1.elementAtOrNull(index);
     final t2 = _tracks2.elementAtOrNull(index);
     if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) {
@@ -1202,7 +1211,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     final uri1 = _spotifyUriFor(t1);
     final uri2 = _spotifyUriFor(t2);
     if (uri1.isEmpty || uri2.isEmpty) return false;
-    return _api.queueRoundTracks(uri1, uri2);
+    final firstUri  = leadArtistIndex == 1 ? uri2 : uri1;
+    final secondUri = leadArtistIndex == 1 ? uri1 : uri2;
+    return _api.queueRoundTracks(firstUri, secondUri);
   }
 
   Future<void> _handleBomb() async {
@@ -1214,7 +1225,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     try {
       int queueFrom;
       if (!_hasVersusPlaybackStarted || _playingTrackIndex == null) {
-        final started = await _playRoundAtIndex(0);
+        // Start from round 0 using whichever side the user is currently viewing.
+        final started = await _playRoundAtIndex(0, leadArtistIndex: _leadArtistIndex);
         if (!started) return;
         queueFrom = 1;
       } else {
@@ -1222,8 +1234,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         queueFrom = _activeTrackIndex + 1;
       }
 
+      // Queue remaining rounds in the same lead order as the round that started.
       for (int i = queueFrom; i < total; i++) {
-        final queued = await _queueRoundAtIndex(i);
+        final queued = await _queueRoundAtIndex(i, leadArtistIndex: _playbackLeadArtistIndex);
         if (!queued) {
           debugPrint('[ArtistVersusPlayground] bomb stopped at index $i');
           break;
@@ -1534,19 +1547,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                child: Text(
-                  'Tap cover to play · tap title to select round & vote',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.42),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
+             
 
                 _buildVersusSideCommentStrip(),
 
@@ -1616,139 +1617,127 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 12,
-        left: 20, right: 20, bottom: 8,
+        left: 16, right: 16, bottom: 8,
       ),
-        child: SizedBox(
-          height: 40,
-          child: Stack(
-            alignment: Alignment.center,
-        children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-            onTap: () => Navigator.maybePop(context),
-            child: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.15),
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.2), width: 0.8),
+      child: SizedBox(
+        height: 40,
+        child: Row(
+          children: [
+            // ── Back button ──────────────────────────────────────────────
+            GestureDetector(
+              onTap: () => Navigator.maybePop(context),
+              child: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.15),
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.2), width: 0.8),
+                ),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 16),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white, size: 16),
-            ),
-          ),
-              ),
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-          if (avatarPath != null && avatarPath.isNotEmpty) ...[
-                      Builder(
-                        builder: (avatarContext) => GestureDetector(
-                          onTap: () =>
-                              _showProfileBubble(avatarContext, authorLabel),
-                          child: Container(
-              width: 34, height: 34,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                                  color: AppTheme.gradientEnd, width: 1.5),
-                            ),
-                            child: ClipOval(
-                              child: _resolveAvatarWidget(avatarPath, 34),
-                            ),
-                          ),
-                        ),
             ),
             const SizedBox(width: 10),
-          ],
-              const Text('ARTIST VS', style: TextStyle(
-                      fontSize: 13,
-                      fontFamily: AppTheme.fontHeader,
-                      color: Color(0xFFF07012),
-                      letterSpacing: 2.5,
-                    )),
-                    if (hasCollaboratorSide) ...[
-                      const SizedBox(width: 10),
-                      Builder(
-                        builder: (avatarContext) => GestureDetector(
-                          onTap: () =>
-                              _showProfileBubble(avatarContext, collaboratorLabel),
-                          child: Container(
-                            width: 30, height: 30,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: AppTheme.gradientStart, width: 1.3),
-                            ),
-                            child: ClipOval(
-                              child: collaboratorAvatarPath != null &&
-                                      collaboratorAvatarPath.isNotEmpty
-                                  ? _resolveAvatarWidget(
-                                      collaboratorAvatarPath, 30)
-                                  : Container(
-                                      color: Colors.white.withOpacity(0.08),
-                                      child: const Icon(
-                                        Icons.person_rounded,
-                                        color: Colors.white70,
-                                        size: 16,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (_canOpenEditBackroom) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: _openEditBackroom,
+
+            // ── Center: author avatar + title + collaborator avatar ───────
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (avatarPath != null && avatarPath.isNotEmpty) ...[
+                    Builder(
+                      builder: (avatarContext) => GestureDetector(
+                        onTap: () =>
+                            _showProfileBubble(avatarContext, authorLabel),
                         child: Container(
-                          width: 24, height: 24,
+                          width: 30, height: 30,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.12),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.25),
-                              width: 0.8,
-                            ),
+                                color: AppTheme.gradientEnd, width: 1.5),
                           ),
-                          child: Icon(
-                            Icons.edit_rounded,
-                            size: 13,
-                            color: Colors.white.withOpacity(0.9),
+                          child: ClipOval(
+                            child: _resolveAvatarWidget(avatarPath, 30),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                     const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _showShareBottomSheet,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.25),
-                            width: 0.8,
+                  ],
+                  const Text('ARTIST VS', style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: AppTheme.fontHeader,
+                    color: Color(0xFFF07012),
+                    letterSpacing: 2.5,
+                  )),
+                  if (hasCollaboratorSide) ...[
+                    const SizedBox(width: 8),
+                    Builder(
+                      builder: (avatarContext) => GestureDetector(
+                        onTap: () =>
+                            _showProfileBubble(avatarContext, collaboratorLabel),
+                        child: Container(
+                          width: 28, height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppTheme.gradientStart, width: 1.3),
                           ),
-                        ),
-                        child: const Icon(
-                          Icons.ios_share_rounded,
-                          color: Colors.white,
-                          size: 16,
+                          child: ClipOval(
+                            child: collaboratorAvatarPath != null &&
+                                    collaboratorAvatarPath.isNotEmpty
+                                ? _resolveAvatarWidget(collaboratorAvatarPath, 28)
+                                : Container(
+                                    color: Colors.white.withOpacity(0.08),
+                                    child: const Icon(Icons.person_rounded,
+                                        color: Colors.white70, size: 14),
+                                  ),
+                          ),
                         ),
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // ── Right actions ────────────────────────────────────────────
+            if (_canOpenEditBackroom) ...[
+              GestureDetector(
+                onTap: _openEditBackroom,
+                child: Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.12),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.25), width: 0.8),
+                  ),
+                  child: Icon(Icons.edit_rounded,
+                      size: 14, color: Colors.white.withOpacity(0.9)),
                 ),
               ),
+              const SizedBox(width: 8),
             ],
-          ),
+            GestureDetector(
+              onTap: _showShareBottomSheet,
+              child: Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.12),
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.25), width: 0.8),
+                ),
+                child: const Icon(Icons.ios_share_rounded,
+                    color: Colors.white, size: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1826,6 +1815,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
       final hasComment = comment != null && comment.isNotEmpty;
 
+      if (!hasComment) return const SizedBox.shrink();
+
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: AnimatedSwitcher(
@@ -1834,67 +1825,43 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
           switchOutCurve: Curves.easeIn,
           child: KeyedSubtree(
             key: ValueKey<int>(_selectedArtist),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
-                  border: Border.all(
-                      color: accent.withOpacity(0.35), width: 0.9),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Thin accent bar
+                Container(
+                  width: 1.5,
+                  height: hasComment ? 32 : 22,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    color: accent.withOpacity(0.5),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 30, height: 30,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: accent.withOpacity(0.65), width: 1.2),
-                          ),
-                          child: ClipOval(
-                            child:
-                                rawAvatar != null && rawAvatar.trim().isNotEmpty
-                                    ? _resolveAvatarWidget(rawAvatar.trim(), 30)
-                                    : _avatarFallback(30),
-                          ),
-                        ),
-                        if (!isSoloVersus) ...[
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              userLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.92),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                const SizedBox(width: 10),
+                // Small avatar
+                if (rawAvatar != null && rawAvatar.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8, top: 1),
+                    child: ClipOval(
+                      child: _resolveAvatarWidget(rawAvatar.trim(), 20),
                     ),
-                    if (hasComment) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        comment!,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          height: 1.35,
-                        ),
+                  ),
+                // Comment
+                if (hasComment)
+                  Expanded(
+                    child: Text(
+                      comment!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.52),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
                       ),
-                    ],
-                  ],
-                ),
-              ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

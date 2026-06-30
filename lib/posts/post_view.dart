@@ -1,5 +1,6 @@
 // lib/posts/post_view.dart
 
+import 'dart:async';
 import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,8 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/models/artist_versus_model.dart';
+import 'package:welcometothedisco/versus/artistplayground.dart';
 import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
 
 const _kGreen      = AppTheme.createGreen;
@@ -52,20 +55,36 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   String? _playingTrackId;
   bool    _isBusy = false; // prevents double-taps while API in flight
 
+  // Live-updating counts from Firestore.
+  late int _remixCount;
+  StreamSubscription<PostModel?>? _postSub;
+
   PostModel get post => widget.post;
 
   @override
   void initState() {
     super.initState();
+    _remixCount = post.remixCount;
+
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 450),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    if (post.id.isNotEmpty) {
+      _postSub = FirebaseService.getPostStream(post.id).listen((updated) {
+        if (!mounted || updated == null) return;
+        if (updated.remixCount != _remixCount) {
+          setState(() => _remixCount = updated.remixCount);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _postSub?.cancel();
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -327,11 +346,23 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                         SliverToBoxAdapter(
                             child: _HDivider(top: 12, bottom: 8)),
 
+                        // Remixes
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: _RemixesSection(postId: post.id),
+                          ),
+                        ),
+
+                        SliverToBoxAdapter(
+                            child: _HDivider(top: 4, bottom: 8)),
+
                         // Footer
                         SliverToBoxAdapter(
                           child: _FooterActions(
                             post: post,
                             fmt: _fmt,
+                            remixCount: _remixCount,
                             onQueueAll: _isBusy ? null : _queueAll,
                             onRemix: _onRemixTap,
                           ),
@@ -923,11 +954,13 @@ class _FooterActions extends StatelessWidget {
   const _FooterActions({
     required this.post,
     required this.fmt,
+    required this.remixCount,
     required this.onQueueAll,
     required this.onRemix,
   });
   final PostModel post;
   final String Function(int) fmt;
+  final int remixCount;
   final VoidCallback? onQueueAll;
   final VoidCallback onRemix;
 
@@ -940,7 +973,7 @@ class _FooterActions extends StatelessWidget {
           // Remix
           _ActionBtn(
             icon: Icons.shuffle_rounded,
-            label: 'remix ${fmt(post.remixCount)}',
+            label: 'remix ${fmt(remixCount)}',
             color: post.remixEnabled == RemixEnabled.disabled
                 ? Colors.white.withOpacity(0.30)
                 : _kGreen,
@@ -1073,5 +1106,359 @@ class _HDivider extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: EdgeInsets.fromLTRB(20, top, 20, bottom),
         child: Container(height: 0.5, color: _kDivider),
+      );
+}
+
+// ─── Remixes collapsible section ──────────────────────────────────────────────
+class _RemixesSection extends StatefulWidget {
+  const _RemixesSection({required this.postId});
+  final String postId;
+
+  @override
+  State<_RemixesSection> createState() => _RemixesSectionState();
+}
+
+class _RemixesSectionState extends State<_RemixesSection>
+    with SingleTickerProviderStateMixin {
+  bool _expanded = false;
+  late final AnimationController _ctrl;
+  late final Animation<double>   _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _ctrl.forward() : _ctrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.postId.isEmpty) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: FirebaseService.getPostRemixesStream(widget.postId),
+      builder: (context, snap) {
+        final remixes = snap.data ?? [];
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.10), width: 0.8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header strip ───────────────────────────────────────
+                  GestureDetector(
+                    onTap: remixes.isEmpty ? null : _toggle,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.shuffle_rounded,
+                              color: _kGreen.withOpacity(0.70), size: 14),
+                          const SizedBox(width: 8),
+                          if (remixes.isEmpty) ...[
+                            Text(
+                              'No remixes yet',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.38),
+                                fontFamily: AppTheme.fontBody,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ] else ...[
+                            _OverlappingRemixCircles(
+                                remixes: remixes.take(7).toList()),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${remixes.length} remix${remixes.length == 1 ? '' : 'es'}',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.82),
+                                  fontFamily: AppTheme.fontBody,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (remixes.isNotEmpty)
+                            AnimatedRotation(
+                              turns: _expanded ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(Icons.expand_more_rounded,
+                                  color: Colors.white.withOpacity(0.50),
+                                  size: 20),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Expanded list ──────────────────────────────────────
+                  SizeTransition(
+                    sizeFactor: _anim,
+                    axisAlignment: -1,
+                    child: Column(
+                      children: [
+                        Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Colors.white.withOpacity(0.08)),
+                        ...remixes.asMap().entries.map((e) => _RemixRow(
+                              data: e.value,
+                              isLast: e.key == remixes.length - 1,
+                            )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Overlapping artist image circles (remix strip) ───────────────────────────
+class _OverlappingRemixCircles extends StatelessWidget {
+  const _OverlappingRemixCircles({required this.remixes});
+  final List<Map<String, dynamic>> remixes;
+
+  static const double _size    = 28.0;
+  static const double _overlap = 9.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (remixes.isEmpty) return const SizedBox.shrink();
+    final count = remixes.length;
+    final totalWidth = _size + (_size - _overlap) * (count - 1);
+
+    return SizedBox(
+      height: _size,
+      width: totalWidth,
+      child: Stack(
+        children: List.generate(count, (i) {
+          final url =
+              (remixes[i]['artist2ImageUrl'] as String?)?.trim() ?? '';
+          return Positioned(
+            left: i * (_size - _overlap),
+            child: _RemixAvatarCircle(url: url),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _RemixAvatarCircle extends StatelessWidget {
+  const _RemixAvatarCircle({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _OverlappingRemixCircles._size,
+      height: _OverlappingRemixCircles._size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border:
+            Border.all(color: _kGreen.withOpacity(0.45), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.28),
+              blurRadius: 5,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: ClipOval(
+        child: url.isNotEmpty
+            ? Image.network(url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallback())
+            : _fallback(),
+      ),
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: _kBlue.withOpacity(0.35),
+        child: Icon(Icons.music_note_rounded,
+            color: _kGreen.withOpacity(0.8), size: 13),
+      );
+}
+
+// ─── Single remix row (expanded list) ────────────────────────────────────────
+class _RemixRow extends StatelessWidget {
+  const _RemixRow({required this.data, required this.isLast});
+  final Map<String, dynamic> data;
+  final bool isLast;
+
+  void _openPlayground(BuildContext context) {
+    final versusId = (data['id'] as String?)?.trim() ?? '';
+    final model = ArtistVersusModel.fromFirestore(
+      Map<String, dynamic>.from(data)..remove('id'),
+      versusId,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ArtistVersusPlayground(
+          versus: model,
+          versusId: versusId,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final artist2Name =
+        (data['artist2Name'] as String?)?.trim() ?? 'Unknown Artist';
+    final artist2Image =
+        (data['artist2ImageUrl'] as String?)?.trim() ?? '';
+    final collabName =
+        (data['collaborator_username'] as String?)?.trim() ?? '';
+    final collabAvatar =
+        (data['collaborator_avatar'] as String?)?.trim() ?? '';
+
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _openPlayground(context),
+            splashColor: Colors.white.withOpacity(0.06),
+            highlightColor: Colors.white.withOpacity(0.03),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              // Artist circle
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.20), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _kGreen.withOpacity(0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: ClipOval(
+                  child: artist2Image.isNotEmpty
+                      ? Image.network(artist2Image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _artistFallback())
+                      : _artistFallback(),
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      artist2Name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (collabName.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (collabAvatar.isNotEmpty) ...[
+                            ClipOval(
+                              child: Image.network(
+                                collabAvatar,
+                                width: 14,
+                                height: 14,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              'by $collabName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.48),
+                                fontFamily: AppTheme.fontBody,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              Icon(Icons.chevron_right_rounded,
+                  size: 17, color: Colors.white.withOpacity(0.25)),
+            ],
+          ),
+        ),
+          ),
+        ),
+        if (!isLast)
+          Divider(
+            height: 1,
+            thickness: 1,
+            indent: 14,
+            endIndent: 14,
+            color: Colors.white.withOpacity(0.07),
+          ),
+      ],
+    );
+  }
+
+  Widget _artistFallback() => Container(
+        color: _kBlue.withOpacity(0.30),
+        child: Icon(Icons.music_note_rounded,
+            color: _kGreen.withOpacity(0.7), size: 22),
       );
 }

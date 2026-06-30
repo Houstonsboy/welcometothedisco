@@ -1322,6 +1322,16 @@ class FirebaseService {
       if (artist2ImageUrl.trim().isNotEmpty) 'artist2ImageUrl': artist2ImageUrl.trim(),
     });
 
+    // Increment remix count on the source post.
+    final pid = sourcePostID.trim();
+    if (pid.isNotEmpty) {
+      _firestore.collection('posts').doc(pid).update({
+        'Remixcount': FieldValue.increment(1),
+      }).catchError((Object e) {
+        debugPrint('[FirebaseService] createPostRemixVersus → Remixcount increment failed for post $pid: $e');
+      });
+    }
+
     // Write ranking stubs so both artists appear in rankings immediately.
     if (artist1ID.trim().isNotEmpty && artist2ID.trim().isNotEmpty) {
       _scheduleRankingWritesAfterVersus(
@@ -2381,5 +2391,45 @@ class FirebaseService {
       return bDate.compareTo(aDate);
     });
     return posts;
+  }
+
+  /// Real-time stream for a single post document.
+  /// Emits a new [PostModel] whenever any field on the doc changes —
+  /// [Remixcount], [Sharecount], etc. update in real-time with no polling.
+  static Stream<PostModel?> getPostStream(String postId) {
+    final id = postId.trim();
+    if (id.isEmpty) return Stream.value(null);
+    return _firestore
+        .collection('posts')
+        .doc(id)
+        .snapshots()
+        .map((snap) => snap.exists && snap.data() != null
+            ? PostModel.fromFirestore(snap.data()!, snap.id)
+            : null);
+  }
+
+  /// Real-time stream of all remix versus docs that reference [postId] as
+  /// their source post. Returns the raw Firestore data plus a synthetic 'id'
+  /// key so callers never need to query the doc ID separately.
+  static Stream<List<Map<String, dynamic>>> getPostRemixesStream(String postId) {
+    final id = postId.trim();
+    if (id.isEmpty) return Stream.value(const []);
+    return _firestore
+        .collection('versus')
+        .where('sourcePostID', isEqualTo: id)
+        .snapshots()
+        .map((snap) {
+          final docs = snap.docs
+              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+              .toList();
+          // Sort newest-first client-side — avoids the composite index that
+          // Firestore requires for where(...).orderBy('timestamp').
+          docs.sort((a, b) {
+            final ta = (a['timestamp'] as dynamic)?.millisecondsSinceEpoch ?? 0;
+            final tb = (b['timestamp'] as dynamic)?.millisecondsSinceEpoch ?? 0;
+            return (tb as int).compareTo(ta as int);
+          });
+          return docs;
+        });
   }
 }
