@@ -5,6 +5,7 @@ import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/versus_history.dart';
 
 const _kBlue = AppTheme.gradientStart;
 const _kPink = AppTheme.gradientEnd;
@@ -88,7 +89,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                 : (widget.initialUsername ?? 'Profile'),
             style: const TextStyle(
               fontSize: 14.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
+              fontFamily: AppTheme.fontHeader,
               color: AppTheme.titleAccent,
             ),
           ),
@@ -122,6 +123,8 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                             key: ValueKey(_user!.id),
                             albums: _user!.favoriteAlbums,
                           ),
+                          const SizedBox(height: 12),
+                          _FriendPollsCard(uid: _user!.id),
                           const SizedBox(height: 16),
                           ProfilePostsSection(authorUid: _user!.id),
                         ],
@@ -396,6 +399,92 @@ class _FriendFavoriteAlbumsWidget extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Friend polls nav card ──────────────────────────────────────────────────────
+class _FriendPollsCard extends StatelessWidget {
+  final String uid;
+  const _FriendPollsCard({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VersusHistoryScreen(uid: uid),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.14),
+                width: 0.9,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF17B5EE).withOpacity(0.15),
+                    border: Border.all(
+                      color: const Color(0xFF17B5EE).withOpacity(0.4),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.how_to_vote_outlined,
+                    color: Color(0xFF17B5EE),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'POLLS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'View their voting history',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.45),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withOpacity(0.35),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

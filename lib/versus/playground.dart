@@ -122,6 +122,10 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   final Map<int, int>                  _votesByIndex = {};
   final Map<int, AlbumTrackVoteDetail> _trackDetails = {};
 
+  // ── Scroll controllers — one per side, kept in sync when active track changes
+  final ScrollController _scrollController1 = ScrollController();
+  final ScrollController _scrollController2 = ScrollController();
+
   // ── Comment controllers (state-level so they survive rebuilds & are syncable)
   final Map<int, TextEditingController> _commentControllers = {};
 
@@ -658,10 +662,26 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     return '';
   }
 
+  void _syncScrollToActiveTrack() {
+    const double headerH = 44.0;
+    const double rowH    = 78.0;
+    final target = headerH + _activeTrackIndex * rowH;
+    for (final ctrl in [_scrollController1, _scrollController2]) {
+      if (ctrl.hasClients) {
+        ctrl.animateTo(
+          target.clamp(0.0, ctrl.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+  }
+
   void _onTitleTap(int trackIndex, int _) {
     setState(() {
       _activeTrackIndex = trackIndex;
     });
+    _syncScrollToActiveTrack();
   }
 
   // ── Playback ──────────────────────────────────────────────────────────────
@@ -743,6 +763,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         final total = math.min(_albums?[0]?.tracks.length ?? 0, _albums?[1]?.tracks.length ?? 0);
         if (_activeTrackIndex < total - 1) {
           setState(() { _activeTrackIndex++; _playingTrackIndex = null; });
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollToActiveTrack());
         } else {
           setState(() => _playingTrackIndex = null);
         }
@@ -817,6 +838,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _pulseController.dispose();
     _slideController.dispose();
     _pageController.dispose();
+    _scrollController1.dispose();
+    _scrollController2.dispose();
     for (final c in _commentControllers.values) { c.dispose(); }
     super.dispose();
   }
@@ -976,6 +999,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     coverLoadingRoundIndex: _coverLoadingRoundIndex,
                                     votableRoundCount: _pairedRoundCount,
                                     votesByIndex: _votesByIndex,
+                                    scrollController: _scrollController1,
                                     onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
                                     onCoverTap: _onCoverTap,
                                     onTitleTap: _onTitleTap,
@@ -995,6 +1019,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     coverLoadingRoundIndex: _coverLoadingRoundIndex,
                                     votableRoundCount: _pairedRoundCount,
                                     votesByIndex: _votesByIndex,
+                                    scrollController: _scrollController2,
                                     onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
                                     onCoverTap: _onCoverTap,
                                     onTitleTap: _onTitleTap,
@@ -1481,6 +1506,7 @@ class _TrackPage extends StatelessWidget {
   final void Function(int trackIndex, int albumIndex) onTitleTap;
   final TextEditingController Function(int)        getCommentCtrl;
   final void Function(int roundIndex, String text) onCommentChanged;
+  final ScrollController? scrollController;
 
   const _TrackPage({
     required this.album,
@@ -1495,6 +1521,7 @@ class _TrackPage extends StatelessWidget {
     this.coverLoadingRoundIndex,
     required this.votableRoundCount,
     required this.votesByIndex,
+    this.scrollController,
     required this.onVote,
     required this.onCoverTap,
     required this.onTitleTap,
@@ -1507,6 +1534,7 @@ class _TrackPage extends StatelessWidget {
     final tracks = album?.tracks ?? <SpotifyAlbumTrack>[];
 
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
       physics: const BouncingScrollPhysics(),
       itemCount: tracks.isEmpty ? 2 : tracks.length + 1,

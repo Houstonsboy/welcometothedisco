@@ -1655,7 +1655,7 @@ class FirebaseService {
 
       final data = snap.data()!;
       final type = (data['type'] as String?)?.trim() ?? '';
-      if (type != 'collaboration' && type != 'artist') {
+      if (type != 'collaboration' && type != 'collaborator' && type != 'artist') {
         throw Exception('Not a supported versus type for this update');
       }
 
@@ -1931,6 +1931,12 @@ class FirebaseService {
       final snap = await ref.get();
 
       if (!snap.exists) {
+        // Don't create a document if the user never actually voted —
+        // dispose() fires unconditionally and would otherwise write zero-vote ghost docs.
+        if (artist1Vote + artist2Vote == 0) {
+          debugPrint('[FirebaseService] upsertArtistPoll → skipped: no votes on new poll');
+          return;
+        }
         // ── First vote: write full document ──────────────────────────────
         await ref.set({
           'versus_id': versusIdTrim,
@@ -1959,6 +1965,7 @@ class FirebaseService {
           'unvoted_count': unvotedCount,
           'track_details': trackMap,
           'Versus_type': versusTypeTrim,
+          'timestamp': FieldValue.serverTimestamp(),
         });
         debugPrint('[FirebaseService] upsertArtistPoll → updated $docId');
       }
@@ -2021,6 +2028,10 @@ class FirebaseService {
     try {
       final snap = await ref.get();
       if (!snap.exists) {
+        if (album1Vote + album2Vote == 0) {
+          debugPrint('[FirebaseService] upsertAlbumPoll → skipped: no votes on new poll');
+          return;
+        }
         await ref.set({
           'versus_id': versusIdTrim,
           'Versus_type': versusTypeTrim,
@@ -2046,6 +2057,7 @@ class FirebaseService {
           'completion_percentage': completionPercentage,
           'unvoted_count': unvotedCount,
           'track_details': trackMap,
+          'timestamp': FieldValue.serverTimestamp(),
         });
         debugPrint('[FirebaseService] upsertAlbumPoll → updated $docId');
       }

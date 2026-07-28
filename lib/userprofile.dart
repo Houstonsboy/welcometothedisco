@@ -9,7 +9,9 @@ import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/auth_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/versus_history.dart';
 
 const _kBlue = AppTheme.gradientStart;
 const _kPink = AppTheme.gradientEnd;
@@ -31,6 +33,7 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   bool _loggingOut = false;
+  bool _reconnectingSpotify = false;
   bool _editing = false;
   bool _savingProfile = false;
 
@@ -121,6 +124,36 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  Future<void> _handleReconnectSpotify() async {
+    if (_reconnectingSpotify) return;
+    setState(() => _reconnectingSpotify = true);
+    try {
+      final result = await SpotifyAuth().login();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isSuccess
+                ? 'Spotify reconnected.'
+                : 'Spotify: ${result.message ?? 'cancelled'}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Spotify error: $e'),
+          backgroundColor: _kPink.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _reconnectingSpotify = false);
+    }
+  }
+
   Future<void> _handleLogout() async {
     if (_loggingOut) return;
     setState(() => _loggingOut = true);
@@ -182,12 +215,46 @@ class _UserProfilePageState extends State<UserProfilePage> {
           title: const Text(
             'Welcome to the Disco',
             style: TextStyle(
-              fontSize: 14.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: AppTheme.titleAccent,
+              fontSize: 12.0,
+              fontFamily: AppTheme.fontHeader,
+              color: Color(0xFF17B5EE),
             ),
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: _reconnectingSpotify ? null : _handleReconnectSpotify,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.spotifyGreen.withOpacity(0.15),
+                    border: Border.all(
+                      color: AppTheme.spotifyGreen.withOpacity(0.45),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: Center(
+                    child: _reconnectingSpotify
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              color: AppTheme.spotifyGreen,
+                            ),
+                          )
+                        : Icon(
+                            Icons.headset_rounded,
+                            color: AppTheme.spotifyGreen,
+                            size: 17,
+                          ),
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: GestureDetector(
@@ -249,6 +316,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       key: ValueKey(user?.id ?? ''),
                       initialAlbums: user?.favoriteAlbums ?? const [],
                     ),
+                    const SizedBox(height: 12),
+                    _MyPollsCard(),
                     if ((user?.id ?? '').trim().isNotEmpty) ...[
                       const SizedBox(height: 16),
                       ProfilePostsSection(authorUid: user!.id),
@@ -1217,6 +1286,89 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── My Polls nav card ──────────────────────────────────────────────────────────
+class _MyPollsCard extends StatelessWidget {
+  const _MyPollsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const VersusHistoryScreen()),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.14),
+                width: 0.9,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF17B5EE).withOpacity(0.15),
+                    border: Border.all(
+                      color: const Color(0xFF17B5EE).withOpacity(0.4),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.how_to_vote_outlined,
+                    color: Color(0xFF17B5EE),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'MY POLLS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'View your voting history',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.45),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withOpacity(0.35),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -21,6 +21,8 @@ class VersusShareCard extends StatelessWidget {
   final List<String> roundTrackNames2;
   final List<String> roundTrackIds1;
   final List<String> roundTrackIds2;
+  /// true = album poll → square cover art; false (default) = artist → circle.
+  final bool isAlbumPoll;
 
   const VersusShareCard({
     super.key,
@@ -39,6 +41,7 @@ class VersusShareCard extends StatelessWidget {
     required this.roundTrackIds2,
     this.artist1ImageUrl,
     this.artist2ImageUrl,
+    this.isAlbumPoll = false,
   });
 
   Map<String, dynamic> _mergedRound(int index) {
@@ -153,6 +156,7 @@ class VersusShareCard extends StatelessWidget {
                             align: CrossAxisAlignment.start,
                             isWinner: total > 0 &&
                                 artist1Votes > artist2Votes,
+                            isAlbum: isAlbumPoll,
                           ),
                         ),
 
@@ -195,6 +199,7 @@ class VersusShareCard extends StatelessWidget {
                             align: CrossAxisAlignment.end,
                             isWinner: total > 0 &&
                                 artist2Votes > artist1Votes,
+                            isAlbum: isAlbumPoll,
                           ),
                         ),
                       ],
@@ -351,6 +356,8 @@ class _ArtistSide extends StatelessWidget {
   final Color color;
   final CrossAxisAlignment align;
   final bool isWinner;
+  // true = album poll → rounded-square cover; false = artist → circle.
+  final bool isAlbum;
 
   const _ArtistSide({
     required this.name,
@@ -359,10 +366,18 @@ class _ArtistSide extends StatelessWidget {
     required this.align,
     required this.isWinner,
     this.imageUrl,
+    this.isAlbum = false,
   });
+
+  static const double _size = 68;
+  static const double _albumRadius = 12;
 
   @override
   Widget build(BuildContext context) {
+    final br = isAlbum
+        ? BorderRadius.circular(_albumRadius)
+        : BorderRadius.circular(_size / 2);
+
     return Column(
       crossAxisAlignment: align,
       children: [
@@ -370,10 +385,10 @@ class _ArtistSide extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 68,
-              height: 68,
+              width: _size,
+              height: _size,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                borderRadius: br,
                 border: Border.all(
                   color: isWinner
                       ? color
@@ -381,7 +396,8 @@ class _ArtistSide extends StatelessWidget {
                   width: isWinner ? 2.5 : 1.2,
                 ),
               ),
-              child: ClipOval(
+              child: ClipRRect(
+                borderRadius: br,
                 child: imageUrl != null && imageUrl!.isNotEmpty
                     ? Image.network(
                         imageUrl!,
@@ -456,8 +472,11 @@ class _ArtistSide extends StatelessWidget {
 
   Widget _fallback(Color color) => Container(
         color: color.withOpacity(0.15),
-        child: const Icon(Icons.person_rounded,
-            color: Colors.white38, size: 28),
+        child: Icon(
+          isAlbum ? Icons.album_rounded : Icons.person_rounded,
+          color: Colors.white38,
+          size: 28,
+        ),
       );
 }
 

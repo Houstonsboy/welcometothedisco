@@ -336,7 +336,7 @@ class _SignupScreenState extends State<SignupScreen> {
             'Welcome to the Disco',
             style: TextStyle(
               fontSize: 25.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
+              fontFamily: AppTheme.fontHeader,
               color: AppTheme.titleAccent,
             ),
           ),

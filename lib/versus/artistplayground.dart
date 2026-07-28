@@ -168,7 +168,11 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       return base + bonus;
     }
 
-    // ── Per-track comment controllers (keyed by track index) ─────────────────
+    // ── Scroll controllers — one per side, kept in sync when active track changes
+  final ScrollController _scrollController1 = ScrollController();
+  final ScrollController _scrollController2 = ScrollController();
+
+  // ── Per-track comment controllers (keyed by track index) ─────────────────
     final Map<int, TextEditingController> _commentControllers = {};
 
     TextEditingController _commentCtrlAt(int index) {
@@ -543,6 +547,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     _pulseController.dispose();
     _slideController.dispose();
     _pageController.dispose();
+    _scrollController1.dispose();
+    _scrollController2.dispose();
     for (final ctrl in _commentControllers.values) {
       ctrl.dispose();
     }
@@ -1134,12 +1140,28 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     }
   }
 
+  void _syncScrollToActiveTrack() {
+    const double headerH = 44.0;
+    const double rowH    = 78.0;
+    final target = headerH + _activeTrackIndex * rowH;
+    for (final ctrl in [_scrollController1, _scrollController2]) {
+      if (ctrl.hasClients) {
+        ctrl.animateTo(
+          target.clamp(0.0, ctrl.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+  }
+
   /// Tap title/artist — select round for voting & notes without starting playback.
   void _onTitleTap(int trackIndex, int artistIndex) {
     setState(() {
       _activeTrackIndex = trackIndex;
       _leadArtistIndex = artistIndex;
     });
+    _syncScrollToActiveTrack();
   }
 
   /// Tap album cover — plays the tapped round with the tapped artist's track first.
@@ -1191,6 +1213,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
             _activeTrackIndex++;
             _playingTrackIndex = null;
           });
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollToActiveTrack());
         } else {
           setState(() => _playingTrackIndex = null);
         }
@@ -1569,6 +1592,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                         playingTrackIndex: _playingTrackIndex,
                         coverLoadingRoundIndex: _coverLoadingRoundIndex,
                         votesByIndex:      _votesByIndex,
+                        scrollController:  _scrollController1,
                         onVote:            (roundIndex) => _onVote(roundIndex, 0),
                         onCoverTap:        _onCoverTap,
                         onTitleTap:        _onTitleTap,
@@ -1587,6 +1611,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                         playingTrackIndex: _playingTrackIndex,
                         coverLoadingRoundIndex: _coverLoadingRoundIndex,
                         votesByIndex:      _votesByIndex,
+                        scrollController:  _scrollController2,
                         onVote:            (roundIndex) => _onVote(roundIndex, 1),
                         onCoverTap:        _onCoverTap,
                         onTitleTap:        _onTitleTap,
@@ -2077,6 +2102,7 @@ class _ArtistTrackPage extends StatelessWidget {
   final void Function(int trackIndex, int artistIndex) onTitleTap;
     final TextEditingController Function(int roundIndex) getCommentCtrl;
     final void Function(int roundIndex, String text) onCommentChanged;
+  final ScrollController? scrollController;
 
   const _ArtistTrackPage({
     required this.tracks,
@@ -2090,6 +2116,7 @@ class _ArtistTrackPage extends StatelessWidget {
     this.playingTrackIndex,
     this.coverLoadingRoundIndex,
       required this.votesByIndex,
+    this.scrollController,
     required this.onVote,
     required this.onCoverTap,
     required this.onTitleTap,
@@ -2100,6 +2127,7 @@ class _ArtistTrackPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
       physics: const BouncingScrollPhysics(),
       itemCount: tracks.isEmpty ? 2 : tracks.length + 1,

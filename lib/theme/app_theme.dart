@@ -29,6 +29,10 @@ abstract final class AppTheme {
 
   /// Use for standard UI/body text.
   static const String fontBody = 'Satoshi';
+  // static const String fontBody = 'Roboto';
+
+  /// Base body font size. 14 = Flutter default (no change); increase to scale up all body text.
+  static const double fontBodySize = 14.0;
 
   /// Default color for body typography (matches Stories friend username green).
   static const Color fontBodyColor = createGreen;
@@ -132,6 +136,7 @@ abstract final class AppTheme {
     final text = base.textTheme.apply(
       fontFamily: fontBody,
       bodyColor: fontBodyColor,
+      fontSizeDelta: fontBodySize - 14,
     );
     TextStyle? minusOne(TextStyle? s) {
       if (s == null) return null;

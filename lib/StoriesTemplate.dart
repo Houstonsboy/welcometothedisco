@@ -14,13 +14,28 @@ const _kGreen = AppTheme.createGreen;
 /// Streams the current user's document so the list stays live —
 /// any friend added in the Find Friends tab appears here instantly
 /// without a manual refresh.
-class StoriesTemplate extends StatelessWidget {
+class StoriesTemplate extends StatefulWidget {
   const StoriesTemplate({super.key});
+
+  @override
+  State<StoriesTemplate> createState() => _StoriesTemplateState();
+}
+
+class _StoriesTemplateState extends State<StoriesTemplate> {
+  // Stream is created once — parent rebuilds (e.g. search typing) won't
+  // reset the StreamBuilder subscription and cause a loading flicker.
+  late final Stream<UserModel?> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = FirebaseService.getCurrentUserStream();
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<UserModel?>(
-      stream: FirebaseService.getCurrentUserStream(),
+      stream: _stream,
       builder: (context, snapshot) {
         final friends = snapshot.data?.friends ?? const <FriendEntry>[];
         final loading = snapshot.connectionState == ConnectionState.waiting;

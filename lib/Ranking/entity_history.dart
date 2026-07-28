@@ -13,7 +13,7 @@ import 'package:welcometothedisco/versus/playground.dart';
 const _kBlue = AppTheme.gradientStart;
 const _kPink = AppTheme.gradientEnd;
 
-class EntityOpponentHistoryScreen extends StatelessWidget {
+class EntityOpponentHistoryScreen extends StatefulWidget {
   final RankingModel ranking;
   final OpponentModel opponent;
 
@@ -23,11 +23,54 @@ class EntityOpponentHistoryScreen extends StatelessWidget {
     required this.opponent,
   });
 
-  bool get _isArtist => ranking.entityType == 'artist';
+  @override
+  State<EntityOpponentHistoryScreen> createState() =>
+      _EntityOpponentHistoryScreenState();
+}
+
+class _EntityOpponentHistoryScreenState
+    extends State<EntityOpponentHistoryScreen> {
+  bool get _isArtist => widget.ranking.entityType == 'artist';
+
+  // versusId → {authorName, authorAvatarPath}
+  final Map<String, String> _authorNames   = {};
+  final Map<String, String> _authorAvatars = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAuthors();
+  }
+
+  Future<void> _fetchAuthors() async {
+    final ids = widget.opponent.versusHistory
+        .map((v) => v.versusId)
+        .where((id) => id.trim().isNotEmpty)
+        .toList();
+    if (ids.isEmpty) return;
+
+    final futures = ids.map(
+      (id) => FirebaseFirestore.instance.collection('versus').doc(id).get(),
+    );
+    final docs = await Future.wait(futures);
+
+    final names   = <String, String>{};
+    final avatars = <String, String>{};
+    for (final doc in docs) {
+      if (!doc.exists) continue;
+      final data = doc.data()!;
+      names[doc.id]   = (data['author_username'] as String?)?.trim() ?? '';
+      avatars[doc.id] = (data['author_avatar']   as String?)?.trim() ?? '';
+    }
+    if (mounted) setState(() {
+      _authorNames.addAll(names);
+      _authorAvatars.addAll(avatars);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final items = opponent.versusHistory;
+    final items = widget.opponent.versusHistory;
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -44,18 +87,20 @@ class EntityOpponentHistoryScreen extends StatelessWidget {
               _buildHeader(context),
               Expanded(
                 child: items.isEmpty
-                    ? _EmptyState(opponentName: opponent.opponentName)
+                    ? _EmptyState(opponentName: widget.opponent.opponentName)
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 22),
                         itemBuilder: (context, i) {
                           final versus = items[i];
                           return _VersusHistoryCard(
                             isArtist: _isArtist,
-                            entityName: ranking.entityName,
-                            entityImage: ranking.entityImage,
-                            opponentName: opponent.opponentName,
-                            opponentImage: opponent.opponentImage,
+                            entityName: widget.ranking.entityName,
+                            entityImage: widget.ranking.entityImage,
+                            opponentName: widget.opponent.opponentName,
+                            opponentImage: widget.opponent.opponentImage,
                             versusResult: versus,
+                            authorName:   _authorNames[versus.versusId]   ?? '',
+                            authorAvatar: _authorAvatars[versus.versusId] ?? '',
                             onTap: () => _openVersus(context, versus.versusId),
                           );
                         },
@@ -107,7 +152,7 @@ class EntityOpponentHistoryScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${ranking.entityName} vs ${opponent.opponentName}',
+                  '${widget.ranking.entityName} vs ${widget.opponent.opponentName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -177,6 +222,8 @@ class _VersusHistoryCard extends StatelessWidget {
   final String opponentName;
   final String opponentImage;
   final VersusResultModel versusResult;
+  final String authorName;
+  final String authorAvatar;
   final VoidCallback onTap;
 
   const _VersusHistoryCard({
@@ -186,6 +233,8 @@ class _VersusHistoryCard extends StatelessWidget {
     required this.opponentName,
     required this.opponentImage,
     required this.versusResult,
+    required this.authorName,
+    required this.authorAvatar,
     required this.onTap,
   });
 
@@ -237,24 +286,18 @@ class _VersusHistoryCard extends StatelessWidget {
                   Row(
                     children: [
                       _statusBadge(versusResult.status),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Votes ${versusResult.entityVotes} - ${versusResult.opponentVotes}',
+                          '${versusResult.entityVotes} - ${versusResult.opponentVotes}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.86),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withOpacity(0.72),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withOpacity(0.5),
-                        size: 20,
-                      ),
+                      _authorBubble(),
                     ],
                   ),
                 ],
@@ -262,6 +305,62 @@ class _VersusHistoryCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  static String? _avatarAssetPath(String raw) {
+    final p = raw.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    return 'assets/images/$p';
+  }
+
+  Widget _authorBubble() {
+    final name   = authorName.trim();
+    final path   = _avatarAssetPath(authorAvatar);
+    final hasAvatar = path != null;
+    final hasName   = name.isNotEmpty;
+    if (!hasName && !hasAvatar) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.20), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasAvatar) ...[
+            ClipOval(
+              child: Image.asset(
+                path!,
+                width: 18,
+                height: 18,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.person_rounded,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.6),
+                ),
+              ),
+            ),
+            if (hasName) const SizedBox(width: 5),
+          ],
+          if (hasName)
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
       ),
     );
   }

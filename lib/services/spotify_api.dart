@@ -296,6 +296,7 @@ class SpotifyApi {
     }
     final resp = await http.get(uri, headers: h);
     debugPrint('[SpotifyApi] GET $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] GET $path error body: ${resp.body}');
     return resp;
   }
 
@@ -308,6 +309,7 @@ class SpotifyApi {
     }
     final resp = await http.put(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] PUT $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] PUT $path error body: ${resp.body}');
     return resp;
   }
 
@@ -320,6 +322,7 @@ class SpotifyApi {
     }
     final resp = await http.post(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] POST $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] POST $path error body: ${resp.body}');
     return resp;
   }
 

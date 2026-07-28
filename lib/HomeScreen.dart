@@ -89,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
             "Welcome to the Disco",
             style: TextStyle(
               fontSize: 22.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
+              fontFamily: AppTheme.fontHeader,
               color: AppTheme.titleAccent,
             ),
           ),
@@ -397,7 +397,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       _searchLoading = true;
       _searchLastQuery = q;
     });
-    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () async {
       if (_artistMode) {
         final artists = await _searchApi.searchArtists(q, limit: 14);
         if (!mounted || _searchLastQuery != q) return;
@@ -1042,22 +1042,45 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(_focused ? 0.16 : 0.12),
-                  Colors.white.withOpacity(_focused ? 0.08 : 0.05),
-                ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _focused
+              ? [
+                  BoxShadow(
+                    color: AppTheme.gradientStart.withOpacity(0.55),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : [],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(_focused ? 0.22 : 0.12),
+                    Colors.white.withOpacity(_focused ? 0.12 : 0.05),
+                  ],
+                ),
+                border: Border.all(
+                  color: _focused
+                      ? Colors.white.withOpacity(0.50)
+                      : Colors.white.withOpacity(0.15),
+                  width: _focused ? 1.2 : 0.8,
+                ),
               ),
-            ),
             child: Row(
               children: [
                 Expanded(
@@ -1161,7 +1184,7 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
