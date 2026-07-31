@@ -22,6 +22,7 @@ import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/posts/view_posts.dart';
@@ -32,6 +33,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await NotificationService.initialize();
 
   // Cold-start: app opened by Spotify redirect URI.
   final appLinks = AppLinks();
@@ -98,6 +100,7 @@ class _AuthGateState extends State<_AuthGate> {
       _user = current;
       _initializing = false;
       unawaited(FirebaseService.ensureCurrentUserProfileCached());
+      unawaited(NotificationService.saveTokenForUser(current.uid));
     }
     // Stream handles future sign-in / sign-out events.
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -109,6 +112,7 @@ class _AuthGateState extends State<_AuthGate> {
       }
       if (user != null) {
         unawaited(FirebaseService.ensureCurrentUserProfileCached());
+        unawaited(NotificationService.saveTokenForUser(user.uid));
       }
     });
   }

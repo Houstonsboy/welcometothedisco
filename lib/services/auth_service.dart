@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 
@@ -194,6 +195,8 @@ class AuthService {
   // Sign out (Firebase only — Spotify tokens are intentionally kept so the
   // user doesn't have to re-authenticate with Spotify on every login).
   Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid ?? '';
+    if (uid.isNotEmpty) await NotificationService.clearTokenForUser(uid);
     await _googleSignIn.signOut();
     await _auth.signOut();
     await UserProfileCacheService.clear();

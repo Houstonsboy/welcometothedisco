@@ -108,6 +108,10 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
   List<List<SpotifyTrack>> _topTracks      = [[], []];
   bool                     _isLoadingTracks = false;
 
+  // ── Discography for author's artist (lazy background load) ─────────────────
+  List<SpotifyTrack> _discographyTracks0 = [];
+  bool               _isLoadingDiscography = false;
+
   // ── Author-only selected tracks (slot 0 only) ──────────────────────────────
   final List<SpotifyTrack> _selectedTracks1 = [];
 
@@ -311,6 +315,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         _topTracks[0] = [];
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
+        _discographyTracks0 = [];
         _collaborationInviteSent = false;
         _collaborationVersusID = null;
         if (_selected[1] != null) {
@@ -337,6 +342,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         _topTracks[0] = [];
         _selectedTracks1.clear();
         _trackSearchResults1 = null;
+        _discographyTracks0 = [];
         _collaborationInviteSent = false;
         _collaborationVersusID = null;
       }
@@ -364,7 +370,10 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     if (a1 == null) return;
     if (_isLoadingTracks) return;
 
-    setState(() => _isLoadingTracks = true);
+    setState(() {
+      _isLoadingTracks = true;
+      _discographyTracks0 = []; // reset on new artist
+    });
     try {
       final a2 = _selected[1];
       if (a2 != null) {
@@ -389,10 +398,31 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         });
       }
       _slideController.forward(from: 0);
+      // Background-load full discography for author's artist
+      unawaited(_loadDiscographyForAuthor(a1));
     } finally {
       if (mounted) setState(() => _isLoadingTracks = false);
     }
   }
+
+  Future<void> _loadDiscographyForAuthor(SpotifyArtistDetails a1) async {
+    if (!mounted) return;
+    setState(() => _isLoadingDiscography = true);
+    try {
+      final tracks = await _api.getArtistDiscographyTracks(a1.id);
+      if (!mounted) return;
+      if (_selected[0]?.id != a1.id) return; // stale — artist changed
+      setState(() => _discographyTracks0 = tracks);
+      _slideController.forward(from: 0);
+    } catch (e) {
+      debugPrint('[CollaboratorLockeroom] discography load failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingDiscography = false);
+    }
+  }
+
+  bool get _isShowingDiscographyForAuthor =>
+      _trackFilterQuery.isEmpty && _discographyTracks0.isNotEmpty;
 
   // ── Track search (artist1 / slot-0 only) ───────────────────────────────────
   void _onTrackFilterChanged() {
@@ -490,6 +520,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     if (_trackFilterQuery.isNotEmpty && _trackSearchResults1 != null) {
       return _trackSearchResults1!;
     }
+    if (_discographyTracks0.isNotEmpty) return _discographyTracks0;
     return _topTracks[0];
   }
 
@@ -945,6 +976,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
                         _topTracks[0] = [];
                         _selectedTracks1.clear();
                         _trackSearchResults1 = null;
+                        _discographyTracks0 = [];
                         _collaborationInviteSent = false;
                         _collaborationVersusID = null;
                       }),
@@ -1045,6 +1077,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     final tracks  = _tracksForPage(0);
     final picked  = _selectedTracks1;
     final isSearchMode = _trackFilterQuery.isNotEmpty;
+    final isDiscography = _isShowingDiscographyForAuthor;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -1053,6 +1086,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         _buildTrackListHeader(
           artist: artist, accentColor: _kPurple,
           isSecondArtist: false, isSearchMode: isSearchMode,
+          isDiscography: isDiscography,
         ),
 
         _buildAuthorCommentStrip(),
@@ -1092,8 +1126,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
 
         if (tracks.isNotEmpty)
           _buildSectionLabel(
-            icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
-            label: isSearchMode ? 'SEARCH RESULTS' : 'TOP TRACKS',
+            icon: isSearchMode
+                ? Icons.manage_search_rounded
+                : (isDiscography ? Icons.library_music_rounded : Icons.star_rounded),
+            label: isSearchMode
+                ? 'SEARCH RESULTS'
+                : (isDiscography ? 'DISCOGRAPHY' : 'TOP TRACKS'),
             count: tracks.length,
             accentColor: _kPurple,
             dimmed: picked.isNotEmpty,
@@ -1143,6 +1181,34 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
               ),
             );
           }),
+
+        // Loading indicator while discography loads in the background
+        if (_isLoadingDiscography && !isSearchMode && !isDiscography)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 12, height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: _kPurple.withOpacity(0.4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'loading full discography...',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.28),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -1540,6 +1606,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
     required Color accentColor,
     required bool isSecondArtist,
     required bool isSearchMode,
+    bool isDiscography = false,
   }) {
     final profile = Container(
       width: 32, height: 32,
@@ -1566,7 +1633,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
         border: Border.all(color: accentColor.withOpacity(0.4), width: 0.8),
       ),
       child: Text(
-        isSecondArtist ? "COLLAB'S" : (isSearchMode ? 'SEARCH' : 'TOP TRACKS'),
+        isSecondArtist ? "COLLAB'S" : (isSearchMode ? 'SEARCH' : (isDiscography ? 'DISCOGRAPHY' : 'TOP TRACKS')),
         style: TextStyle(color: accentColor.withOpacity(0.9),
             fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5),
       ),
@@ -2415,10 +2482,12 @@ class _PostRemixScreenState extends State<PostRemixScreen>
 
   // ── Right-side artist / tracks ────────────────────────────────────────────
   SpotifyArtistDetails? _rightArtist;
-  List<SpotifyTrack>   _rightTopTracks      = [];
-  final List<SpotifyTrack> _rightSelected   = [];
-  bool _isLoadingRightTracks = false;
-  bool _isSubmitting         = false;
+  List<SpotifyTrack>   _rightTopTracks           = [];
+  List<SpotifyTrack>   _rightDiscographyTracks   = [];
+  final List<SpotifyTrack> _rightSelected        = [];
+  bool _isLoadingRightTracks      = false;
+  bool _isLoadingRightDiscography = false;
+  bool _isSubmitting              = false;
 
   // ── Artist search (only used in 'different' mode) ─────────────────────────
   final TextEditingController _searchCtrl  = TextEditingController();
@@ -2454,10 +2523,13 @@ class _PostRemixScreenState extends State<PostRemixScreen>
   bool get _canSubmit  =>
       _rightArtist != null && _rightSelected.isNotEmpty;
 
-  List<SpotifyTrack> get _visibleRightTracks =>
-      (_trackFilterQuery.isNotEmpty && _trackSearchResults != null)
-          ? _trackSearchResults!
-          : _rightTopTracks;
+  List<SpotifyTrack> get _visibleRightTracks {
+    if (_trackFilterQuery.isNotEmpty && _trackSearchResults != null) {
+      return _trackSearchResults!;
+    }
+    if (_rightDiscographyTracks.isNotEmpty) return _rightDiscographyTracks;
+    return _rightTopTracks;
+  }
 
   @override
   void initState() {
@@ -2575,19 +2647,36 @@ class _PostRemixScreenState extends State<PostRemixScreen>
       imageUrl: post.artistImageUrl.isNotEmpty ? post.artistImageUrl : null,
     );
     setState(() {
-      _rightArtist        = artist;
+      _rightArtist          = artist;
       _isLoadingRightTracks = true;
     });
     try {
       final tracks = await _api.getArtistTopTracks(post.artistID);
       if (!mounted) return;
       setState(() {
-        _rightTopTracks      = tracks;
+        _rightTopTracks       = tracks;
         _isLoadingRightTracks = false;
       });
       _slideCtrl.forward(from: 0);
+      unawaited(_loadRightDiscography(post.artistID));
     } catch (_) {
       if (mounted) setState(() => _isLoadingRightTracks = false);
+    }
+  }
+
+  Future<void> _loadRightDiscography(String artistId) async {
+    if (!mounted) return;
+    setState(() => _isLoadingRightDiscography = true);
+    try {
+      final tracks = await _api.getArtistDiscographyTracks(artistId);
+      if (!mounted) return;
+      if (_rightArtist?.id != artistId) return;
+      setState(() => _rightDiscographyTracks = tracks);
+      _slideCtrl.forward(from: 0);
+    } catch (e) {
+      debugPrint('[PostRemixScreen] discography load failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingRightDiscography = false);
     }
   }
 
@@ -2629,24 +2718,26 @@ class _PostRemixScreenState extends State<PostRemixScreen>
       return;
     }
     setState(() {
-      _rightArtist         = artist;
-      _rightTopTracks      = [];
+      _rightArtist              = artist;
+      _rightTopTracks           = [];
+      _rightDiscographyTracks   = [];
       _rightSelected.clear();
-      _trackSearchResults  = null;
-      _trackFilterQuery    = '';
+      _trackSearchResults       = null;
+      _trackFilterQuery         = '';
       _trackCtrl.clear();
       _searchCtrl.clear();
-      _searchResults = [];
-      _lastQuery     = '';
-      _isLoadingRightTracks = true;
+      _searchResults            = [];
+      _lastQuery                = '';
+      _isLoadingRightTracks     = true;
     });
     _api.getArtistTopTracks(artist.id).then((tracks) {
       if (!mounted) return;
       setState(() {
-        _rightTopTracks      = tracks;
+        _rightTopTracks       = tracks;
         _isLoadingRightTracks = false;
       });
       _slideCtrl.forward(from: 0);
+      unawaited(_loadRightDiscography(artist.id));
     });
   }
 
@@ -3188,8 +3279,12 @@ class _PostRemixScreenState extends State<PostRemixScreen>
           )
         else ...[
           _buildSectionLabel(
-            icon: Icons.star_rounded,
-            label: 'TOP TRACKS',
+            icon: _rightDiscographyTracks.isNotEmpty
+                ? Icons.library_music_rounded
+                : Icons.star_rounded,
+            label: _rightDiscographyTracks.isNotEmpty
+                ? 'DISCOGRAPHY'
+                : 'TOP TRACKS',
             count: _visibleRightTracks.length,
             accentColor: _kPink,
             dimmed: _rightSelected.isNotEmpty,
@@ -3221,6 +3316,14 @@ class _PostRemixScreenState extends State<PostRemixScreen>
               ),
             );
           }),
+          if (_isLoadingRightDiscography && _rightDiscographyTracks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              child: Center(child: SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: _kPink),
+              )),
+            ),
         ],
       ],
     );
@@ -3303,10 +3406,14 @@ class _PostRemixScreenState extends State<PostRemixScreen>
             _buildSectionLabel(
               icon: _trackFilterQuery.isNotEmpty
                   ? Icons.manage_search_rounded
-                  : Icons.star_rounded,
+                  : (_rightDiscographyTracks.isNotEmpty
+                      ? Icons.library_music_rounded
+                      : Icons.star_rounded),
               label: _trackFilterQuery.isNotEmpty
                   ? 'SEARCH RESULTS'
-                  : 'TOP TRACKS',
+                  : (_rightDiscographyTracks.isNotEmpty
+                      ? 'DISCOGRAPHY'
+                      : 'TOP TRACKS'),
               count: _visibleRightTracks.length,
               accentColor: _kPink,
               dimmed: _rightSelected.isNotEmpty,
@@ -3338,6 +3445,16 @@ class _PostRemixScreenState extends State<PostRemixScreen>
                 ),
               );
             }),
+            if (_isLoadingRightDiscography &&
+                _trackFilterQuery.isEmpty &&
+                _rightDiscographyTracks.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 8),
+                child: Center(child: SizedBox(
+                  width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _kPink),
+                )),
+              ),
           ],
         ],
       ],

@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -198,7 +199,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     setState(() => _isPublishing = true);
     try {
-      await FirebaseService.createPost(
+      final postId = await FirebaseService.createPost(
         artistID:       _selectedArtist!.id,
         artistName:     _selectedArtist!.name,
         artistImageUrl: _selectedArtist!.imageUrl ?? '',
@@ -213,6 +214,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             .toList(),
         remixEnabled: _remixEnabled,
       );
+      final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
+      unawaited(NotificationService.notifyFriendsNewPost(
+        authorUid:  uid,
+        authorName: name,
+        postId:     postId,
+      ));
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {

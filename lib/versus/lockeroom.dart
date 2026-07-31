@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/playground.dart';
@@ -219,7 +220,16 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
       );
       if (!mounted) return;
 
-      final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+      final uid  = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+      final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
+      unawaited(NotificationService.notifyFriendsNewVersus(
+        creatorUid:  uid,
+        creatorName: name,
+        versusId:    versusId,
+        versusType:  'album',
+        entityName1: album1.name,
+        entityName2: album2.name,
+      ));
 
       final versus = VersusModel(
         id: versusId,
@@ -919,8 +929,6 @@ final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
-    final visible = album.tracks.take(6).toList();
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -998,28 +1006,14 @@ final Color accentColor;
                 ),
               ),
               ...List.generate(
-                visible.length,
+                album.tracks.length,
                 (i) => _PreviewTrackRow(
-                  track: visible[i],
+                  track: album.tracks[i],
                   accentColor: accentColor,
-                  isLast: i == visible.length - 1 &&
-                      album.tracks.length <= 6,
+                  isLast: i == album.tracks.length - 1,
                 ),
               ),
-              if (album.tracks.length > 6)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                  child: Text(
-                    '+${album.tracks.length - 6} more tracks',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(height: 12),
+              const SizedBox(height: 12),
             ],
           ),
         ),

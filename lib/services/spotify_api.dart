@@ -77,6 +77,8 @@ class SpotifyTrack {
   final List<String> allArtistIds;    // ALL credited artist IDs
   final List<String> allArtistNames;  // ALL credited artist names
   final String? albumArtUrl;
+  final int popularity;   // 0-100, from full track objects only
+  final String? isrc;     // international standard recording code for dedup
 
   const SpotifyTrack({
     required this.id,
@@ -87,6 +89,8 @@ class SpotifyTrack {
     this.allArtistIds = const [],
     this.allArtistNames = const [],
     this.albumArtUrl,
+    this.popularity = 0,
+    this.isrc,
   });
 
   factory SpotifyTrack.fromJson(Map<String, dynamic> json) {
@@ -95,6 +99,7 @@ class SpotifyTrack {
     final album = json['album'] as Map<String, dynamic>? ?? {};
     final images =
         (album['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final externalIds = json['external_ids'] as Map<String, dynamic>? ?? {};
     return SpotifyTrack(
       id: json['id'] as String? ?? '',
       uri: json['uri'] as String? ?? '',
@@ -111,6 +116,8 @@ class SpotifyTrack {
           .where((n) => n.isNotEmpty)
           .toList(),
       albumArtUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+      popularity: json['popularity'] as int? ?? 0,
+      isrc: externalIds['isrc'] as String?,
     );
   }
 
@@ -678,6 +685,109 @@ class SpotifyApi {
     final results = await Future.wait([
       getArtistTopTracks(artist1Id, market: market),
       getArtistTopTracks(artist2Id, market: market),
+    ]);
+    return results;
+  }
+
+  /// Fetches an artist's full discography (albums + singles), collects all
+  /// track IDs, batch-fetches full track details for popularity scores, then
+  /// deduplicates by ISRC and returns tracks sorted by popularity descending.
+  Future<List<SpotifyTrack>> getArtistDiscographyTracks(
+    String artistId, {
+    String market = 'US',
+  }) async {
+    if (artistId.isEmpty) return [];
+
+    // Step 1: get artist's own albums and singles (up to 50 — covers most artists)
+    final albumsResp = await _get(
+      '/artists/$artistId/albums',
+      query: {
+        'include_groups': 'album,single',
+        'market': market,
+        'limit': '50',
+      },
+    );
+    if (albumsResp.statusCode != 200) return [];
+
+    final albumsJson = jsonDecode(albumsResp.body) as Map<String, dynamic>;
+    final albumItems =
+        (albumsJson['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final albumIds = albumItems
+        .map((a) => a['id'] as String? ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (albumIds.isEmpty) return [];
+
+    // Step 2: batch-fetch full album objects (includes first 50 tracks each)
+    final albumBatches = <List<String>>[];
+    for (int i = 0; i < albumIds.length; i += 20) {
+      albumBatches.add(albumIds.sublist(i, math.min(i + 20, albumIds.length)));
+    }
+
+    final albumResponses = await Future.wait(
+      albumBatches.map((batch) => _get('/albums', query: {'ids': batch.join(',')})),
+    );
+
+    // Step 3: collect all track IDs from the embedded track lists
+    final allTrackIds = <String>[];
+    for (final resp in albumResponses) {
+      if (resp.statusCode != 200) continue;
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final albums =
+          (json['albums'] as List?)?.cast<Map<String, dynamic>?>() ?? [];
+      for (final album in albums) {
+        if (album == null) continue;
+        final trackPage = album['tracks'] as Map<String, dynamic>? ?? {};
+        final items =
+            (trackPage['items'] as List?)?.cast<Map<String, dynamic>?>() ?? [];
+        for (final track in items) {
+          if (track == null) continue;
+          final id = track['id'] as String? ?? '';
+          if (id.isNotEmpty) allTrackIds.add(id);
+        }
+      }
+    }
+
+    if (allTrackIds.isEmpty) return [];
+
+    // Step 4: batch-fetch full track objects (adds popularity + ISRC)
+    final uniqueIds = allTrackIds.toSet().toList();
+    final fullTracks = await getTracksByIds(uniqueIds);
+
+    // Step 5: sort by popularity first (so we keep the best version when deduping)
+    fullTracks.sort((a, b) => b.popularity.compareTo(a.popularity));
+
+    // Step 6: filter to this artist, deduplicate by ISRC then name+artist fallback
+    final deduped = <SpotifyTrack>[];
+    final seenIsrcs = <String>{};
+    final seenNameKeys = <String>{};
+
+    for (final track in fullTracks) {
+      if (!track.hasArtist(id: artistId)) continue;
+
+      final isrc = track.isrc;
+      if (isrc != null && isrc.isNotEmpty) {
+        if (!seenIsrcs.add(isrc)) continue;
+      } else {
+        final key = '${track.name.toLowerCase()}|${track.artistId ?? ''}';
+        if (!seenNameKeys.add(key)) continue;
+      }
+
+      deduped.add(track);
+    }
+
+    return deduped; // already sorted by popularity desc
+  }
+
+  Future<List<List<SpotifyTrack>>> getBothArtistsDiscographyTracks(
+    String artist1Id,
+    String artist2Id, {
+    String market = 'US',
+  }) async {
+    final results = await Future.wait([
+      getArtistDiscographyTracks(artist1Id, market: market),
+      getArtistDiscographyTracks(artist2Id, market: market),
     ]);
     return results;
   }

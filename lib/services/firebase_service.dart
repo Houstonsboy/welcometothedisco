@@ -809,6 +809,33 @@ class FirebaseService {
     final ranking2Ref = _firestore.collection('rankings').doc(e2);
     final pollRef = _firestore.collection('polls').doc('${vid}_$uid');
 
+    // Aggregate votes across ALL voters for this versus before entering the
+    // transaction. Each poll doc holds one voter's counts; the ranking must
+    // store the combined total, not just the last reconciler's numbers.
+    // upsertArtistPoll always writes before reconcile is called, so the
+    // current voter's poll is already present in this snapshot.
+    int aggregateE1Votes = 0;
+    int aggregateE2Votes = 0;
+    try {
+      final pollsSnap = await _firestore
+          .collection('polls')
+          .where('versus_id', isEqualTo: vid)
+          .get();
+      for (final doc in pollsSnap.docs) {
+        aggregateE1Votes += (doc.data()['artist1Vote'] as num?)?.toInt() ?? 0;
+        aggregateE2Votes += (doc.data()['artist2Vote'] as num?)?.toInt() ?? 0;
+      }
+      debugPrint(
+        '[reconcileRankingBatch] poll aggregate for $vid: '
+        'e1=$aggregateE1Votes e2=$aggregateE2Votes (${pollsSnap.docs.length} voter(s))',
+      );
+    } catch (e) {
+      // Fall back to caller's local counts so reconcile still proceeds.
+      aggregateE1Votes = currentEntity1Votes;
+      aggregateE2Votes = currentEntity2Votes;
+      debugPrint('[reconcileRankingBatch] poll aggregate failed, using local counts: $e');
+    }
+
     try {
       await _firestore.runTransaction((tx) async {
         // ── 1. Read both ranking docs ──────────────────────────────────────
@@ -828,15 +855,16 @@ class FirebaseService {
         }
 
         // ── 2. Build updated versus entry for each doc ─────────────────────
-        // Entity1 perspective: entity1 votes are "entity", entity2 are "opponent"
+        // Use aggregate votes (all voters summed) so status and vote totals
+        // reflect the full pool, not just the voter triggering this reconcile.
         final status1 = VersusResultModel.computeStatus(
-          currentEntity1Votes,
-          currentEntity2Votes,
+          aggregateE1Votes,
+          aggregateE2Votes,
         );
         // Entity2 perspective: mirror
         final status2 = VersusResultModel.computeStatus(
-          currentEntity2Votes,
-          currentEntity1Votes,
+          aggregateE2Votes,
+          aggregateE1Votes,
         );
 
         // ── 3. Recount helper — runs entirely on in-memory doc data ────────
@@ -953,16 +981,16 @@ class FirebaseService {
         final update1 = buildRankingUpdate(
           existingData: snap1.data()!,
           opponentId: e2,
-          myVotes: currentEntity1Votes,
-          theirVotes: currentEntity2Votes,
+          myVotes: aggregateE1Votes,
+          theirVotes: aggregateE2Votes,
           myStatus: status1,
         );
 
         final update2 = buildRankingUpdate(
           existingData: snap2.data()!,
           opponentId: e1,
-          myVotes: currentEntity2Votes,
-          theirVotes: currentEntity1Votes,
+          myVotes: aggregateE2Votes,
+          theirVotes: aggregateE1Votes,
           myStatus: status2,
         );
 
@@ -983,7 +1011,7 @@ class FirebaseService {
 
       debugPrint(
         '[reconcileRankingBatch] ✓ versusId=$vid '
-        'e1=$e1($currentEntity1Votes) e2=$e2($currentEntity2Votes) pct=$currentPct',
+        'e1=$e1($aggregateE1Votes) e2=$e2($aggregateE2Votes) pct=$currentPct',
       );
     } on RankingStubsMissingException {
       rethrow;

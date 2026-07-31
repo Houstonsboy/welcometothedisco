@@ -226,9 +226,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   String                      _lastArtistQuery  = '';
 
   // Track selection
-  List<SpotifyTrack>  _myTopTracks       = [];
-  List<SpotifyTrack>  _mySelectedTracks  = [];
-  bool                _isLoadingMyTracks = false;
+  List<SpotifyTrack>  _myTopTracks            = [];
+  List<SpotifyTrack>  _myDiscographyTracks    = [];
+  List<SpotifyTrack>  _mySelectedTracks       = [];
+  bool                _isLoadingMyTracks      = false;
+  bool                _isLoadingMyDiscography = false;
 
   // Track search
   final TextEditingController _trackSearchCtrl  = TextEditingController();
@@ -241,9 +243,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   // Solo author — second side (artist2 in Firestore)
   SpotifyArtistDetails? _soloSide2Artist;
   String?               _soloSide2ImageUrl;
-  List<SpotifyTrack>    _soloSide2TopTracks       = [];
-  List<SpotifyTrack>    _soloSide2SelectedTracks  = [];
-  bool                  _isLoadingSide2Tracks     = false;
+  List<SpotifyTrack>    _soloSide2TopTracks           = [];
+  List<SpotifyTrack>    _soloSide2DiscographyTracks   = [];
+  List<SpotifyTrack>    _soloSide2SelectedTracks      = [];
+  bool                  _isLoadingSide2Tracks         = false;
+  bool                  _isLoadingSide2Discography    = false;
 
   final TextEditingController _trackSearchCtrlSide2 = TextEditingController();
   final FocusNode             _trackSearchFocusSide2 = FocusNode();
@@ -475,8 +479,25 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       if (!mounted) return;
       setState(() => _soloSide2TopTracks = tracks);
       _slideCtrl.forward(from: 0);
+      unawaited(_loadSide2Discography(artistId));
     } finally {
       if (mounted) setState(() => _isLoadingSide2Tracks = false);
+    }
+  }
+
+  Future<void> _loadSide2Discography(String artistId) async {
+    if (!mounted) return;
+    setState(() => _isLoadingSide2Discography = true);
+    try {
+      final tracks = await _api.getArtistDiscographyTracks(artistId);
+      if (!mounted) return;
+      if (_soloSide2Artist?.id != artistId) return;
+      setState(() => _soloSide2DiscographyTracks = tracks);
+      _slideCtrl.forward(from: 0);
+    } catch (e) {
+      debugPrint('[CollaboratorBackroom] side2 discography load failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingSide2Discography = false);
     }
   }
 
@@ -548,6 +569,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         _trackSearchResultsSide2 != null) {
       return _trackSearchResultsSide2!;
     }
+    if (_soloSide2DiscographyTracks.isNotEmpty) return _soloSide2DiscographyTracks;
     return _soloSide2TopTracks;
   }
 
@@ -588,10 +610,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   void _selectMyArtist(SpotifyArtistDetails artist) {
     if (_artistsLocked) return;
     setState(() {
-      _myArtist         = artist;
-      _myArtistImageUrl = artist.imageUrl;
-      _myTopTracks      = [];
-      _mySelectedTracks = [];
+      _myArtist              = artist;
+      _myArtistImageUrl      = artist.imageUrl;
+      _myTopTracks           = [];
+      _myDiscographyTracks   = [];
+      _mySelectedTracks      = [];
       _trackSearchResults = null;
       _trackSearchCtrl.clear();
       _trackFilterQuery = '';
@@ -607,10 +630,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     if (_artistsLocked) return;
     if (_authorEditsBothSides && _currentPage == 1) {
       setState(() {
-        _soloSide2Artist = artist;
-        _soloSide2ImageUrl = artist.imageUrl;
-        _soloSide2TopTracks = [];
-        _soloSide2SelectedTracks = [];
+        _soloSide2Artist              = artist;
+        _soloSide2ImageUrl            = artist.imageUrl;
+        _soloSide2TopTracks           = [];
+        _soloSide2DiscographyTracks   = [];
+        _soloSide2SelectedTracks      = [];
         _trackSearchResultsSide2 = null;
         _trackSearchCtrlSide2.clear();
         _trackFilterQuerySide2 = '';
@@ -633,8 +657,25 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       if (!mounted) return;
       setState(() { _myTopTracks = tracks; });
       _slideCtrl.forward(from: 0);
+      unawaited(_loadMyDiscography(artistId));
     } finally {
       if (mounted) setState(() => _isLoadingMyTracks = false);
+    }
+  }
+
+  Future<void> _loadMyDiscography(String artistId) async {
+    if (!mounted) return;
+    setState(() => _isLoadingMyDiscography = true);
+    try {
+      final tracks = await _api.getArtistDiscographyTracks(artistId);
+      if (!mounted) return;
+      if (_myArtist?.id != artistId) return;
+      setState(() => _myDiscographyTracks = tracks);
+      _slideCtrl.forward(from: 0);
+    } catch (e) {
+      debugPrint('[CollaboratorBackroom] my discography load failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingMyDiscography = false);
     }
   }
 
@@ -700,6 +741,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     if (_trackFilterQuery.isNotEmpty && _trackSearchResults != null) {
       return _trackSearchResults!;
     }
+    if (_myDiscographyTracks.isNotEmpty) return _myDiscographyTracks;
     return _myTopTracks;
   }
 
@@ -1367,10 +1409,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               onRemove: (_myArtist == null || _artistsLocked)
                   ? null
                   : () => setState(() {
-                        _myArtist = null;
-                        _myArtistImageUrl = null;
-                        _myTopTracks = [];
-                        _mySelectedTracks = [];
+                        _myArtist              = null;
+                        _myArtistImageUrl      = null;
+                        _myTopTracks           = [];
+                        _myDiscographyTracks   = [];
+                        _mySelectedTracks      = [];
                         _trackSearchResults = null;
                         _trackFilterQuery = '';
                         _trackSearchCtrl.clear();
@@ -1402,10 +1445,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               onRemove: (_soloSide2Artist == null || _artistsLocked)
                   ? null
                   : () => setState(() {
-                        _soloSide2Artist = null;
-                        _soloSide2ImageUrl = null;
-                        _soloSide2TopTracks = [];
-                        _soloSide2SelectedTracks = [];
+                        _soloSide2Artist              = null;
+                        _soloSide2ImageUrl            = null;
+                        _soloSide2TopTracks           = [];
+                        _soloSide2DiscographyTracks   = [];
+                        _soloSide2SelectedTracks      = [];
                         _trackSearchResultsSide2 = null;
                         _trackFilterQuerySide2 = '';
                         _trackSearchCtrlSide2.clear();
@@ -1811,14 +1855,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               : GestureDetector(
             onTap: () {
               setState(() {
-                _myArtist         = null;
-                _myArtistImageUrl = null;
-                _myTopTracks      = [];
-                _mySelectedTracks = [];
-                _trackSearchResults = null;
-                _trackFilterQuery = '';
+                _myArtist              = null;
+                _myArtistImageUrl      = null;
+                _myTopTracks           = [];
+                _myDiscographyTracks   = [];
+                _mySelectedTracks      = [];
+                _trackSearchResults    = null;
+                _trackFilterQuery      = '';
                 _trackSearchCtrl.clear();
-                _artist2PreFilled = false;
+                _artist2PreFilled      = false;
               });
             },
             child: Container(
@@ -1907,11 +1952,17 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           const SizedBox(height: 10),
         ],
 
-        // Top tracks / search results
+        // Discography / top tracks / search results
         if (tracks.isNotEmpty)
           _buildSectionLabel(
-            icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
-            label: isSearchMode ? 'RESULTS' : 'TOP TRACKS',
+            icon: isSearchMode
+                ? Icons.manage_search_rounded
+                : (_myDiscographyTracks.isNotEmpty
+                    ? Icons.library_music_rounded
+                    : Icons.star_rounded),
+            label: isSearchMode
+                ? 'RESULTS'
+                : (_myDiscographyTracks.isNotEmpty ? 'DISCOGRAPHY' : 'TOP TRACKS'),
             count: tracks.length, accentColor: _kPink,
             dimmed: picked.isNotEmpty,
           ),
@@ -1952,6 +2003,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               ),
             );
           }),
+
+        if (_isLoadingMyDiscography && !isSearchMode && _myDiscographyTracks.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Center(child: SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _kPink),
+            )),
+          ),
       ],
     );
   }
@@ -2021,14 +2081,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               : GestureDetector(
             onTap: () {
               setState(() {
-                _soloSide2Artist = null;
-                _soloSide2ImageUrl = null;
-                _soloSide2TopTracks = [];
-                _soloSide2SelectedTracks = [];
-                _trackSearchResultsSide2 = null;
-                _trackFilterQuerySide2 = '';
+                _soloSide2Artist              = null;
+                _soloSide2ImageUrl            = null;
+                _soloSide2TopTracks           = [];
+                _soloSide2DiscographyTracks   = [];
+                _soloSide2SelectedTracks      = [];
+                _trackSearchResultsSide2      = null;
+                _trackFilterQuerySide2        = '';
                 _trackSearchCtrlSide2.clear();
-                _artist2PreFilled = false;
+                _artist2PreFilled             = false;
               });
             },
             child: Container(
@@ -2123,8 +2184,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
         if (tracks.isNotEmpty)
           _buildSectionLabel(
-            icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
-            label: isSearchMode ? 'RESULTS' : 'TOP TRACKS',
+            icon: isSearchMode
+                ? Icons.manage_search_rounded
+                : (_soloSide2DiscographyTracks.isNotEmpty
+                    ? Icons.library_music_rounded
+                    : Icons.star_rounded),
+            label: isSearchMode
+                ? 'RESULTS'
+                : (_soloSide2DiscographyTracks.isNotEmpty ? 'DISCOGRAPHY' : 'TOP TRACKS'),
             count: tracks.length,
             accentColor: _kPurple,
             dimmed: picked.isNotEmpty,
@@ -2177,6 +2244,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               ),
             );
           }),
+
+        if (_isLoadingSide2Discography && !isSearchMode && _soloSide2DiscographyTracks.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Center(child: SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple),
+            )),
+          ),
       ],
     );
   }

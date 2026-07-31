@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -35,6 +37,16 @@ class ArtistLockeroom extends StatelessWidget {
             '[ArtistLockeroom] createArtistVersus success | versus_id: '
             '${createdVersusId.trim().isEmpty ? '(missing)' : createdVersusId}',
           );
+          final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
+          final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
+          unawaited(NotificationService.notifyFriendsNewVersus(
+            creatorUid:  uid,
+            creatorName: name,
+            versusId:    createdVersusId,
+            versusType:  'artist',
+            entityName1: artist1.name,
+            entityName2: artist2.name,
+          ));
           if (context.mounted) Navigator.of(context).pop();
         } catch (e) {
           debugPrint('[ArtistLockeroom] createArtistVersus failed: $e');
@@ -83,6 +95,10 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
   // ── Top tracks ────────────────────────────────────────────────────────────
   List<List<SpotifyTrack>> _topTracks = [[], []];
   bool _isLoadingTracks = false;
+
+  // ── Discography (lazy background load) ───────────────────────────────────
+  List<List<SpotifyTrack>> _discographyTracks = [[], []];
+  bool _isLoadingDiscography = false;
 
   // ── Selected tracks per artist slot ──────────────────────────────────────
   final List<List<SpotifyTrack>> _selectedTracks = [[], []];
@@ -189,11 +205,11 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     setState(() {
       if (_selected[0]?.id == artist.id) {
         _selected[0] = null; _topTracks[0] = []; _selectedTracks[0] = [];
-        _trackSearchResults = null; return;
+        _discographyTracks[0] = []; _trackSearchResults = null; return;
       }
       if (_selected[1]?.id == artist.id) {
         _selected[1] = null; _topTracks[1] = []; _selectedTracks[1] = [];
-        _trackSearchResults = null; return;
+        _discographyTracks[1] = []; _trackSearchResults = null; return;
       }
       if (_selected[0] == null) {
         _selected[0] = artist;
@@ -202,7 +218,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       } else {
         _selected[1] = artist;
         _topTracks[1] = []; _selectedTracks[1] = [];
-        _trackSearchResults = null;
+        _discographyTracks[1] = []; _trackSearchResults = null;
       }
     });
     _maybeFetchTopTracks();
@@ -221,7 +237,10 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     if (a1 == null || a2 == null) return;
     if (_isLoadingTracks) return;
 
-    setState(() => _isLoadingTracks = true);
+    setState(() {
+      _isLoadingTracks = true;
+      _discographyTracks = [[], []]; // reset on new artist pair
+    });
     try {
       final both = await _api.getBothArtistsTopTracks(a1.id, a2.id);
       if (!mounted) return;
@@ -232,10 +251,35 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
         _trackFilterQuery = '';
       });
       _slideController.forward(from: 0);
+      // Background-load full discography sorted by popularity
+      unawaited(_loadDiscographyTracks(a1, a2));
     } finally {
       if (mounted) setState(() => _isLoadingTracks = false);
     }
   }
+
+  Future<void> _loadDiscographyTracks(
+    SpotifyArtistDetails a1,
+    SpotifyArtistDetails a2,
+  ) async {
+    if (!mounted) return;
+    setState(() => _isLoadingDiscography = true);
+    try {
+      final both = await _api.getBothArtistsDiscographyTracks(a1.id, a2.id);
+      if (!mounted) return;
+      // Guard: discard if artists have changed since we started
+      if (_selected[0]?.id != a1.id || _selected[1]?.id != a2.id) return;
+      setState(() => _discographyTracks = [both[0], both[1]]);
+      _slideController.forward(from: 0);
+    } catch (e) {
+      debugPrint('[ArtistLockeroom] discography load failed: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingDiscography = false);
+    }
+  }
+
+  bool _isShowingDiscography(int pageIndex) =>
+      _trackFilterQuery.isEmpty && _discographyTracks[pageIndex].isNotEmpty;
 
   // ── Track search ──────────────────────────────────────────────────────────
   void _onTrackFilterChanged() {
@@ -316,6 +360,9 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     if (artist == null) return [];
     if (_trackFilterQuery.isNotEmpty && _trackSearchResults != null) {
       return _trackSearchResults![artist.id] ?? [];
+    }
+    if (_discographyTracks[pageIndex].isNotEmpty) {
+      return _discographyTracks[pageIndex];
     }
     return _topTracks[pageIndex];
   }
@@ -828,6 +875,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     final tracks = _tracksForPage(pageIndex);
     final picked = _selectedTracks[pageIndex];
     final isSearchMode = _trackFilterQuery.isNotEmpty;
+    final isDiscography = _isShowingDiscography(pageIndex);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -836,6 +884,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
         _buildTrackListHeader(
           artist: artist, accentColor: accentColor,
           pageIndex: pageIndex, isSearchMode: isSearchMode,
+          isDiscography: isDiscography,
           trackCount: tracks.length,
         ),
 
@@ -874,11 +923,15 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
           const SizedBox(height: 10),
         ],
 
-        // ── Suggested / search results section ───────────────────────────
+        // ── Suggested / search results / discography section ─────────────
         if (tracks.isNotEmpty)
           _buildSectionLabel(
-            icon: isSearchMode ? Icons.manage_search_rounded : Icons.star_rounded,
-            label: isSearchMode ? 'SEARCH RESULTS' : 'TOP TRACKS',
+            icon: isSearchMode
+                ? Icons.manage_search_rounded
+                : (isDiscography ? Icons.library_music_rounded : Icons.star_rounded),
+            label: isSearchMode
+                ? 'SEARCH RESULTS'
+                : (isDiscography ? 'DISCOGRAPHY' : 'TOP TRACKS'),
             count: tracks.length,
             accentColor: accentColor,
             dimmed: picked.isNotEmpty,
@@ -926,6 +979,34 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               ),
             );
           }),
+
+        // Loading indicator while discography loads in the background
+        if (_isLoadingDiscography && !isSearchMode && !isDiscography)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 12, height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: accentColor.withOpacity(0.4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'loading full discography...',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.28),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -935,6 +1016,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     required Color accentColor,
     required int pageIndex,
     required bool isSearchMode,
+    required bool isDiscography,
     required int trackCount,
   }) {
     final isSecondArtist = pageIndex == 1;
@@ -962,7 +1044,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
         border: Border.all(color: accentColor.withOpacity(0.4), width: 0.8),
       ),
       child: Text(
-        isSearchMode ? 'SEARCH' : 'TOP TRACKS',
+        isSearchMode ? 'SEARCH' : (isDiscography ? 'DISCOGRAPHY' : 'TOP TRACKS'),
         style: TextStyle(color: accentColor.withOpacity(0.9),
             fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5),
       ),
