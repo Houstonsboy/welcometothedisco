@@ -131,17 +131,8 @@ class _PostsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Text(
-        'POSTS',
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.95),
-          fontFamily: AppTheme.fontBody,
-          fontSize: 13,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2.4,
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8)
+      
     );
   }
 }
@@ -228,7 +219,7 @@ class _PostCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Row 1: author header ───────────────────────────────────
+            // ── Section 1: author header ───────────────────────────────
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -270,22 +261,33 @@ class _PostCard extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // ── Row 2: description + artist ────────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // ── Section 2: description anchors height; artist is
+            //    positioned top-right and does NOT affect Stack height,
+            //    so the tracklist margin tracks the description, not the
+            //    artist circle.
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Expanded(
+                // Forces the Stack to stretch to full card width so that
+                // Positioned(right: 0) always anchors to the card edge,
+                // not the description text's natural width.
+                const SizedBox(width: double.infinity, height: 0),
+                // Description drives the Stack's intrinsic height
+                Padding(
+                  padding: const EdgeInsets.only(right: 68),
                   child: _PostDescriptionBody(text: post.description),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 52,
+                // Artist floats top-right, outside the layout flow
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  width: 56,
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
-                        width: 52,
-                        height: 52,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -296,13 +298,13 @@ class _PostCard extends StatelessWidget {
                         child: ClipOval(
                           child: Image.network(
                             post.artistImageUrl,
-                            width: 52,
-                            height: 52,
+                            width: 48,
+                            height: 48,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
                               color: _kBlue.withOpacity(0.35),
                               child: Icon(Icons.music_note_rounded,
-                                  color: _kPink.withOpacity(0.9), size: 22),
+                                  color: _kPink.withOpacity(0.9), size: 20),
                             ),
                           ),
                         ),
@@ -327,46 +329,37 @@ class _PostCard extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            // ── Row 3: tracklist circles ───────────────────────────────
+            // ── Section 3: tracklist covers ────────────────────────────
             _OverlappingTrackCovers(tracklist: post.tracklist),
 
             const SizedBox(height: 9),
 
-            // ── Row 4: remix + share stats ─────────────────────────────
+            // ── Section 4: action stats (left-aligned) ─────────────────
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.loop_rounded,
-                        color: _kGreen.withOpacity(0.75), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      _fmt(post.remixCount),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.50),
-                        fontFamily: AppTheme.fontBody,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                Icon(Icons.loop_rounded,
+                    color: _kGreen.withOpacity(0.75), size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  _fmt(post.remixCount),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.50),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 11,
+                  ),
                 ),
                 const SizedBox(width: 18),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.reply_rounded,
-                        color: Colors.white.withOpacity(0.40), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      _fmt(post.shareCount),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.50),
-                        fontFamily: AppTheme.fontBody,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                Icon(Icons.reply_rounded,
+                    color: Colors.white.withOpacity(0.40), size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  _fmt(post.shareCount),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.50),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
