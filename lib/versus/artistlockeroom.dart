@@ -32,6 +32,18 @@ class ArtistLockeroom extends StatelessWidget {
             artist2TrackIDs: selectedTracks2.map((t) => t.id).toList(),
             artist1ImageUrl: artist1.imageUrl ?? '',
             artist2ImageUrl: artist2.imageUrl ?? '',
+            artist1Tracklist: selectedTracks1.map((t) => {
+              'spotifyID':   t.id,
+              'trackname':   t.name,
+              'trackartist': t.artistName,
+              'trackcover':  t.albumArtUrl ?? '',
+            }).toList(),
+            artist2Tracklist: selectedTracks2.map((t) => {
+              'spotifyID':   t.id,
+              'trackname':   t.name,
+              'trackartist': t.artistName,
+              'trackcover':  t.albumArtUrl ?? '',
+            }).toList(),
           );
           debugPrint(
             '[ArtistLockeroom] createArtistVersus success | versus_id: '

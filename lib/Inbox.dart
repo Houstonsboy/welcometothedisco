@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -101,26 +102,65 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
     try {
       final List<InboxVersusEntry> entries =
           await FirebaseService.getInboxVersusList(typeFilter: widget.typeFilter);
-      // Enrich album entries with Spotify (titles, images)
+
+      // Enrich album entries with Spotify (titles, images).
+      // Docs that already have both image URLs skip the API call entirely.
       final albumVersus =
           entries.where((e) => e.albumVersus != null).map((e) => e.albumVersus!).toList();
       if (albumVersus.isNotEmpty) {
+        // Record which docs are missing images before enrichment so we can
+        // write the fetched values back to Firestore (lazy one-time backfill).
+        final needsBackfill = albumVersus
+            .where((v) =>
+                (v.album1ImageUrl?.isEmpty ?? true) ||
+                (v.album2ImageUrl?.isEmpty ?? true))
+            .toList();
         try {
           await _spotifyApi.enrichVersusList(albumVersus);
+          // Persist newly-fetched images so future inbox loads are API-free.
+          for (final v in needsBackfill) {
+            if ((v.album1ImageUrl?.isNotEmpty ?? false) ||
+                (v.album2ImageUrl?.isNotEmpty ?? false)) {
+              unawaited(FirebaseService.backfillAlbumVersusImages(
+                v.id,
+                album1ImageUrl: v.album1ImageUrl,
+                album1ArtistName: v.album1ArtistName,
+                album2ImageUrl: v.album2ImageUrl,
+                album2ArtistName: v.album2ArtistName,
+              ));
+            }
+          }
         } catch (e) {
           debugPrint('[Inbox] Spotify album enrichment failed: $e');
         }
       }
-      // Enrich artist entries with Spotify (artist profile images)
+
+      // Enrich artist entries with Spotify (artist profile images).
       final artistVersus =
           entries.where((e) => e.artistVersus != null).map((e) => e.artistVersus!).toList();
       if (artistVersus.isNotEmpty) {
+        final needsBackfill = artistVersus
+            .where((v) =>
+                (v.artist1ImageUrl?.isEmpty ?? true) ||
+                (v.artist2ImageUrl?.isEmpty ?? true))
+            .toList();
         try {
           await _spotifyApi.enrichArtistVersusList(artistVersus);
+          for (final v in needsBackfill) {
+            if ((v.artist1ImageUrl?.isNotEmpty ?? false) ||
+                (v.artist2ImageUrl?.isNotEmpty ?? false)) {
+              unawaited(FirebaseService.backfillArtistVersusImages(
+                v.id,
+                artist1ImageUrl: v.artist1ImageUrl,
+                artist2ImageUrl: v.artist2ImageUrl,
+              ));
+            }
+          }
         } catch (e) {
           debugPrint('[Inbox] Spotify artist enrichment failed: $e');
         }
       }
+
       return entries;
     } catch (e) {
       debugPrint('[Inbox] Failed to load versus list: $e');

@@ -74,6 +74,12 @@ class ArtistVersusModel {
   List<dynamic> artist1Tracks; // List<SpotifyTrack> — dynamic to avoid circular import
   List<dynamic> artist2Tracks;
 
+  /// Full track details stored at creation time.
+  /// Each entry: { spotifyID, trackname, trackartist, trackcover }
+  /// Enables rendering without a Spotify API call; falls back to IDs for older records.
+  final List<Map<String, dynamic>>? artist1Tracklist;
+  final List<Map<String, dynamic>>? artist2Tracklist;
+
   ArtistVersusModel({
     required this.id,
     this.type = 'artist',
@@ -99,6 +105,8 @@ class ArtistVersusModel {
     this.artist2ImageUrl,
     this.artist1Tracks = const [],
     this.artist2Tracks = const [],
+    this.artist1Tracklist,
+    this.artist2Tracklist,
   });
 
   // ── Firestore → model ─────────────────────────────────────────────────────
@@ -128,6 +136,8 @@ class ArtistVersusModel {
       // Denormalized at creation time — avoids Spotify API calls on read.
       artist1ImageUrl: (data['artist1ImageUrl'] as String?)?.trim(),
       artist2ImageUrl: (data['artist2ImageUrl'] as String?)?.trim(),
+      artist1Tracklist: _parseTracklist(data['artist1Tracklist']),
+      artist2Tracklist: _parseTracklist(data['artist2Tracklist']),
     );
   }
 
@@ -165,6 +175,10 @@ class ArtistVersusModel {
         'collaborator_username': collaboratorUsername!.trim(),
       if (collaboratorAvatar != null && collaboratorAvatar!.trim().isNotEmpty)
         'collaborator_avatar': collaboratorAvatar!.trim(),
+      if (artist1Tracklist != null && artist1Tracklist!.isNotEmpty)
+        'artist1Tracklist': artist1Tracklist,
+      if (artist2Tracklist != null && artist2Tracklist!.isNotEmpty)
+        'artist2Tracklist': artist2Tracklist,
     };
   }
 
@@ -182,6 +196,19 @@ bool get hasCollaborator => collaboratorID != null && collaboratorID!.isNotEmpty
       artist1TrackIDs.length + artist2TrackIDs.length;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+  static List<Map<String, dynamic>>? _parseTracklist(dynamic value) {
+    if (value is! List || value.isEmpty) return null;
+    final result = <Map<String, dynamic>>[];
+    for (final item in value) {
+      if (item is Map<String, dynamic>) {
+        result.add(item);
+      } else if (item is Map) {
+        result.add(Map<String, dynamic>.from(item));
+      }
+    }
+    return result.isEmpty ? null : result;
+  }
+
   static List<String> _parseStringList(dynamic value) {
     if (value == null) return [];
     if (value is List) {

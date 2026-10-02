@@ -119,7 +119,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   // ── Playback state ────────────────────────────────────────────────────────
   int _selectedArtist = 0;
-  late final PageController _pageController;
   int _activeTrackIndex = 0;
   int? _playingTrackIndex;
   int _leadArtistIndex = 0;
@@ -168,9 +167,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       return base + bonus;
     }
 
-    // ── Scroll controllers — one per side, kept in sync when active track changes
+  // ── Scroll controller for dual-track feed
   final ScrollController _scrollController1 = ScrollController();
-  final ScrollController _scrollController2 = ScrollController();
 
   // ── Per-track comment controllers (keyed by track index) ─────────────────
     final Map<int, TextEditingController> _commentControllers = {};
@@ -201,8 +199,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         '[ArtistVersusPlayground] opened | versus_id: '
         '${versusId.isEmpty ? '(missing)' : versusId}',
       );
-
-    _pageController = PageController();
 
     _pulseController = AnimationController(
       vsync: this,
@@ -457,7 +453,34 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         }
       }
 
-      final results = await Future.wait([
+      final tl1 = model.artist1Tracklist;
+      final tl2 = model.artist2Tracklist;
+      final hasTracklists = (tl1 != null && tl1.isNotEmpty) &&
+                            (tl2 != null && tl2.isNotEmpty);
+
+      if (hasTracklists) {
+        // Render immediately from Firestore data — no Spotify API call needed.
+        final tracks1 = _tracksFromTracklist(tl1);
+        final tracks2 = _tracksFromTracklist(tl2);
+
+        if (!mounted) return;
+        setState(() {
+          _versus = model;
+          _tracks1 = tracks1;
+          _tracks2 = tracks2;
+          _artist1ImageUrl = model.artist1ImageUrl;
+          _artist2ImageUrl = model.artist2ImageUrl;
+          _isLoadingTracks = false;
+        });
+
+        _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
+        _logVoteTemplateSnapshot('tracks-loaded-from-firestore');
+
+        // Background: enrich artist images from Spotify (non-critical).
+        _enrichArtistImagesFromApi(model);
+      } else {
+        // Older records without tracklists: fetch full data from Spotify.
+        final results = await Future.wait([
           _api.getTracksByIds(model.artist1TrackIDs),
           _api.getTracksByIds(model.artist2TrackIDs),
           _api.getArtistDetails(model.artist1ID),
@@ -469,18 +492,19 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         final artist1  = results[2] as SpotifyArtistDetails?;
         final artist2  = results[3] as SpotifyArtistDetails?;
 
-      if (!mounted) return;
-      setState(() {
-        _versus = model;
-        _tracks1 = tracks1;
-        _tracks2 = tracks2;
-        _artist1ImageUrl = artist1?.imageUrl;
-        _artist2ImageUrl = artist2?.imageUrl;
-        _isLoadingTracks = false;
-      });
+        if (!mounted) return;
+        setState(() {
+          _versus = model;
+          _tracks1 = tracks1;
+          _tracks2 = tracks2;
+          _artist1ImageUrl = artist1?.imageUrl;
+          _artist2ImageUrl = artist2?.imageUrl;
+          _isLoadingTracks = false;
+        });
 
-      _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
+        _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
         _logVoteTemplateSnapshot('tracks-loaded');
+      }
     } catch (e) {
       debugPrint('[ArtistVersusPlayground] _loadData error: $e');
       if (mounted) {
@@ -490,6 +514,42 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         });
       }
     }
+  }
+
+  // ── Tracklist → SpotifyTrack ──────────────────────────────────────────────
+  static List<SpotifyTrack> _tracksFromTracklist(
+      List<Map<String, dynamic>> tracklist) {
+    return tracklist.map((t) {
+      final id = (t['spotifyID'] as String?) ?? '';
+      return SpotifyTrack(
+        id: id,
+        uri: id.isNotEmpty ? 'spotify:track:$id' : '',
+        name: (t['trackname'] as String?) ?? '',
+        artistName: (t['trackartist'] as String?) ?? '',
+        albumArtUrl: t['trackcover'] as String?,
+      );
+    }).toList();
+  }
+
+  Future<void> _enrichArtistImagesFromApi(ArtistVersusModel model) async {
+    try {
+      final results = await Future.wait([
+        _api.getArtistDetails(model.artist1ID),
+        _api.getArtistDetails(model.artist2ID),
+      ]);
+      final artist1 = results[0] as SpotifyArtistDetails?;
+      final artist2 = results[1] as SpotifyArtistDetails?;
+      if (!mounted) return;
+      final img1 = artist1?.imageUrl;
+      final img2 = artist2?.imageUrl;
+      if (img1 != null || img2 != null) {
+        setState(() {
+          if (img1 != null) _artist1ImageUrl = img1;
+          if (img2 != null) _artist2ImageUrl = img2;
+        });
+        _extractPalette(_artist1ImageUrl, _artist2ImageUrl);
+      }
+    } catch (_) {/* non-critical — Firestore data already shown */}
   }
 
   Future<void> _extractPalette(String? url1, String? url2) async {
@@ -546,9 +606,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     _nowPlayingSub?.cancel();
     _pulseController.dispose();
     _slideController.dispose();
-    _pageController.dispose();
     _scrollController1.dispose();
-    _scrollController2.dispose();
     for (final ctrl in _commentControllers.values) {
       ctrl.dispose();
     }
@@ -1046,17 +1104,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     if (_selectedArtist == index) return;
     setState(() => _selectedArtist = index);
     _slideController.forward(from: 0);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  void _onPageChanged(int index) {
-    if (_selectedArtist == index) return;
-    setState(() => _selectedArtist = index);
-    _slideController.forward(from: 0);
   }
 
   // ── Playback ──────────────────────────────────────────────────────────────
@@ -1141,17 +1188,14 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   }
 
   void _syncScrollToActiveTrack() {
-    const double headerH = 44.0;
-    const double rowH    = 78.0;
-    final target = headerH + _activeTrackIndex * rowH;
-    for (final ctrl in [_scrollController1, _scrollController2]) {
-      if (ctrl.hasClients) {
-        ctrl.animateTo(
-          target.clamp(0.0, ctrl.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-        );
-      }
+    const double rowH = 136.0; // 130px cell + 6px gap
+    final target = _activeTrackIndex * rowH;
+    if (_scrollController1.hasClients) {
+      _scrollController1.animateTo(
+        target.clamp(0.0, _scrollController1.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -1161,7 +1205,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       _activeTrackIndex = trackIndex;
       _leadArtistIndex = artistIndex;
     });
-    _syncScrollToActiveTrack();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollToActiveTrack());
   }
 
   /// Tap album cover — plays the tapped round with the tapped artist's track first.
@@ -1441,22 +1485,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
         const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-        // ── Swipe dots ───────────────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                  _SwipeDot(isActive: _selectedArtist == 0, color: _color1),
-                const SizedBox(width: 6),
-                  _SwipeDot(isActive: _selectedArtist == 1, color: _color2),
-              ],
-            ),
-          ),
-        ),
 
-        // ── Track PageView ───────────────────────────────────────────────────
         SliverFillRemaining(
           child: Column(
             children: [
@@ -1574,57 +1603,279 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
                 _buildVersusSideCommentStrip(),
 
-              // ── Track pages ────────────────────────────────────────────────
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: _onPageChanged,
-                  children: [
-                    _ArtistTrackPage(
-                        tracks:            _tracks1,
-                        artistIndex:       0,
-                        votableRoundCount: _pairedRoundCount,
-                        artistName:        _versus.artist1Name,
-                        artistImageUrl:    _artist1ImageUrl,
-                        slideAnim:         _slideAnim,
-                        accentColor:       _color1,
-                        activeTrackIndex:  _activeTrackIndex,
-                        playingTrackIndex: _playingTrackIndex,
-                        coverLoadingRoundIndex: _coverLoadingRoundIndex,
-                        votesByIndex:      _votesByIndex,
-                        scrollController:  _scrollController1,
-                        onVote:            (roundIndex) => _onVote(roundIndex, 0),
-                        onCoverTap:        _onCoverTap,
-                        onTitleTap:        _onTitleTap,
-                        getCommentCtrl:    _commentCtrlAt,
-                        onCommentChanged:  _onCommentChanged,
-                    ),
-                    _ArtistTrackPage(
-                        tracks:            _tracks2,
-                        artistIndex:       1,
-                        votableRoundCount: _pairedRoundCount,
-                        artistName:        _versus.artist2Name,
-                        artistImageUrl:    _artist2ImageUrl,
-                        slideAnim:         _slideAnim,
-                        accentColor:       _color2,
-                        activeTrackIndex:  _activeTrackIndex,
-                        playingTrackIndex: _playingTrackIndex,
-                        coverLoadingRoundIndex: _coverLoadingRoundIndex,
-                        votesByIndex:      _votesByIndex,
-                        scrollController:  _scrollController2,
-                        onVote:            (roundIndex) => _onVote(roundIndex, 1),
-                        onCoverTap:        _onCoverTap,
-                        onTitleTap:        _onTitleTap,
-                        getCommentCtrl:    _commentCtrlAt,
-                        onCommentChanged:  _onCommentChanged,
-                    ),
-                  ],
-                ),
-              ),
+              // ── Dual-column track feed ──────────────────────────────────────
+              Expanded(child: _buildDualTrackFeed()),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  // ── Dual-column cover feed ────────────────────────────────────────────────
+  Widget _buildDualTrackFeed() {
+    final roundCount = math.max(_tracks1.length, _tracks2.length);
+    if (roundCount == 0) {
+      return Center(
+        child: Text('No tracks loaded.',
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+      );
+    }
+    return ListView.builder(
+      controller: _scrollController1,
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 48),
+      physics: const BouncingScrollPhysics(),
+      itemCount: roundCount,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: _buildRoundRow(i),
+      ),
+    );
+  }
+
+  Widget _buildRoundRow(int roundIndex) {
+    const double cellH = 130.0;
+
+    final track1 = roundIndex < _tracks1.length ? _tracks1[roundIndex] : null;
+    final track2 = roundIndex < _tracks2.length ? _tracks2[roundIndex] : null;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _buildArtistCoverCell(
+            roundIndex:  roundIndex,
+            artistIndex: 0,
+            track:       track1,
+            coverUrl:    track1?.albumArtUrl,
+            accentColor: _color1,
+            height:      cellH,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _buildArtistCoverCell(
+            roundIndex:  roundIndex,
+            artistIndex: 1,
+            track:       track2,
+            coverUrl:    track2?.albumArtUrl,
+            accentColor: _color2,
+            height:      cellH,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArtistCoverCell({
+    required int roundIndex,
+    required int artistIndex,
+    required SpotifyTrack? track,
+    required String? coverUrl,
+    required Color accentColor,
+    required double height,
+  }) {
+    if (track == null) return SizedBox(height: height);
+
+    final votedArtist    = _votesByIndex[roundIndex];
+    final isVotedForMe   = votedArtist == artistIndex;
+    final isActive       = roundIndex == _activeTrackIndex;
+    final isLocked       = roundIndex > _activeTrackIndex;
+    final isBonusIndex   = roundIndex >= _pairedRoundCount;
+    final isVoteDisabled = isBonusIndex || (votedArtist != null && votedArtist != artistIndex);
+    final showVoteButton = isActive || isVotedForMe;
+    final isPlaying      = _playingTrackIndex == roundIndex;
+    final isCoverLoading = _coverLoadingRoundIndex == roundIndex;
+
+    return GestureDetector(
+      onTap: () {
+        if (roundIndex == _activeTrackIndex) {
+          _onCoverTap(roundIndex, artistIndex);
+        } else {
+          _onTitleTap(roundIndex, artistIndex);
+        }
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Album cover fill
+            if (coverUrl != null && coverUrl.isNotEmpty)
+              Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: accentColor.withOpacity(0.25)),
+              )
+            else
+              Container(color: accentColor.withOpacity(0.25)),
+
+            // Bottom gradient
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.3, 1.0],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.80),
+                  ],
+                ),
+              ),
+            ),
+
+            // Lock dim
+            if (isLocked) Container(color: Colors.black.withOpacity(0.35)),
+
+            // Active border
+            if (isActive)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: accentColor, width: 2.0),
+                ),
+              ),
+
+            // Round badge
+            Positioned(
+              left: artistIndex == 0 ? 6 : null,
+              right: artistIndex == 1 ? 6 : null,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${roundIndex + 1}'.padLeft(2, '0'),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+
+            // Now-playing indicator
+            if (isPlaying)
+              Positioned(
+                right: artistIndex == 0 ? 6 : null,
+                left: artistIndex == 1 ? 6 : null,
+                top: 6,
+                child: const Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 14,
+                  color: _kSpotifyGreen,
+                ),
+              ),
+
+            // Lock icon
+            if (isLocked)
+              Center(
+                child: Icon(
+                  Icons.lock_rounded,
+                  size: 16,
+                  color: Colors.white.withOpacity(0.38),
+                ),
+              ),
+
+            // Cover loading spinner
+            if (isCoverLoading)
+              const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: Colors.white),
+                ),
+              ),
+
+            // Track name + vote button
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    track.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isLocked
+                          ? Colors.white.withOpacity(0.45)
+                          : Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                      shadows: const [
+                        Shadow(color: Colors.black87, blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                  if (showVoteButton) ...[
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                      onTap: (isActive && !isBonusIndex && !isVoteDisabled)
+                          ? () => _onVote(roundIndex, artistIndex)
+                          : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: isVotedForMe
+                              ? _kSpotifyGreen.withOpacity(0.85)
+                              : accentColor.withOpacity(0.30),
+                          border: Border.all(
+                            color: isVotedForMe
+                                ? _kSpotifyGreen
+                                : accentColor.withOpacity(0.65),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isVotedForMe
+                                  ? Icons.check_rounded
+                                  : Icons.how_to_vote_rounded,
+                              size: 10,
+                              color: isVoteDisabled
+                                  ? Colors.white.withOpacity(0.3)
+                                  : Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              isVotedForMe ? 'Voted' : 'Vote',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: isVoteDisabled
+                                    ? Colors.white.withOpacity(0.3)
+                                    : Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        ),
+      ),
     );
   }
 
@@ -2006,76 +2257,56 @@ class _ArtistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected
-                        ? accentColor.withOpacity(0.7)
-                        : Colors.white.withOpacity(0.12),
-                    width: isSelected ? 2.5 : 1,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: ClipOval(
+            child: imageUrl != null && imageUrl!.isNotEmpty
+                ? Image.network(imageUrl!, fit: BoxFit.cover)
+                : Container(
+                    color: Colors.white.withOpacity(0.06),
+                    child: Icon(Icons.person_rounded, size: 36,
+                        color: Colors.white.withOpacity(0.3)),
                   ),
-                  boxShadow: isSelected
-                      ? [BoxShadow(
-                          color: accentColor.withOpacity(0.4),
-                          blurRadius: 18, spreadRadius: 2)]
-                      : [],
-                ),
-                child: ClipOval(
-                  child: imageUrl != null && imageUrl!.isNotEmpty
-                      ? Image.network(imageUrl!, fit: BoxFit.cover)
-                      : Container(
-                          color: Colors.white.withOpacity(0.06),
-                          child: Icon(Icons.person_rounded, size: 36,
-                              color: Colors.white.withOpacity(0.3)),
-                        ),
-                ),
-              ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+              fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
             ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+        ),
+        if (voteCount > 0) ...[
+          const SizedBox(height: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              color: accentColor.withOpacity(0.22),
+              border: Border.all(color: accentColor.withOpacity(0.55), width: 0.9),
+            ),
             child: Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.7),
-                    fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
-                  ),
-                ),
-          ),
-          // Live vote badge
-          if (voteCount > 0) ...[
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
-                color: accentColor.withOpacity(0.22),
-                border: Border.all(
-                    color: accentColor.withOpacity(0.55), width: 0.9),
+              '$voteCount',
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
               ),
-              child: Text(
-                '$voteCount',
-                style: TextStyle(
-                  color: accentColor,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
             ),
           ),
         ],
-        ],
+      ],
     );
   }
 }

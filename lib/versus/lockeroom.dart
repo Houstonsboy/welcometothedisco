@@ -217,6 +217,18 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
         album2ImageUrl: album2.imageUrl ?? '',
         album1ArtistName: album1.artistName,
         album2ArtistName: album2.artistName,
+        album1Tracklist: album1.tracks.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': album1.artistName,
+          'trackcover':  album1.imageUrl ?? '',
+        }).toList(),
+        album2Tracklist: album2.tracks.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': album2.artistName,
+          'trackcover':  album2.imageUrl ?? '',
+        }).toList(),
       );
       if (!mounted) return;
 

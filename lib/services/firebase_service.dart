@@ -393,6 +393,49 @@ class FirebaseService {
     }
   }
 
+  // ── Lazy image backfill — write Spotify images back to old versus docs ───────
+
+  /// Writes missing image/artist-name fields back into an album versus doc so
+  /// subsequent inbox loads never need a Spotify call for that doc.
+  static Future<void> backfillAlbumVersusImages(
+    String versusId, {
+    String? album1ImageUrl,
+    String? album1ArtistName,
+    String? album2ImageUrl,
+    String? album2ArtistName,
+  }) async {
+    final fields = <String, dynamic>{};
+    if (album1ImageUrl?.isNotEmpty ?? false) fields['album1ImageUrl'] = album1ImageUrl;
+    if (album1ArtistName?.isNotEmpty ?? false) fields['album1ArtistName'] = album1ArtistName;
+    if (album2ImageUrl?.isNotEmpty ?? false) fields['album2ImageUrl'] = album2ImageUrl;
+    if (album2ArtistName?.isNotEmpty ?? false) fields['album2ArtistName'] = album2ArtistName;
+    if (fields.isEmpty) return;
+    try {
+      await _firestore.collection('versus').doc(versusId).update(fields);
+      debugPrint('[FirebaseService] backfilled album images → $versusId');
+    } catch (e) {
+      debugPrint('[FirebaseService] album backfill failed $versusId: $e');
+    }
+  }
+
+  /// Writes missing artist image URLs back into an artist/collaboration versus doc.
+  static Future<void> backfillArtistVersusImages(
+    String versusId, {
+    String? artist1ImageUrl,
+    String? artist2ImageUrl,
+  }) async {
+    final fields = <String, dynamic>{};
+    if (artist1ImageUrl?.isNotEmpty ?? false) fields['artist1ImageUrl'] = artist1ImageUrl;
+    if (artist2ImageUrl?.isNotEmpty ?? false) fields['artist2ImageUrl'] = artist2ImageUrl;
+    if (fields.isEmpty) return;
+    try {
+      await _firestore.collection('versus').doc(versusId).update(fields);
+      debugPrint('[FirebaseService] backfilled artist images → $versusId');
+    } catch (e) {
+      debugPrint('[FirebaseService] artist backfill failed $versusId: $e');
+    }
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // RANKINGS — initial entity stubs (`rankings/{spotifyEntityId}`)
   // ══════════════════════════════════════════════════════════════════════════
@@ -1087,6 +1130,8 @@ class FirebaseService {
     String album2ImageUrl = '',
     String album1ArtistName = '',
     String album2ArtistName = '',
+    List<Map<String, dynamic>>? album1Tracklist,
+    List<Map<String, dynamic>>? album2Tracklist,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1105,6 +1150,10 @@ class FirebaseService {
       if (album2ImageUrl.trim().isNotEmpty) 'album2ImageUrl': album2ImageUrl.trim(),
       if (album1ArtistName.trim().isNotEmpty) 'album1ArtistName': album1ArtistName.trim(),
       if (album2ArtistName.trim().isNotEmpty) 'album2ArtistName': album2ArtistName.trim(),
+      if (album1Tracklist != null && album1Tracklist.isNotEmpty)
+        'album1Tracklist': album1Tracklist,
+      if (album2Tracklist != null && album2Tracklist.isNotEmpty)
+        'album2Tracklist': album2Tracklist,
     });
 
     _scheduleRankingWritesAfterVersus(
@@ -1132,6 +1181,8 @@ class FirebaseService {
     String album2ImageUrl = '',
     String album1ArtistName = '',
     String album2ArtistName = '',
+    List<Map<String, dynamic>>? album1Tracklist,
+    List<Map<String, dynamic>>? album2Tracklist,
   }) {
     return createVersus(
       type: 'album',
@@ -1143,6 +1194,8 @@ class FirebaseService {
       album2ImageUrl: album2ImageUrl,
       album1ArtistName: album1ArtistName,
       album2ArtistName: album2ArtistName,
+      album1Tracklist: album1Tracklist,
+      album2Tracklist: album2Tracklist,
     );
   }
 
@@ -1217,6 +1270,8 @@ class FirebaseService {
     String? authorComment,
     String artist1ImageUrl = '',
     String artist2ImageUrl = '',
+    List<Map<String, dynamic>>? artist1Tracklist,
+    List<Map<String, dynamic>>? artist2Tracklist,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1238,6 +1293,8 @@ class FirebaseService {
       // immediately without a Spotify API call.
       artist1ImageUrl: artist1ImageUrl.trim().isNotEmpty ? artist1ImageUrl.trim() : null,
       artist2ImageUrl: artist2ImageUrl.trim().isNotEmpty ? artist2ImageUrl.trim() : null,
+      artist1Tracklist: artist1Tracklist,
+      artist2Tracklist: artist2Tracklist,
     );
 
     final ref =
@@ -1282,6 +1339,7 @@ class FirebaseService {
     String? authorComment,
     String artist1ImageUrl = '',
     String artist2ImageUrl = '',
+    List<Map<String, dynamic>>? artist1Tracklist,
   }) {
     return createArtistVersus(
       artist1ID: artist1ID,
@@ -1293,6 +1351,7 @@ class FirebaseService {
       authorComment: authorComment,
       artist1ImageUrl: artist1ImageUrl,
       artist2ImageUrl: artist2ImageUrl,
+      artist1Tracklist: artist1Tracklist,
     );
   }
 
@@ -1312,6 +1371,8 @@ class FirebaseService {
     required String artist2ImageUrl,
     required List<String> artist2TrackIDs,
     required String remixPolicy, // 'same' | 'different'
+    List<Map<String, dynamic>>? artist1Tracklist,
+    List<Map<String, dynamic>>? artist2Tracklist,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Not logged in');
@@ -1348,6 +1409,11 @@ class FirebaseService {
       // Denormalized cover images — inbox renders immediately, no Spotify call.
       if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
       if (artist2ImageUrl.trim().isNotEmpty) 'artist2ImageUrl': artist2ImageUrl.trim(),
+      // Full track details — enables rendering without Spotify API calls.
+      if (artist1Tracklist != null && artist1Tracklist.isNotEmpty)
+        'artist1Tracklist': artist1Tracklist,
+      if (artist2Tracklist != null && artist2Tracklist.isNotEmpty)
+        'artist2Tracklist': artist2Tracklist,
     });
 
     // Increment remix count on the source post.
@@ -1398,6 +1464,7 @@ class FirebaseService {
     String? collaboratorUID,
     String? collaboratorUsername,
     String? collaboratorAvatarPath,
+    List<Map<String, dynamic>>? artist1Tracklist,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1432,6 +1499,10 @@ class FirebaseService {
       if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
       if (artist2ImageUrl != null && artist2ImageUrl.trim().isNotEmpty)
         'artist2ImageUrl': artist2ImageUrl.trim(),
+
+      // Full track details — enables rendering without Spotify API calls.
+      if (artist1Tracklist != null && artist1Tracklist.isNotEmpty)
+        'artist1Tracklist': artist1Tracklist,
 
       // Optional author note
       if (comment != null && comment.isNotEmpty)

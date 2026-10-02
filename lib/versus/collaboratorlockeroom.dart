@@ -51,6 +51,12 @@ class CollaboratorLockeroom extends StatelessWidget {
             authorComment:   authorComment,
             artist1ImageUrl: artist1.imageUrl ?? '',
             artist2ImageUrl: artist2?.imageUrl ?? '',
+            artist1Tracklist: selectedTracks1.map((t) => {
+              'spotifyID':   t.id,
+              'trackname':   t.name,
+              'trackartist': t.artistName,
+              'trackcover':  t.albumArtUrl ?? '',
+            }).toList(),
           );
           if (context.mounted) Navigator.of(context).pop();
         } catch (e) {
@@ -1360,6 +1366,12 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
             collaboratorUID: selectedFriend?.uid,
             collaboratorUsername: selectedFriend?.username,
             collaboratorAvatarPath: selectedFriend?.avatarPath,
+            artist1Tracklist: _selectedTracks1.map((t) => {
+              'spotifyID':   t.id,
+              'trackname':   t.name,
+              'trackartist': t.artistName,
+              'trackcover':  t.albumArtUrl ?? '',
+            }).toList(),
           );
         } catch (e) {
           debugPrint(

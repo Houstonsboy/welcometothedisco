@@ -1,9 +1,21 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/polls_model.dart';
+import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/artistplayground.dart';
+import 'package:welcometothedisco/versus/playground.dart';
 import 'package:welcometothedisco/widgets/versus_share_card.dart';
 
 // Deterministic accent colour from entity ID — avoids any API call.
@@ -233,6 +245,9 @@ class _FeedItemState extends State<_FeedItem> {
 
   String? _img1;
   String? _img2;
+  bool _openingPlayground = false;
+  bool _shareCardOffstage = true;
+  final GlobalKey _shareCardKey = GlobalKey();
 
   @override
   void initState() {
@@ -245,7 +260,6 @@ class _FeedItemState extends State<_FeedItem> {
     final id1  = poll.entity1Id;
     final id2  = poll.entity2Id;
 
-    // Pull from in-memory cache first; only fire Spotify requests for misses.
     String? img1 = _imgCache.containsKey(id1) ? _imgCache[id1] : null;
     String? img2 = _imgCache.containsKey(id2) ? _imgCache[id2] : null;
 
@@ -265,20 +279,166 @@ class _FeedItemState extends State<_FeedItem> {
     }
 
     if (futures.isNotEmpty) await Future.wait(futures);
-
     if (mounted) setState(() { _img1 = img1; _img2 = img2; });
   }
 
-  // Album polls → getAlbumDetails; artist / collab polls → getArtistDetails.
   Future<String?> _fetchOne(String id, bool isAlbum) async {
     if (isAlbum) return (await _api.getAlbumDetails(id))?.imageUrl;
     return (await _api.getArtistDetails(id))?.imageUrl;
   }
 
+  // ── Open playground ──────────────────────────────────────────────────────
+  Future<void> _openPlayground() async {
+    final versusId = widget.poll.versusId;
+    if (versusId.isEmpty) return;
+    setState(() => _openingPlayground = true);
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('versus')
+          .doc(versusId)
+          .get();
+      if (!mounted) return;
+      if (!doc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Versus no longer available')),
+        );
+        return;
+      }
+      final data = doc.data()!;
+      if (!mounted) return;
+      if (widget.poll.isAlbumPoll) {
+        final versus = VersusModel.fromFirestore(data, doc.id);
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => VersusPlayground(versus: versus, versusId: versusId),
+        ));
+      } else {
+        final versus = ArtistVersusModel.fromFirestore(data, doc.id);
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ArtistVersusPlayground(versus: versus, versusId: versusId),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open versus')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingPlayground = false);
+    }
+  }
+
+  // ── Share / capture ──────────────────────────────────────────────────────
+  Future<Uint8List?> _captureCard() async {
+    setState(() => _shareCardOffstage = false);
+    await WidgetsBinding.instance.endOfFrame;
+    Uint8List? result;
+    try {
+      final boundary = _shareCardKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary != null) {
+        final image  = await boundary.toImage(pixelRatio: 3.0);
+        final bytes  = await image.toByteData(format: ui.ImageByteFormat.png);
+        result = bytes?.buffer.asUint8List();
+      }
+    } finally {
+      if (mounted) setState(() => _shareCardOffstage = true);
+    }
+    return result;
+  }
+
+  void _showShareSheet() {
+    final poll = widget.poll;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Share poll result',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SheetOption(
+                icon: Icons.photo_library_outlined,
+                label: 'Save to gallery',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final bytes = await _captureCard();
+                  if (bytes == null || !mounted) return;
+                  try {
+                    await Gal.putImageBytes(bytes, name: 'wttd_poll_result');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Saved to gallery')),
+                      );
+                    }
+                  } on GalException catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.type.message)),
+                      );
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not save to gallery')),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              _SheetOption(
+                icon: Icons.ios_share_rounded,
+                label: 'Share image',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final bytes = await _captureCard();
+                  if (bytes == null) return;
+                  final tempDir = await getTemporaryDirectory();
+                  final file = await File(
+                    '${tempDir.path}/wttd_poll.png',
+                  ).writeAsBytes(bytes);
+                  await Share.shareXFiles(
+                    [XFile(file.path)],
+                    text: '${poll.entity1Name} vs ${poll.entity2Name}'
+                        ' — my poll on welcometothedisco',
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final poll      = widget.poll;
-    final sorted    = poll.roundsSorted;
+    final poll       = widget.poll;
+    final sorted     = poll.roundsSorted;
     final cardHeight = MediaQuery.sizeOf(context).height * 0.75;
 
     final rawDetails = <int, Map<String, dynamic>>{
@@ -294,34 +454,183 @@ class _FeedItemState extends State<_FeedItem> {
     final color1 = _accentFor(poll.entity1Id);
     final color2 = _accentFor(seed2);
 
-    // Constrain to 3/4 of screen height and clip the card's bottom overflow.
-    // FittedBox.fitWidth scales the fixed-360px card to fill the screen width.
-    // Alignment.topCenter keeps artist images + vote totals always visible.
+    VersusShareCard buildCard() => VersusShareCard(
+      artist1Name:      poll.entity1Name.isNotEmpty ? poll.entity1Name : '—',
+      artist2Name:      poll.entity2Name.isNotEmpty ? poll.entity2Name : '—',
+      artist1Votes:     poll.entity1Vote,
+      artist2Votes:     poll.entity2Vote,
+      color1:           color1,
+      color2:           color2,
+      voterName:        poll.voterName.isNotEmpty ? poll.voterName : 'anon',
+      trackDetails:     rawDetails,
+      pairedRoundCount: sorted.length,
+      roundTrackNames1: names1,
+      roundTrackNames2: names2,
+      roundTrackIds1:   ids1,
+      roundTrackIds2:   ids2,
+      artist1ImageUrl:  _img1,
+      artist2ImageUrl:  _img2,
+      isAlbumPoll:      poll.isAlbumPoll,
+    );
+
     return SizedBox(
       height: cardHeight,
-      child: ClipRect(
-        child: FittedBox(
-          fit: BoxFit.fitWidth,
-          alignment: Alignment.topCenter,
-          child: VersusShareCard(
-            artist1Name:      poll.entity1Name.isNotEmpty ? poll.entity1Name : '—',
-            artist2Name:      poll.entity2Name.isNotEmpty ? poll.entity2Name : '—',
-            artist1Votes:     poll.entity1Vote,
-            artist2Votes:     poll.entity2Vote,
-            color1:           color1,
-            color2:           color2,
-            voterName:        poll.voterName.isNotEmpty ? poll.voterName : 'anon',
-            trackDetails:     rawDetails,
-            pairedRoundCount: sorted.length,
-            roundTrackNames1: names1,
-            roundTrackNames2: names2,
-            roundTrackIds1:   ids1,
-            roundTrackIds2:   ids2,
-            // Images render inside _ArtistSide: circle for artists, square for albums.
-            artist1ImageUrl:  _img1,
-            artist2ImageUrl:  _img2,
-            isAlbumPoll:      poll.isAlbumPoll,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // ── Main card display ──────────────────────────────────────────
+          Positioned.fill(
+            child: ClipRect(
+              child: FittedBox(
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.topCenter,
+                child: buildCard(),
+              ),
+            ),
           ),
+
+          // ── Off-screen capture target (same as playground share trick) ─
+          Positioned(
+            left: -8000,
+            top: 0,
+            width: 360,
+            child: Offstage(
+              offstage: _shareCardOffstage,
+              child: RepaintBoundary(
+                key: _shareCardKey,
+                child: SizedBox(width: 360, child: buildCard()),
+              ),
+            ),
+          ),
+
+          // ── Action pills — bottom-right corner ─────────────────────────
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ActionPill(
+                  onTap: _openingPlayground ? null : _openPlayground,
+                  label: 'Open VS',
+                  child: _openingPlayground
+                      ? const SizedBox(
+                          width: 11,
+                          height: 11,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.play_circle_outline_rounded,
+                          size: 14, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                _ActionPill(
+                  onTap: _showShareSheet,
+                  label: 'Share',
+                  child: const Icon(Icons.ios_share_rounded,
+                      size: 14, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Action pill button ─────────────────────────────────────────────────────────
+class _ActionPill extends StatelessWidget {
+  final VoidCallback? onTap;
+  final Widget child;
+  final String label;
+
+  const _ActionPill({
+    required this.onTap,
+    required this.child,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              color: Colors.black.withOpacity(onTap != null ? 0.52 : 0.28),
+              border: Border.all(
+                color: Colors.white.withOpacity(onTap != null ? 0.22 : 0.10),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                child,
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(onTap != null ? 0.90 : 0.45),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Share sheet option row ─────────────────────────────────────────────────────
+class _SheetOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SheetOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withOpacity(0.06),
+          border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white.withOpacity(0.70), size: 18),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.80),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
