@@ -16,6 +16,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/playback_gate.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -753,13 +754,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
     setState(() => _coverLoadingRoundIndex = index);
     try {
-      final played = await _api.playRoundTracks(uri1, uri2);
-      if (!played) {
-        _showPlaybackSnack(
-          'Open Spotify on a phone, speaker, or desktop, then try again.',
-        );
-        return false;
-      }
+      final played = await attemptPlayback(
+        versusId: widget.versusId ?? '',
+        spotifyUri: uri1,
+        onMessage: _showPlaybackSnack,
+        action: () => _api.playRoundTracks(uri1, uri2),
+      );
+      if (!played) return false;
       _hasVersusPlaybackStarted = true;
       _currentRoundTrack1Id = t1.id;
       _currentRoundTrack2Id = t2.id;
@@ -786,15 +787,16 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     if (_playingTrackIndex == playIndex) {
       setState(() => _coverLoadingRoundIndex = playIndex);
       try {
-        final paused = await _api.pause();
+        final paused = await attemptPlayback(
+          versusId: widget.versusId ?? '',
+          spotifyUri: null,
+          onMessage: _showPlaybackSnack,
+          action: () => _api.pause(),
+        );
         if (!mounted) return;
         if (paused) {
           _stopPlaybackTracking();
           setState(() => _playingTrackIndex = null);
-        } else {
-          _showPlaybackSnack(
-            'Could not pause — open Spotify on a device and try again.',
-          );
         }
       } finally {
         if (mounted) setState(() => _coverLoadingRoundIndex = null);
