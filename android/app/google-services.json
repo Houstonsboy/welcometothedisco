@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "941925661587-ko6jlv9tda5p9lm9erne7rkq7h9p4gj2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.welcometothedisco",
+            "certificate_hash": "e310852cde09f24c79598865f4f55f4b00d583de"
+          }
+        },
+        {
           "client_id": "941925661587-p5g6lrhsicmc94luad5lrprtsu444o5o.apps.googleusercontent.com",
           "client_type": 3
         }

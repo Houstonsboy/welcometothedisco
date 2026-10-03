@@ -6,6 +6,7 @@ import 'package:welcometothedisco/BottomNavBar.dart';
 import 'package:welcometothedisco/config/app_config.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/playback_gate.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
@@ -178,11 +179,21 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
 
   Future<void> _doPlay() async {
     if (!await _ensureDevice()) return;
-    await _api.resume();
+    await attemptPlayback(
+      versusId: '',
+      spotifyUri: null,
+      onMessage: (m) => setState(() => _statusMessage = m),
+      action: () => _api.resume(),
+    );
   }
 
   Future<void> _doPause() async {
-    await _api.pause();
+    await attemptPlayback(
+      versusId: '',
+      spotifyUri: null,
+      onMessage: (m) => setState(() => _statusMessage = m),
+      action: () => _api.pause(),
+    );
   }
 
   Future<void> _doSkipNext() async {
@@ -206,8 +217,13 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
   Future<void> _playTrack(String uri) async {
     if (!await _ensureDevice()) return;
     setState(() => _statusMessage = 'Playing…');
-    final ok = await _api.play(uri);
-    setState(() => _statusMessage = ok ? 'Playing!' : 'Play failed');
+    final ok = await attemptPlayback(
+      versusId: '',
+      spotifyUri: uri,
+      onMessage: (m) => setState(() => _statusMessage = m),
+      action: () => _api.play(uri),
+    );
+    if (ok) setState(() => _statusMessage = 'Playing!');
   }
 
   Future<bool> _ensureDevice() async {

@@ -7,16 +7,32 @@ import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 
+/// Outcome of a playback-control call (play/pause/resume). See
+/// [SpotifyApi._resultFor] for how this is derived from Spotify's response.
+enum PlaybackResult { ok, noActiveDevice, premiumRequired, error }
+
 class SpotifyUser {
   final String id;
   final String displayName;
   final String? imageUrl;
 
+  /// Raw `product` field from GET /me — "premium", "free", or "open".
+  /// Requires the `user-read-private` scope; null if that scope wasn't
+  /// granted or the field was missing from the response.
+  final String? product;
+
   const SpotifyUser({
     required this.id,
     required this.displayName,
     this.imageUrl,
+    this.product,
   });
+
+  /// True only when Spotify explicitly reports a Premium subscription.
+  /// Missing/unrecognized `product` values are treated as NOT premium
+  /// (fail closed) so playback controls don't appear enabled only to
+  /// 403 with PREMIUM_REQUIRED a moment later.
+  bool get isPremium => product == 'premium';
 
   factory SpotifyUser.fromJson(Map<String, dynamic> json) {
     final images = (json['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -24,6 +40,7 @@ class SpotifyUser {
       id: json['id'] as String? ?? '',
       displayName: json['display_name'] as String? ?? json['id'] as String? ?? 'Spotify User',
       imageUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+      product: json['product'] as String?,
     );
   }
 }
@@ -356,57 +373,82 @@ class SpotifyApi {
 
   // ── Playback control ──────────────────────────────────────────────────────
 
-  Future<bool> play(String spotifyUri) async {
+  /// Outcome of a playback-control call. Distinguishes "this account isn't
+  /// Premium" from "no active Spotify device" from an unrelated failure,
+  /// since those need different UI treatment (prompt to open Spotify vs.
+  /// show a Premium-only message vs. a generic error).
+  PlaybackResult _resultFor(http.Response resp) {
+    if (resp.statusCode == 204 || resp.statusCode == 200) return PlaybackResult.ok;
+    String? reason;
+    try {
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      reason = (json['error'] as Map<String, dynamic>?)?['reason'] as String?;
+    } catch (_) {
+      // Non-JSON or unexpected error body — fall back to status-code mapping below.
+    }
+    if (reason == 'PREMIUM_REQUIRED') return PlaybackResult.premiumRequired;
+    if (reason == 'NO_ACTIVE_DEVICE' || resp.statusCode == 404) {
+      return PlaybackResult.noActiveDevice;
+    }
+    return PlaybackResult.error;
+  }
+
+  Future<PlaybackResult> play(String spotifyUri) async {
     final deviceId = await getActiveDeviceId();
     if (deviceId == null) {
       debugPrint('[SpotifyApi] play() — no active device');
-      return false;
+      return PlaybackResult.noActiveDevice;
     }
     final resp = await _put(
       '/me/player/play',
       query: {'device_id': deviceId},
       body: {'uris': [spotifyUri]},
     );
-    return resp.statusCode == 204 || resp.statusCode == 200;
+    final result = _resultFor(resp);
+    if (result != PlaybackResult.ok) {
+      debugPrint('[SpotifyApi] play() → ${result.name} (${resp.statusCode})');
+    }
+    return result;
   }
 
-  Future<bool> playRoundTracks(String track1Uri, String track2Uri) async {
+  Future<PlaybackResult> playRoundTracks(String track1Uri, String track2Uri) async {
     final deviceId = await getActiveDeviceId();
     if (deviceId == null) {
       debugPrint('[SpotifyApi] playRoundTracks() — no active device');
-      return false;
+      return PlaybackResult.noActiveDevice;
     }
     final playResp = await _put(
       '/me/player/play',
       query: {'device_id': deviceId},
       body: {'uris': [track1Uri]},
     );
-    if (playResp.statusCode != 204 && playResp.statusCode != 200) {
-      debugPrint('[SpotifyApi] playRoundTracks() — play failed: ${playResp.statusCode}');
-      return false;
+    final playResult = _resultFor(playResp);
+    if (playResult != PlaybackResult.ok) {
+      debugPrint('[SpotifyApi] playRoundTracks() — play failed: ${playResult.name} (${playResp.statusCode})');
+      return playResult;
     }
     await Future.delayed(const Duration(milliseconds: 300));
     final queueResp = await _post(
       '/me/player/queue',
       query: {'uri': track2Uri, 'device_id': deviceId},
     );
-    final queueOk = queueResp.statusCode == 204 || queueResp.statusCode == 200;
-    debugPrint('[SpotifyApi] playRoundTracks() — queue track2: ${queueResp.statusCode}');
-    return queueOk;
+    final queueResult = _resultFor(queueResp);
+    debugPrint('[SpotifyApi] playRoundTracks() — queue track2: ${queueResult.name} (${queueResp.statusCode})');
+    return queueResult;
   }
 
-  Future<bool> pause() async {
+  Future<PlaybackResult> pause() async {
     final deviceId = await getActiveDeviceId();
-    if (deviceId == null) return false;
+    if (deviceId == null) return PlaybackResult.noActiveDevice;
     final resp = await _put('/me/player/pause', query: {'device_id': deviceId});
-    return resp.statusCode == 204 || resp.statusCode == 200;
+    return _resultFor(resp);
   }
 
-  Future<bool> resume() async {
+  Future<PlaybackResult> resume() async {
     final deviceId = await getActiveDeviceId();
-    if (deviceId == null) return false;
+    if (deviceId == null) return PlaybackResult.noActiveDevice;
     final resp = await _put('/me/player/play', query: {'device_id': deviceId});
-    return resp.statusCode == 204 || resp.statusCode == 200;
+    return _resultFor(resp);
   }
 
   Future<bool> skipNext() async {

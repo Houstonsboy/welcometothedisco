@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/playback_gate.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/playable_album_cover.dart';
@@ -805,14 +806,15 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     if (_previewPlayingTrackId == track.id) {
       setState(() => _previewLoadingTrackId = track.id);
       try {
-        final paused = await _api.pause();
+        final paused = await attemptPlayback(
+          versusId: widget.versus.id,
+          spotifyUri: null,
+          onMessage: _showSpotifyPlaybackSnack,
+          action: () => _api.pause(),
+        );
         if (!mounted) return;
         if (paused) {
           _stopPreviewPlayback();
-        } else {
-          _showSpotifyPlaybackSnack(
-            'Could not pause — open Spotify on a device and try again.',
-          );
         }
       } finally {
         if (mounted) setState(() => _previewLoadingTrackId = null);
@@ -822,14 +824,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
     setState(() => _previewLoadingTrackId = track.id);
     try {
-      final played = await _api.play(uri);
+      final played = await attemptPlayback(
+        versusId: widget.versus.id,
+        spotifyUri: uri,
+        onMessage: _showSpotifyPlaybackSnack,
+        action: () => _api.play(uri),
+      );
       if (!mounted) return;
-      if (!played) {
-        _showSpotifyPlaybackSnack(
-          'Open Spotify on a phone, speaker, or desktop, then try again.',
-        );
-        return;
-      }
+      if (!played) return;
       _nowPlayingSub?.cancel();
       _nowPlayingSub = null;
       _advanceOnTrackId = null;
@@ -865,7 +867,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
     setState(() => _isPlayLoading = true);
     try {
-      final played = await _api.playRoundTracks(t1.uri, uri2);
+      final played = await attemptPlayback(
+        versusId: widget.versus.id,
+        spotifyUri: t1.uri,
+        onMessage: _showSpotifyPlaybackSnack,
+        action: () => _api.playRoundTracks(t1.uri, uri2),
+      );
       if (!played) return;
       _roundTrack1Id     = t1.id;
       _roundTrack2Id     = id2;
