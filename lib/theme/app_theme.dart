@@ -63,6 +63,14 @@ abstract final class AppTheme {
   /// Author profile chip accent (magenta — inbox tile, collaboration).
   static const Color authorAccent         = Color(0xFFE310EF);
 
+  // ── Splash screen ─────────────────────────────────────────────────────────
+  static const Color splashBackground    = Color(0xFF161616);
+  static const Color splashLogoYellow    = Color(0xFFF2DC00);
+  static const Color splashLogoDark      = Color(0xFF101010);
+  /// White at 25 % opacity — progress-bar track.
+  static const Color splashProgressTrack = Color(0x40FFFFFF);
+  static const Color splashProgressFill  = Colors.white;
+
   // ── Collaborator invite banner ───────────────────────────────────────────
   static const Color bannerDark1          = Color(0xFF0E0E1A);
   static const Color bannerDark2          = Color(0xFF14102A);

@@ -7,10 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:app_links/app_links.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'package:welcometothedisco/firebase_options.dart';
 import 'package:welcometothedisco/config/app_config.dart';
 import 'package:welcometothedisco/authentication/login.dart';
+import 'package:welcometothedisco/authentication/onboarding.dart';
+import 'package:welcometothedisco/features/splash/splash_screen.dart';
 import 'package:welcometothedisco/HomeScreen.dart';
 import 'package:welcometothedisco/Inbox.dart';
 import 'package:welcometothedisco/SpotifyAPIplayer.dart';
@@ -28,7 +31,9 @@ import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/posts/view_posts.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  // Keep native splash visible until SplashScreen.initState() calls remove().
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -61,10 +66,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.appTheme(),
-      initialRoute: '/',
+      initialRoute: '/splash',
       navigatorObservers: [inboxRouteObserver],
       routes: {
-        '/': (_) => const _AuthGate(),
+        '/splash': (_) => const SplashScreen(),
+        '/': (_) => const AuthGate(),
+        '/onboarding': (_) => const OnboardingScreen(),
         '/spotify': (_) => const SpotifyAPIplayer(),
       },
     );
@@ -79,14 +86,14 @@ class MyApp extends StatelessWidget {
 ///       immediately finds the already-signed-in user without waiting for the
 ///       stream to emit.
 ///   (b) Future sign-in/sign-out events (authStateChanges) still update the UI.
-class _AuthGate extends StatefulWidget {
-  const _AuthGate();
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
 
   @override
-  State<_AuthGate> createState() => _AuthGateState();
+  State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<_AuthGate> {
+class _AuthGateState extends State<AuthGate> {
   User? _user;
   bool _initializing = true;
   late final StreamSubscription<User?> _authSub;
