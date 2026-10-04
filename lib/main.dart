@@ -19,7 +19,7 @@ import 'package:welcometothedisco/friends/friendrequest.dart';
 import 'package:welcometothedisco/userprofile.dart';
 import 'package:welcometothedisco/notification/notification.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
-import 'package:welcometothedisco/services/spotify_service.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/notification/notification_service.dart';
@@ -144,6 +144,7 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
+  final SpotifyApi _spotifyApi = SpotifyApi();
 
   SpotifyUser? _spotifyUser;
   bool _spotifyLoading = true;
@@ -190,7 +191,7 @@ class _AppShellState extends State<_AppShell> {
   }
 
   Future<void> _loadSpotifyProfile() async {
-    final user = await SpotifyService.refreshCurrentUser();
+    final user = await _spotifyApi.getCurrentUser();
     if (mounted) setState(() => _spotifyUser = user);
   }
 

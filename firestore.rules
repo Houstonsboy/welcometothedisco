@@ -146,15 +146,5 @@ service cloud.firestore {
       allow update: if isOwnerUpdate();
       allow delete: if isAuthed() && resource.data.get('voter_id', '') == request.auth.uid;
     }
-
-    // Playback-gate A/B test events (see lib/services/playback_gate.dart).
-    // Write-only event log: a client logs its own attempts, never reads them
-    // back (analysis happens via the Firebase console / a script) and can
-    // never edit or delete one after the fact.
-    match /playback_gate_events/{eventId} {
-      allow create: if request.auth != null
-        && request.resource.data.get('uid', '') == request.auth.uid;
-      allow read, update, delete: if false;
-    }
   }
 }

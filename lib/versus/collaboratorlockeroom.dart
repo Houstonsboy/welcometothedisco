@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
-import 'package:welcometothedisco/services/playback_gate.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/versus/collaboratorinvitebanner.dart';
 import 'package:welcometothedisco/versus/playable_album_cover.dart';
@@ -2606,15 +2605,13 @@ class _PostRemixScreenState extends State<PostRemixScreen>
     if (_previewPlayingTrackId == trackId) {
       setState(() => _previewLoadingTrackId = trackId);
       try {
-        final paused = await attemptPlayback(
-          versusId: widget.post.id,
-          spotifyUri: null,
-          onMessage: _showPlaybackSnack,
-          action: () => _api.pause(),
-        );
+        final paused = await _api.pause();
         if (!mounted) return;
         if (paused) {
           _stopPreviewPlayback();
+        } else {
+          _showPlaybackSnack(
+              'Could not pause — open Spotify on a device and try again.');
         }
       } finally {
         if (mounted) setState(() => _previewLoadingTrackId = null);
@@ -2624,14 +2621,13 @@ class _PostRemixScreenState extends State<PostRemixScreen>
 
     setState(() => _previewLoadingTrackId = trackId);
     try {
-      final played = await attemptPlayback(
-        versusId: widget.post.id,
-        spotifyUri: uri,
-        onMessage: _showPlaybackSnack,
-        action: () => _api.play(uri),
-      );
+      final played = await _api.play(uri);
       if (!mounted) return;
-      if (!played) return;
+      if (!played) {
+        _showPlaybackSnack(
+            'Open Spotify on a phone, speaker, or desktop, then try again.');
+        return;
+      }
       setState(() => _previewPlayingTrackId = trackId);
     } catch (e) {
       debugPrint('[PostRemixScreen] preview error: $e');

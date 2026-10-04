@@ -9,7 +9,6 @@ import 'package:welcometothedisco/Ranking/entity_profile.dart';
 import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
-import 'package:welcometothedisco/services/playback_gate.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/userprofile.dart';
@@ -110,24 +109,22 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     try {
       if (_playingTrackId == track.spotifyID) {
         // Already playing → pause
-        final ok = await attemptPlayback(
-          versusId: post.id,
-          spotifyUri: null,
-          onMessage: _snack,
-          action: () => _api.pause(),
-        );
+        final ok = await _api.pause();
         if (!mounted) return;
-        if (ok) setState(() => _playingTrackId = null);
+        if (ok) {
+          setState(() => _playingTrackId = null);
+        } else {
+          _snack('Could not pause — open Spotify on a device and try again.');
+        }
       } else {
         // Play this track
-        final ok = await attemptPlayback(
-          versusId: post.id,
-          spotifyUri: uri,
-          onMessage: _snack,
-          action: () => _api.play(uri),
-        );
+        final ok = await _api.play(uri);
         if (!mounted) return;
-        if (ok) setState(() => _playingTrackId = track.spotifyID);
+        if (ok) {
+          setState(() => _playingTrackId = track.spotifyID);
+        } else {
+          _snack('Open Spotify on a phone, speaker, or desktop, then try again.');
+        }
       }
     } catch (e) {
       if (mounted) _snack('Playback error: $e');
@@ -151,14 +148,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       }
 
       if (_playingTrackId == null) {
-        final ok = await attemptPlayback(
-          versusId: post.id,
-          spotifyUri: firstUri,
-          onMessage: _snack,
-          action: () => _api.play(firstUri),
-        );
+        final ok = await _api.play(firstUri);
         if (!mounted) return;
-        if (!ok) return;
+        if (!ok) {
+          _snack('Open Spotify on a device first, then try again.');
+          return;
+        }
         setState(() => _playingTrackId = tracks.first.spotifyID);
         await Future.delayed(const Duration(milliseconds: 300));
       }
