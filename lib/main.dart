@@ -19,7 +19,7 @@ import 'package:welcometothedisco/friends/friendrequest.dart';
 import 'package:welcometothedisco/userprofile.dart';
 import 'package:welcometothedisco/notification/notification.dart';
 import 'package:welcometothedisco/services/spotify_auth.dart';
-import 'package:welcometothedisco/services/spotify_service.dart';
+import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/token_storage_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/notification/notification_service.dart';
@@ -144,6 +144,7 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
+  final SpotifyApi _spotifyApi = SpotifyApi();
 
   SpotifyUser? _spotifyUser;
   bool _spotifyLoading = true;
@@ -152,6 +153,12 @@ class _AppShellState extends State<_AppShell> {
   DateTime? _lastBackExitPrompt;
   bool _exitHintVisible = false;
   Timer? _exitHintTimer;
+
+  // Posts tab (index 0) is the first screen after login and loads eagerly;
+  // Home/Friends only start building once the user actually visits them, so
+  // their initial fetches (Spotify profile, open-versus inbox query) don't
+  // compete with the posts feed load right after sign-in.
+  final Set<int> _mountedTabs = {0};
 
   @override
   void initState() {
@@ -190,12 +197,15 @@ class _AppShellState extends State<_AppShell> {
   }
 
   Future<void> _loadSpotifyProfile() async {
-    final user = await SpotifyService.refreshCurrentUser();
+    final user = await _spotifyApi.getCurrentUser();
     if (mounted) setState(() => _spotifyUser = user);
   }
 
   void _onTabTapped(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _mountedTabs.add(index);
+    });
   }
 
   /// System back: pop any overlay route first; then leave search/friends for home;
@@ -280,8 +290,12 @@ class _AppShellState extends State<_AppShell> {
                 index: _selectedIndex,
                 children: [
                   const ViewPostsScreen(),
-                  const HomeScreenContent(),
-                  const FriendRequest(),
+                  _mountedTabs.contains(1)
+                      ? const HomeScreenContent()
+                      : const SizedBox.shrink(),
+                  _mountedTabs.contains(2)
+                      ? const FriendRequest()
+                      : const SizedBox.shrink(),
                 ],
               ),
               bottomNavigationBar: BottomNavBar(

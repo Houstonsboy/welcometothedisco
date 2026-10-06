@@ -73,6 +73,15 @@ class TrackItem {
   };
 }
 
+/// Result of a single paginated posts fetch (see FirebaseService.getPostsPage).
+class PostsPage {
+  final List<PostModel> posts;
+  final DocumentSnapshot? lastDoc;
+  final bool hasMore;
+
+  PostsPage({required this.posts, required this.lastDoc, required this.hasMore});
+}
+
 class PostModel {
   final String  id;           // Firestore document UID
   final String  authorID;

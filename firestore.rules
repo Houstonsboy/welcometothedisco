@@ -78,6 +78,20 @@ service cloud.firestore {
               ]);
       }
 
+      /// Lazy Spotify image/name cache fill-in: any viewer (not just the author) may
+      /// populate these fields, since they're just cached display data keyed off the
+      /// doc's own Spotify IDs and are read in the shared Inbox feed (see
+      /// FirebaseService.backfillAlbumVersusImages / backfillArtistVersusImages).
+      function versusImageCacheBackfill() {
+        return request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly([
+                'album1ImageUrl', 'album1ArtistName',
+                'album2ImageUrl', 'album2ArtistName',
+                'artist1ImageUrl', 'artist2ImageUrl'
+              ]);
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null
@@ -87,6 +101,7 @@ service cloud.firestore {
           || isVersusAuthor()
           || collaborationCollaboratorUpdate()
           || artistVersusOpenJoinUpdate()
+          || versusImageCacheBackfill()
         );
       allow delete: if request.auth != null && isVersusAuthor();
     }
@@ -145,6 +160,31 @@ service cloud.firestore {
       allow create: if isOwnerCreate();
       allow update: if isOwnerUpdate();
       allow delete: if isAuthed() && resource.data.get('voter_id', '') == request.auth.uid;
+    }
+
+    // Posts: global feed + per-author / per-artist streams.
+    match /posts/{postId} {
+      function isPostAuthor() {
+        return request.auth != null
+          && resource.data.get('authorID', '') == request.auth.uid;
+      }
+
+      allow read: if request.auth != null;
+
+      // Creator must stamp their own uid in authorID.
+      allow create: if request.auth != null
+        && request.resource.data.get('authorID', '') == request.auth.uid;
+
+      allow update: if request.auth != null && (
+        // Post owner can patch any field.
+        isPostAuthor()
+        // Anyone can bump the remix counter (the remixer is not the post author).
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Remixcount'])
+        // Anyone can bump the share counter.
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Sharecount'])
+      );
+
+      allow delete: if request.auth != null && isPostAuthor();
     }
 
     // Playback-gate A/B test events (see lib/services/playback_gate.dart).
