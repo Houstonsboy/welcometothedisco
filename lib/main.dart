@@ -154,6 +154,12 @@ class _AppShellState extends State<_AppShell> {
   bool _exitHintVisible = false;
   Timer? _exitHintTimer;
 
+  // Posts tab (index 0) is the first screen after login and loads eagerly;
+  // Home/Friends only start building once the user actually visits them, so
+  // their initial fetches (Spotify profile, open-versus inbox query) don't
+  // compete with the posts feed load right after sign-in.
+  final Set<int> _mountedTabs = {0};
+
   @override
   void initState() {
     super.initState();
@@ -196,7 +202,10 @@ class _AppShellState extends State<_AppShell> {
   }
 
   void _onTabTapped(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _mountedTabs.add(index);
+    });
   }
 
   /// System back: pop any overlay route first; then leave search/friends for home;
@@ -281,8 +290,12 @@ class _AppShellState extends State<_AppShell> {
                 index: _selectedIndex,
                 children: [
                   const ViewPostsScreen(),
-                  const HomeScreenContent(),
-                  const FriendRequest(),
+                  _mountedTabs.contains(1)
+                      ? const HomeScreenContent()
+                      : const SizedBox.shrink(),
+                  _mountedTabs.contains(2)
+                      ? const FriendRequest()
+                      : const SizedBox.shrink(),
                 ],
               ),
               bottomNavigationBar: BottomNavBar(

@@ -2407,6 +2407,54 @@ class FirebaseService {
             .toList());
   }
 
+  /// One-time page of posts, newest first. Pass the previous page's
+  /// [PostsPage.lastDoc] as [startAfter] to fetch the next page.
+  static Future<PostsPage> getPostsPage({
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    var query = _firestore
+        .collection('posts')
+        .orderBy('Created_at', descending: true)
+        .limit(limit);
+    if (startAfter != null) query = query.startAfterDocument(startAfter);
+
+    final snap = await query.get();
+    return PostsPage(
+      posts: snap.docs
+          .map((d) => PostModel.fromFirestore(d.data(), d.id))
+          .toList(),
+      lastDoc: snap.docs.isEmpty ? null : snap.docs.last,
+      hasMore: snap.docs.length == limit,
+    );
+  }
+
+  /// One-time fetch of posts newer than [since], newest first. Used to pull
+  /// in newly-arrived posts without re-fetching the whole feed.
+  static Future<List<PostModel>> getPostsNewerThan(Timestamp since) async {
+    final snap = await _firestore
+        .collection('posts')
+        .where('Created_at', isGreaterThan: since)
+        .orderBy('Created_at', descending: true)
+        .get();
+    return snap.docs
+        .map((d) => PostModel.fromFirestore(d.data(), d.id))
+        .toList();
+  }
+
+  /// Cheap (1-doc) live listener on just the newest post, used to drive a
+  /// "N new posts" indicator without streaming/re-fetching the full feed.
+  static Stream<PostModel?> watchNewestPost() {
+    return _firestore
+        .collection('posts')
+        .orderBy('Created_at', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snap) => snap.docs.isEmpty
+            ? null
+            : PostModel.fromFirestore(snap.docs.first.data(), snap.docs.first.id));
+  }
+
   /// Live stream of posts by one author, ordered by newest first.
   static Stream<List<PostModel>> getPostsByAuthorStream(String authorId) {
     final uid = authorId.trim();
