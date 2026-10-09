@@ -1,10 +1,15 @@
 // lib/screens/view_posts_screen.dart
 
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/posts/create_post.dart';
 import 'package:welcometothedisco/posts/post_view.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
+import 'package:welcometothedisco/services/perf_trace.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
 const _kBlue        = AppTheme.gradientStart;
@@ -23,79 +28,223 @@ class ViewPostsScreen extends StatefulWidget {
 }
 
 class _ViewPostsScreenState extends State<ViewPostsScreen> {
-  late Stream<List<PostModel>> _postsStream;
+  final List<PostModel> _posts = [];
+  DocumentSnapshot? _lastDoc;
+  bool _hasMore = true;
+  bool _loadingInitial = true;
+  bool _loadingMore = false;
+  bool _error = false;
+
+  int _newPostsCount = 0;
+  Timestamp? _topTimestamp;
+  StreamSubscription<PostModel?>? _newestSub;
+
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _postsStream = FirebaseService.getPostsStream();
+    _scrollController.addListener(_onScroll);
+    _loadInitialPage();
   }
 
-  void _refreshPosts() {
-    setState(() {
-      _postsStream = FirebaseService.getPostsStream();
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _newestSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialPage() async {
+    final trace = PerfTrace('posts_feed')..mark('query_start');
+    try {
+      final page = await FirebaseService.getPostsPage();
+      trace.mark('first_snapshot');
+      if (!mounted) return;
+      setState(() {
+        _posts
+          ..clear()
+          ..addAll(page.posts);
+        _lastDoc = page.lastDoc;
+        _hasMore = page.hasMore;
+        _loadingInitial = false;
+        _error = false;
+        _topTimestamp = page.posts.isNotEmpty ? page.posts.first.createdAt : null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        trace
+          ..mark('first_frame')
+          ..end();
+      });
+      _subscribeToNewest();
+    } catch (e) {
+      debugPrint('[ViewPostsScreen] initial load failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingInitial = false;
+        _error = true;
+      });
+    }
+  }
+
+  void _subscribeToNewest() {
+    _newestSub?.cancel();
+    _newestSub = FirebaseService.watchNewestPost().listen((newest) {
+      if (!mounted || newest == null || _posts.isEmpty) return;
+      if (newest.id == _posts.first.id) return;
+      final newestCreated = newest.createdAt;
+      final topCreated = _topTimestamp;
+      if (newestCreated != null &&
+          topCreated != null &&
+          newestCreated.compareTo(topCreated) <= 0) {
+        return;
+      }
+      setState(() => _newPostsCount += 1);
     });
+  }
+
+  void _onScroll() {
+    if (_loadingMore || !_hasMore) return;
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final trace = PerfTrace('posts_feed_more')..mark('query_start');
+    setState(() => _loadingMore = true);
+    try {
+      final page = await FirebaseService.getPostsPage(startAfter: _lastDoc);
+      trace
+        ..mark('first_snapshot')
+        ..end();
+      if (!mounted) return;
+      setState(() {
+        _posts.addAll(page.posts);
+        _lastDoc = page.lastDoc;
+        _hasMore = page.hasMore;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      debugPrint('[ViewPostsScreen] load more failed: $e');
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+    }
+  }
+
+  /// Fetches posts newer than what's currently shown and splices them in at
+  /// the top — the feed already on screen is never torn down or re-rendered
+  /// wholesale. Used by the "new posts" banner, pull-to-refresh, and after
+  /// creating a post.
+  Future<void> _pullNewPosts() async {
+    final since = _topTimestamp;
+    if (since == null) {
+      await _loadInitialPage();
+      return;
+    }
+    final trace = PerfTrace('posts_feed_refresh')..mark('query_start');
+    try {
+      final newer = await FirebaseService.getPostsNewerThan(since);
+      trace
+        ..mark('first_snapshot')
+        ..end();
+      if (!mounted) return;
+      setState(() {
+        if (newer.isNotEmpty) {
+          _posts.insertAll(0, newer);
+          _topTimestamp = newer.first.createdAt ?? _topTimestamp;
+        }
+        _newPostsCount = 0;
+      });
+      if (newer.isNotEmpty && _scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      debugPrint('[ViewPostsScreen] pull new posts failed: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: StreamBuilder<List<PostModel>>(
-        stream: _postsStream,
-        builder: (context, snapshot) {
-          final posts = snapshot.data ?? [];
-          final loading = snapshot.connectionState == ConnectionState.waiting
-              && posts.isEmpty;
-          final error = snapshot.hasError;
-
-          return Stack(
-            children: [
-              CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  const SliverToBoxAdapter(child: _PostsHeader()),
-                  if (loading)
-                    const SliverFillRemaining(
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white54,
-                          strokeWidth: 2,
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _pullNewPosts,
+            color: Colors.white,
+            backgroundColor: _kBlue,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                const SliverToBoxAdapter(child: _PostsHeader()),
+                if (_loadingInitial)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white54,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                else if (_error)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'Could not load posts',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.45),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 14,
                         ),
                       ),
-                    )
-                  else if (error)
-                    SliverFillRemaining(
-                      child: Center(
-                        child: Text(
-                          'Could not load posts',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.45),
-                            fontFamily: AppTheme.fontBody,
-                            fontSize: 14,
-                          ),
+                    ),
+                  )
+                else if (_posts.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'No posts yet — be the first!',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.40),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 14,
                         ),
                       ),
-                    )
-                  else if (posts.isEmpty)
-                    SliverFillRemaining(
-                      child: Center(
-                        child: Text(
-                          'No posts yet — be the first!',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.40),
-                            fontFamily: AppTheme.fontBody,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => Column(
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index == _posts.length) {
+                          return _hasMore
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white54,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink();
+                        }
+                        final post = _posts[index];
+                        return Column(
+                          key: ValueKey(post.id),
                           children: [
-                            _PostCard(post: posts[index]),
+                            _PostCard(post: post),
                             Divider(
                               height: 1,
                               thickness: 1,
@@ -104,21 +253,82 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
                               endIndent: 0,
                             ),
                           ],
-                        ),
-                        childCount: posts.length,
-                      ),
+                        );
+                      },
+                      childCount: _posts.length + (_hasMore ? 1 : 0),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
+          ),
+          if (_newPostsCount > 0)
+            Positioned(
+              top: 12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _NewPostsBanner(
+                  count: _newPostsCount,
+                  onTap: _pullNewPosts,
+                ),
               ),
-              Positioned(
-                bottom: 24,
-                right: 20,
-                child: _CreatePostFAB(onPostCreated: _refreshPosts),
+            ),
+          Positioned(
+            bottom: 24,
+            right: 20,
+            child: _CreatePostFAB(onPostCreated: _pullNewPosts),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── "N new posts" banner ───────────────────────────────────────────────────
+class _NewPostsBanner extends StatelessWidget {
+  const _NewPostsBanner({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            color: _kCreateCyan,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
-          );
-        },
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.arrow_upward_rounded,
+                  color: Colors.white, size: 15),
+              const SizedBox(width: 6),
+              Text(
+                count == 1 ? '1 new post' : '$count new posts',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -162,12 +372,13 @@ class _PostCard extends StatelessWidget {
 
     if (p.startsWith('http://') || p.startsWith('https://')) {
       return ClipOval(
-        child: Image.network(
-          p,
+        child: CachedNetworkImage(
+          imageUrl: p,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => fallback(),
+          placeholder: (_, __) => fallback(),
+          errorWidget: (_, __, ___) => fallback(),
         ),
       );
     }
@@ -296,12 +507,17 @@ class _PostCard extends StatelessWidget {
                           ),
                         ),
                         child: ClipOval(
-                          child: Image.network(
-                            post.artistImageUrl,
+                          child: CachedNetworkImage(
+                            imageUrl: post.artistImageUrl,
                             width: 48,
                             height: 48,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            placeholder: (_, __) => Container(
+                              color: _kBlue.withOpacity(0.35),
+                              child: Icon(Icons.music_note_rounded,
+                                  color: _kPink.withOpacity(0.9), size: 20),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
                               color: _kBlue.withOpacity(0.35),
                               child: Icon(Icons.music_note_rounded,
                                   color: _kPink.withOpacity(0.9), size: 20),
@@ -504,10 +720,15 @@ class _TrackCircle extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          placeholder: (_, __) => Container(
+            color: _kBlue.withOpacity(0.35),
+            child: Icon(Icons.album_rounded,
+                color: _kPink.withOpacity(0.85), size: 16), // reduced from 22
+          ),
+          errorWidget: (_, __, ___) => Container(
             color: _kBlue.withOpacity(0.35),
             child: Icon(Icons.album_rounded,
                 color: _kPink.withOpacity(0.85), size: 16), // reduced from 22
