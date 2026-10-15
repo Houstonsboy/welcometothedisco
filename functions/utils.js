@@ -111,7 +111,9 @@ function computePairIncrements({ newVoterState, oldVoterData, versusId }) {
  * Self-matchups are recorded but excluded from pair docs and rankings.
  */
 function isSelfMatchup(id1, id2) {
-  return id1.trim() === id2.trim();
+  const a = (id1 || "").trim();
+  const b = (id2 || "").trim();
+  return a.length > 0 && b.length > 0 && a === b;
 }
 
 /**

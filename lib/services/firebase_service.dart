@@ -1260,6 +1260,12 @@ class FirebaseService {
         debugPrint('[FirebaseService] upsertPoll → created $docId');
       } else {
         await ref.update({
+          'pair_key':    selfMatchup ? null : pairKey.trim(),
+          'entity_type': entityType.trim(),
+          'entity1_id':   entity1Id.trim(),
+          'entity1_name': entity1Name.trim(),
+          'entity2_id':   entity2Id.trim(),
+          'entity2_name': entity2Name.trim(),
           'track_details': trackDetails,
           'summary': {
             'entity1_votes':      entity1Votes,

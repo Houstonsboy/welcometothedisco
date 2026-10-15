@@ -623,7 +623,7 @@ async function _handlePollUpsert(pollId, data) {
   const trackDetails    = Array.isArray(data.track_details) ? data.track_details : [];
 
   if (!entity1Id || !entity2Id || !voterId || !versusId) {
-    logger.warn("onPollWritten: missing required fields", { pollId });
+    logger.error("onPollWritten: missing required fields", { pollId, fields: Object.keys(data) });
     return;
   }
 

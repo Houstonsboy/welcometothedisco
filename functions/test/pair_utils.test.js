@@ -5,7 +5,7 @@
 
 const {
   makePairKey, countRounds, mapRoundsToAB, computeNewVoterState, computePairIncrements,
-  computeBradleyTerry, computeEntityStats, computeRanks,
+  computeBradleyTerry, computeEntityStats, computeRanks, isSelfMatchup,
 } = require("../utils");
 
 // ── makePairKey ───────────────────────────────────────────────────────────────
@@ -717,6 +717,27 @@ describe("computePairIncrements", () => {
     expect(inc.diffVersusRoundsA).toBe(1);
     expect(inc.diffVersusRoundsB).toBe(2);
     expect(inc.isFirstVersusForVoter).toBe(true);
+  });
+});
+
+describe("isSelfMatchup", () => {
+  test("empty strings → false", () => {
+    expect(isSelfMatchup("", "")).toBe(false);
+  });
+  test("undefined arguments → false", () => {
+    expect(isSelfMatchup(undefined, undefined)).toBe(false);
+  });
+  test("one empty, one non-empty → false", () => {
+    expect(isSelfMatchup("abc", "")).toBe(false);
+  });
+  test("identical non-empty IDs → true", () => {
+    expect(isSelfMatchup("abc", "abc")).toBe(true);
+  });
+  test("whitespace-padded identical IDs → true", () => {
+    expect(isSelfMatchup("  abc  ", "abc")).toBe(true);
+  });
+  test("distinct non-empty IDs → false", () => {
+    expect(isSelfMatchup("abc", "xyz")).toBe(false);
   });
 });
 
