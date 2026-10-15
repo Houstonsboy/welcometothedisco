@@ -64,7 +64,7 @@ abstract final class AppTheme {
   static const Color authorAccent         = Color(0xFFE310EF);
 
   // ── Splash screen ─────────────────────────────────────────────────────────
-  static const Color splashBackground    = Color(0xFF161616);
+  static const Color splashBackground    = Color(0xFF0A1F5C);
   static const Color splashLogoYellow    = Color(0xFFF2DC00);
   static const Color splashLogoDark      = Color(0xFF101010);
   /// White at 25 % opacity — progress-bar track.

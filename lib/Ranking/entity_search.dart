@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/Ranking/entity_profile.dart';
+import 'package:welcometothedisco/models/ranking_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 
@@ -51,7 +53,9 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
   bool _isSearching = false;
   String _lastQuery = '';
   List<_EntitySearchItem> _results = [];
+  Map<String, RankingModel> _ratings = {};
   _SearchMode _searchMode = _SearchMode.artist;
+  int _searchSeq = 0;
 
   @override
   void dispose() {
@@ -67,6 +71,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
     if (q.isEmpty) {
       setState(() {
         _results = [];
+        _ratings = {};
         _lastQuery = '';
         _isSearching = false;
       });
@@ -79,21 +84,33 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
     });
 
     _debounce = Timer(const Duration(milliseconds: 420), () async {
+      final seq = ++_searchSeq;
+
+      List<_EntitySearchItem> items;
       if (_searchMode == _SearchMode.artist) {
         final artists = await _api.searchArtists(q, limit: 12);
         if (!mounted || _lastQuery != q) return;
-        setState(() {
-          _results = artists.map(_EntitySearchItem.fromArtist).toList();
-          _isSearching = false;
-        });
-        return;
+        items = artists.map(_EntitySearchItem.fromArtist).toList();
+      } else {
+        final albums = await _api.searchAlbums(q, limit: 12);
+        if (!mounted || _lastQuery != q) return;
+        items = albums.map(_EntitySearchItem.fromAlbum).toList();
       }
 
-      final albums = await _api.searchAlbums(q, limit: 12);
-      if (!mounted || _lastQuery != q) return;
       setState(() {
-        _results = albums.map(_EntitySearchItem.fromAlbum).toList();
+        _results = items;
         _isSearching = false;
+      });
+
+      // Enrich with Firestore ratings; failure is non-fatal.
+      final ids = items.map((e) => e.id).toList();
+      Map<String, RankingModel> ratings = {};
+      try {
+        ratings = await FirebaseService.getRankingsByIds(ids);
+      } catch (_) {}
+      if (!mounted || seq != _searchSeq) return;
+      setState(() {
+        _ratings = ratings;
       });
     });
   }
@@ -104,6 +121,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
           ? _SearchMode.album
           : _SearchMode.artist;
       _results = [];
+      _ratings = {};
       _isSearching = false;
     });
     final current = _searchController.text.trim();
@@ -379,20 +397,17 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
       );
     }
 
-    return GridView.builder(
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       physics: const BouncingScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.78,
-      ),
       itemCount: _results.length,
       itemBuilder: (context, i) {
         final item = _results[i];
-        return _EntityResultGridCard(
+        final ranking = _ratings[item.id];
+        return _SearchResultRow(
           item: item,
+          ranking: ranking,
+          isLast: i == _results.length - 1,
           onTap: () => _onItemTap(item),
         );
       },
@@ -440,81 +455,139 @@ class _EntitySearchItem {
   }
 }
 
-class _EntityResultGridCard extends StatelessWidget {
+// ── Search result row ─────────────────────────────────────────────────────────
+
+class _SearchResultRow extends StatelessWidget {
   final _EntitySearchItem item;
+  final RankingModel? ranking;
+  final bool isLast;
   final VoidCallback onTap;
 
-  const _EntityResultGridCard({
+  const _SearchResultRow({
     required this.item,
+    required this.ranking,
+    required this.isLast,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: LayoutBuilder(
-              builder: (_, constraints) {
-                final side = constraints.maxWidth;
-                return SizedBox(
-                  width: side,
-                  height: side,
-                  child: _cover(),
-                );
-              },
+    final isArtist = item.type == _EntityType.artist;
+    final imageUrl = item.imageUrl ?? '';
+    final borderRadius = isArtist
+        ? BorderRadius.circular(999)
+        : BorderRadius.circular(8);
+    final pointsLabel =
+        ranking != null ? ranking!.points.round().toString() : '—';
+    final rankLabel =
+        ranking?.rank != null ? '#${ranking!.rank}' : '—';
+
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: borderRadius,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.25),
+                        width: 0.9,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: borderRadius,
+                      child: imageUrl.isNotEmpty
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _placeholder(isArtist),
+                            )
+                          : _placeholder(isArtist),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        pointsLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        rankLabel,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.55),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            item.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              height: 1.25,
-            ),
+        ),
+        if (!isLast)
+          Divider(
+            height: 1,
+            thickness: 0.5,
+            color: Colors.white.withOpacity(0.1),
           ),
-        ],
-      ),
+      ],
     );
   }
 
-  Widget _cover() {
-    final accent = item.type == _EntityType.artist ? _kBlue : _kPink;
-    final hasImage = item.imageUrl != null && item.imageUrl!.isNotEmpty;
-    final borderRadius = item.type == _EntityType.artist
-        ? BorderRadius.circular(99)
-        : BorderRadius.circular(10);
-
+  Widget _placeholder(bool isArtist) {
     return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: borderRadius,
-        border: Border.all(color: accent.withOpacity(0.55), width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: borderRadius,
-        child: hasImage
-            ? Image.network(item.imageUrl!, fit: BoxFit.cover)
-            : Container(
-                color: accent.withOpacity(0.25),
-                child: Icon(
-                  item.type == _EntityType.artist
-                      ? Icons.person_rounded
-                      : Icons.album_rounded,
-                  color: Colors.white.withOpacity(0.65),
-                  size: 22,
-                ),
-              ),
+      color: Colors.white.withOpacity(0.10),
+      child: Icon(
+        isArtist ? Icons.person_rounded : Icons.album_rounded,
+        color: Colors.white.withOpacity(0.5),
+        size: 22,
       ),
     );
   }

@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ── Single round entry inside track_details ────────────────────────────────
-// Firestore key is the round index as a string ("0", "1", "2", ...).
 class TrackRoundEntry {
-  final String winner;         // winning track ID (empty if unvoted)
+  final String winner;        // "entity1" | "entity2" | "" (unvoted)
   final String entity1TrackId;
   final String entity1TrackName;
   final String entity2TrackId;
@@ -21,64 +20,57 @@ class TrackRoundEntry {
     required this.voterComment,
   });
 
-  bool get isVoted => winner.isNotEmpty;
-  bool get entity1Won => isVoted && winner == entity1TrackId;
-  bool get entity2Won => isVoted && winner == entity2TrackId;
+  bool get isVoted  => winner == 'entity1' || winner == 'entity2';
+  bool get entity1Won => winner == 'entity1';
+  bool get entity2Won => winner == 'entity2';
 
   factory TrackRoundEntry.fromMap(Map<String, dynamic> map) {
     return TrackRoundEntry(
-      winner:           (map['Winner']          as String?)?.trim() ?? '',
-      entity1TrackId:   (map['artist1trackID']  as String?)?.trim() ?? '',
-      entity1TrackName: (map['artist1trackName'] as String?)?.trim() ?? '',
-      entity2TrackId:   (map['artist2trackID']  as String?)?.trim() ?? '',
-      entity2TrackName: (map['artist2trackName'] as String?)?.trim() ?? '',
-      isBonus:    (map['isBonus']      as bool?) ?? false,
-      voterComment: (map['voter_comment'] as String?)?.trim() ?? '',
+      winner:           (map['winner']            as String?)?.trim() ?? '',
+      entity1TrackId:   (map['entity1_track_id']  as String?)?.trim() ?? '',
+      entity1TrackName: (map['entity1_track_name'] as String?)?.trim() ?? '',
+      entity2TrackId:   (map['entity2_track_id']  as String?)?.trim() ?? '',
+      entity2TrackName: (map['entity2_track_name'] as String?)?.trim() ?? '',
+      isBonus:          (map['isBonus']            as bool?) ?? false,
+      voterComment:     (map['voter_comment']      as String?)?.trim() ?? '',
     );
   }
 
   Map<String, dynamic> toMap() => {
-    'Winner':           winner,
-    'artist1trackID':   entity1TrackId,
-    'artist1trackName': entity1TrackName,
-    'artist2trackID':   entity2TrackId,
-    'artist2trackName': entity2TrackName,
-    'isBonus':          isBonus,
-    'voter_comment':    voterComment,
+    'winner':            winner,
+    'entity1_track_id':  entity1TrackId,
+    'entity1_track_name': entity1TrackName,
+    'entity2_track_id':  entity2TrackId,
+    'entity2_track_name': entity2TrackName,
+    'isBonus':           isBonus,
+    'voter_comment':     voterComment,
   };
 }
 
 // ── Poll model ─────────────────────────────────────────────────────────────
 // Doc ID is deterministic: "{versusId}_{voterId}"
-// Handles both album polls (album1ID / album2ID) and
-// artist polls (artist1ID / artist2ID) — unified as entity1 / entity2.
 class PollModel {
-  final String id;             // Firestore doc ID
+  final String id;
   final String versusId;
-  final String versusType;     // "album" | "artist" | "collaboration" | "collaborator"
+  final String versusType;
   final String voterId;
   final String voterName;
   final String voterAvatar;
   final Timestamp? timestamp;
 
-  // Entity 1 (album1ID / artist1ID depending on versusType)
   final String entity1Id;
   final String entity1Name;
   final int entity1Vote;
 
-  // Entity 2 (album2ID / artist2ID depending on versusType)
   final String entity2Id;
   final String entity2Name;
   final int entity2Vote;
 
   final double completionPercentage;
   final int unvotedCount;
-
-  /// Last reconciled percentage — only present on artist/collaboration polls.
   final double? lastReconciledPct;
 
-  /// Round index (0-based) → round entry.
-  final Map<int, TrackRoundEntry> trackDetails;
+  final List<TrackRoundEntry> trackDetails;
 
   const PollModel({
     required this.id,
@@ -100,10 +92,9 @@ class PollModel {
     required this.trackDetails,
   });
 
-  // ── Convenience ──────────────────────────────────────────────────────────
-  bool get isAlbumPoll   => versusType == 'album';
-  bool get isArtistPoll  => versusType == 'artist';
-  bool get isCollabPoll  =>
+  bool get isAlbumPoll  => versusType == 'album';
+  bool get isArtistPoll => versusType == 'artist';
+  bool get isCollabPoll =>
       versusType == 'collaboration' || versusType == 'collaborator';
 
   int get totalVotes => entity1Vote + entity2Vote;
@@ -113,63 +104,45 @@ class PollModel {
   double get entity2Percentage =>
       totalVotes == 0 ? 0 : entity2Vote / totalVotes * 100;
 
-  List<TrackRoundEntry> get roundsSorted {
-    final keys = trackDetails.keys.toList()..sort();
-    return keys.map((k) => trackDetails[k]!).toList();
-  }
+  // trackDetails is already ordered by round_number on write.
+  List<TrackRoundEntry> get roundsSorted => trackDetails;
 
   // ── Firestore → model ─────────────────────────────────────────────────────
   factory PollModel.fromFirestore(Map<String, dynamic> data, String id) {
-    final type = (data['Versus_type'] as String?)?.trim().toLowerCase() ?? 'album';
-    final isAlbum = type == 'album';
+    final e1Id   = (data['entity1_id']   as String?)?.trim() ?? '';
+    final e1Name = (data['entity1_name'] as String?)?.trim() ?? '';
+    final e2Id   = (data['entity2_id']   as String?)?.trim() ?? '';
+    final e2Name = (data['entity2_name'] as String?)?.trim() ?? '';
 
-    // Entity field names differ between album and artist polls.
-    final e1Id   = isAlbum
-        ? (data['album1ID']   as String?)?.trim() ?? ''
-        : (data['artist1ID']  as String?)?.trim() ?? '';
-    final e1Name = isAlbum
-        ? (data['album1Name']  as String?)?.trim() ?? ''
-        : (data['artist1Name'] as String?)?.trim() ?? '';
-    final e1Vote = isAlbum
-        ? (data['album1Vote']  as num?)?.toInt() ?? 0
-        : (data['artist1Vote'] as num?)?.toInt() ?? 0;
+    final summary = data['summary'] as Map<String, dynamic>? ?? {};
+    final e1Vote  = (summary['entity1_votes'] as num?)?.toInt() ?? 0;
+    final e2Vote  = (summary['entity2_votes'] as num?)?.toInt() ?? 0;
 
-    final e2Id   = isAlbum
-        ? (data['album2ID']   as String?)?.trim() ?? ''
-        : (data['artist2ID']  as String?)?.trim() ?? '';
-    final e2Name = isAlbum
-        ? (data['album2Name']  as String?)?.trim() ?? ''
-        : (data['artist2Name'] as String?)?.trim() ?? '';
-    final e2Vote = isAlbum
-        ? (data['album2Vote']  as num?)?.toInt() ?? 0
-        : (data['artist2Vote'] as num?)?.toInt() ?? 0;
-
-    // Parse track_details: Firestore stores keys as strings ("0", "1", ...)
-    final rawDetails = data['track_details'] as Map<String, dynamic>? ?? {};
-    final trackDetails = <int, TrackRoundEntry>{};
-    for (final entry in rawDetails.entries) {
-      final idx = int.tryParse(entry.key);
-      if (idx == null) continue;
-      final raw = entry.value;
-      if (raw is Map<String, dynamic>) {
-        trackDetails[idx] = TrackRoundEntry.fromMap(raw);
+    // track_details is stored as a List in the new format.
+    final rawDetails = data['track_details'];
+    final trackDetails = <TrackRoundEntry>[];
+    if (rawDetails is List) {
+      for (final item in rawDetails) {
+        if (item is Map<String, dynamic>) {
+          trackDetails.add(TrackRoundEntry.fromMap(item));
+        }
       }
     }
 
     return PollModel(
-      id:                  id,
-      versusId:            (data['versus_id']            as String?)?.trim() ?? '',
-      versusType:          (data['Versus_type']           as String?)?.trim() ?? 'album',
-      voterId:             (data['voter_id']              as String?)?.trim() ?? '',
-      voterName:           (data['voter_name']            as String?)?.trim() ?? '',
-      voterAvatar:         (data['voter_avatar']          as String?)?.trim() ?? '',
-      timestamp:           data['timestamp']              as Timestamp?,
-      entity1Id:   e1Id,
-      entity1Name: e1Name,
-      entity1Vote: e1Vote,
-      entity2Id:   e2Id,
-      entity2Name: e2Name,
-      entity2Vote: e2Vote,
+      id:                   id,
+      versusId:             (data['versus_id']             as String?)?.trim() ?? '',
+      versusType:           (data['entity_type']           as String?)?.trim() ?? 'album',
+      voterId:              (data['voter_id']              as String?)?.trim() ?? '',
+      voterName:            (data['voter_name']            as String?)?.trim() ?? '',
+      voterAvatar:          (data['voter_avatar']          as String?)?.trim() ?? '',
+      timestamp:            data['timestamp']              as Timestamp?,
+      entity1Id:            e1Id,
+      entity1Name:          e1Name,
+      entity1Vote:          e1Vote,
+      entity2Id:            e2Id,
+      entity2Name:          e2Name,
+      entity2Vote:          e2Vote,
       completionPercentage: (data['completion_percentage'] as num?)?.toDouble() ?? 0.0,
       unvotedCount:         (data['unvoted_count']         as num?)?.toInt()    ?? 0,
       lastReconciledPct:    (data['last_reconciled_pct']   as num?)?.toDouble(),
@@ -178,33 +151,25 @@ class PollModel {
   }
 
   // ── model → Firestore ─────────────────────────────────────────────────────
-  // Writes back using the correct field names for the poll type.
-  Map<String, dynamic> toFirestore() {
-    final trackMap = {
-      for (final e in trackDetails.entries) '${e.key}': e.value.toMap(),
-    };
-
-    final entityPrefix1 = isAlbumPoll ? 'album1' : 'artist1';
-    final entityPrefix2 = isAlbumPoll ? 'album2' : 'artist2';
-
-    return {
-      'versus_id':             versusId,
-      'Versus_type':           versusType,
-      'voter_id':              voterId,
-      'voter_name':            voterName,
-      'voter_avatar':          voterAvatar,
-      'timestamp':             timestamp ?? FieldValue.serverTimestamp(),
-      '${entityPrefix1}ID':   entity1Id,
-      '${entityPrefix1}Name': entity1Name,
-      '${entityPrefix1}Vote': entity1Vote,
-      '${entityPrefix2}ID':   entity2Id,
-      '${entityPrefix2}Name': entity2Name,
-      '${entityPrefix2}Vote': entity2Vote,
-      'completion_percentage': completionPercentage,
-      'unvoted_count':         unvotedCount,
-      if (lastReconciledPct != null)
-        'last_reconciled_pct': lastReconciledPct,
-      'track_details': trackMap,
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+    'versus_id':             versusId,
+    'entity_type':           versusType,
+    'voter_id':              voterId,
+    'voter_name':            voterName,
+    'voter_avatar':          voterAvatar,
+    'timestamp':             timestamp ?? FieldValue.serverTimestamp(),
+    'entity1_id':            entity1Id,
+    'entity1_name':          entity1Name,
+    'entity2_id':            entity2Id,
+    'entity2_name':          entity2Name,
+    'summary': {
+      'entity1_votes': entity1Vote,
+      'entity2_votes': entity2Vote,
+    },
+    'completion_percentage': completionPercentage,
+    'unvoted_count':         unvotedCount,
+    if (lastReconciledPct != null)
+      'last_reconciled_pct': lastReconciledPct,
+    'track_details': trackDetails.map((r) => r.toMap()).toList(),
+  };
 }

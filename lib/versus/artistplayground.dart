@@ -14,6 +14,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
   import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+  import 'package:welcometothedisco/utils/pair_utils.dart';
   import 'package:welcometothedisco/services/user_profile_cache_service.dart';
   import 'package:welcometothedisco/theme/app_theme.dart';
   import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
@@ -26,11 +27,6 @@ import 'package:welcometothedisco/services/spotify_api.dart';
   const _kDefaultColor1 = AppTheme.gradientStart;
   const _kDefaultColor2 = AppTheme.gradientEnd;
   const _kSpotifyGreen  = AppTheme.spotifyGreen;
-
-  // Ranking: first-time `rankings/{spotifyArtistId}` documents are created when a versus
-  // is saved from the artist lockeroom / collaborator flows — see
-  // [FirebaseService.createArtistVersus] and [FirebaseService.ensureRankingDocIfAbsent]
-  // (RANKINGS section in firebase_service.dart). This screen only consumes versus + polls.
 
   // ── Track Vote Detail ─────────────────────────────────────────────────────────
   /// Represents a fully captured vote for a single round (index).
@@ -93,19 +89,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     String _voterName = '';
     String _voterAvatar = '';
     Timer? _pollDebounce;
-
-    // ── Ranking reconciliation state ──────────────────────────────────────────
-    // Last ranking batch applied for this session: completion % plus entity vote
-    // tallies. Seeded from poll doc in _restoreExistingPoll. When any of these
-    // differ from the current template (e.g. unvote, same % but different winner),
-    // we reconcile again — unlike pct-only checks, which skipped when pct dropped.
-    double _lastReconciledPct = 0.0;
-    int _lastReconciledEntity1Votes = 0;
-    int _lastReconciledEntity2Votes = 0;
-
-    // Guard: prevents concurrent reconcile calls from racing each other.
-    // Set true at start of _reconcileRankingNow, false on completion.
-    bool _isReconciling = false;
 
     // ── Hydrated track lists ──────────────────────────────────────────────────
   List<SpotifyTrack> _tracks1 = [];
@@ -269,71 +252,52 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         }
       }
 
-      final data = await FirebaseService.getExistingArtistPoll(
+      final data = await FirebaseService.getExistingPoll(
         versusId: _resolvedVersusId,
         voterId: _voterId,
       );
       if (data == null || !mounted) return;
 
-      // ── GAP-FILL SEED: runs on every restore regardless of track_details ──
-      final storedLastPct =
-          (data['last_reconciled_pct'] as num?)?.toDouble() ?? 0.0;
-      final storedCompletionPct =
-          (data['completion_percentage'] as num?)?.toDouble() ?? 0.0;
-
-      _lastReconciledPct = storedLastPct;
-      _lastReconciledEntity1Votes =
-          (data['artist1Vote'] as num?)?.toInt() ?? 0;
-      _lastReconciledEntity2Votes =
-          (data['artist2Vote'] as num?)?.toInt() ?? 0;
-
-      if (storedCompletionPct > storedLastPct) {
-        debugPrint(
-          '[_restoreExistingPoll] gap detected before track parse: '
-          'completion=$storedCompletionPct > lastReconciled=$storedLastPct',
-        );
-        unawaited(_reconcileRankingNow(reason: 'restore-gap-fill-early'));
-      }
-
-      final rawDetails = data['track_details'] as Map<String, dynamic>?;
+      final rawDetails = data['track_details'] as List<dynamic>?;
       if (rawDetails == null || rawDetails.isEmpty) return;
 
       final restoredVotes = <int, int>{};
       final restoredDetails = <int, TrackVoteDetail>{};
 
-      for (final entry in rawDetails.entries) {
-        final roundIndex = int.tryParse(entry.key);
-        if (roundIndex == null) continue;
-        final round = entry.value as Map<String, dynamic>?;
+      for (final item in rawDetails) {
+        final round = item as Map<String, dynamic>?;
         if (round == null) continue;
+        final roundIndex = (round['round_number'] as num?)?.toInt();
+        if (roundIndex == null) continue;
         final isBonus = round['isBonus'] as bool? ?? false;
         if (isBonus) continue;
 
-        final artist1trackID = round['artist1trackID'] as String? ?? '';
-        final artist2trackID = round['artist2trackID'] as String? ?? '';
-        final winnerId = round['Winner'] as String? ?? '';
-        if (winnerId.isEmpty || artist1trackID.isEmpty || artist2trackID.isEmpty) {
-          continue;
-        }
+        final art1Id = (round['entity1_track_id'] as String?) ?? '';
+        final art2Id = (round['entity2_track_id'] as String?) ?? '';
+        final winnerStr = round['winner'] as String?;
+        if (winnerStr == null || art1Id.isEmpty || art2Id.isEmpty) continue;
 
-        final int winnerArtistIndex;
-        if (winnerId == artist1trackID) {
-          winnerArtistIndex = 0;
-        } else if (winnerId == artist2trackID) {
-          winnerArtistIndex = 1;
+        final int winnerIndex;
+        final String winnerId;
+        if (winnerStr == 'entity1') {
+          winnerIndex = 0;
+          winnerId = art1Id;
+        } else if (winnerStr == 'entity2') {
+          winnerIndex = 1;
+          winnerId = art2Id;
         } else {
           continue;
         }
 
-        restoredVotes[roundIndex] = winnerArtistIndex;
+        restoredVotes[roundIndex] = winnerIndex;
         restoredDetails[roundIndex] = TrackVoteDetail(
-          artist1trackID: artist1trackID,
-          artist2trackID: artist2trackID,
-          winnerTrackID: winnerId,
-          artist1trackName: round['artist1trackName'] as String? ?? '',
-          artist2trackName: round['artist2trackName'] as String? ?? '',
-          voterComment: round['voter_comment'] as String? ?? '',
-          isBonus: false,
+          artist1trackID:   art1Id,
+          artist2trackID:   art2Id,
+          winnerTrackID:    winnerId,
+          artist1trackName: (round['entity1_track_name'] as String?) ?? '',
+          artist2trackName: (round['entity2_track_name'] as String?) ?? '',
+          voterComment:     (round['voter_comment'] as String?) ?? '',
+          isBonus:          false,
         );
       }
 
@@ -349,22 +313,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         if (comment.isNotEmpty) {
           _commentCtrlAt(entry.key).text = comment;
         }
-      }
-
-      if (storedCompletionPct > storedLastPct) {
-        debugPrint(
-          '[_restoreExistingPoll] gap-fill after vote restore: '
-          'completion=$storedCompletionPct > lastReconciled=$storedLastPct',
-        );
-        unawaited(_reconcileRankingNow(reason: 'restore-gap-fill-post-restore'));
-      }
-
-      if (storedCompletionPct < storedLastPct) {
-        debugPrint(
-          '[_restoreExistingPoll] stale last_reconciled_pct after restore: '
-          'completion=$storedCompletionPct < lastReconciled=$storedLastPct',
-        );
-        unawaited(_reconcileRankingNow(reason: 'restore-stale-last-pct'));
       }
 
       debugPrint(
@@ -579,14 +527,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      debugPrint('[lifecycle] state=$state — flushing poll + reconciling');
-
+      debugPrint('[lifecycle] state=$state — flushing poll');
       _pollDebounce?.cancel();
-      unawaited(
-        _syncPollToFirestore().then(
-          (_) => _reconcileRankingNow(reason: 'lifecycle-${state.name}'),
-        ),
-      );
+      unawaited(_syncPollToFirestore());
     }
   }
 
@@ -595,12 +538,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     WidgetsBinding.instance.removeObserver(this);
 
     _pollDebounce?.cancel();
-
-    unawaited(
-      _syncPollToFirestore().then(
-        (_) => _reconcileRankingNow(reason: 'dispose'),
-      ),
-    );
+    unawaited(_syncPollToFirestore());
 
     _profileBubble?.remove();
     _nowPlayingSub?.cancel();
@@ -658,7 +596,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       }
       _logVoteTemplateSnapshot('vote-updated-round-$roundIndex');
       _schedulePollSync();
-      _requestReconcileAfterVote();
     }
 
     /// Updates the voter_comment on an already-cast vote when the user edits the note field.
@@ -691,139 +628,56 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       }
 
       final doc = _buildVoteTemplateDoc();
-      await FirebaseService.upsertArtistPoll(
-        versusId: _resolvedVersusId,
-        versusType: _versus.type,
-        voterId: _voterId,
-        voterName: _voterName,
+
+      // Convert internal TrackVoteDetail map → unified list format.
+      final trackDetailsList = (doc.trackDetails.entries.map((e) {
+        final roundIndex = e.key;
+        final oldMap = e.value.toMap();
+        final art1Id = (oldMap['artist1trackID'] as String?) ?? '';
+        final art2Id = (oldMap['artist2trackID'] as String?) ?? '';
+        final winnerId = (oldMap['Winner'] as String?) ?? '';
+        final String? winner = winnerId.isEmpty
+            ? null
+            : (winnerId == art1Id
+                ? 'entity1'
+                : (winnerId == art2Id ? 'entity2' : null));
+        return <String, dynamic>{
+          'round_number':      roundIndex,
+          'entity1_track_id':  art1Id,
+          'entity1_track_name': (oldMap['artist1trackName'] as String?) ?? '',
+          'entity2_track_id':  art2Id,
+          'entity2_track_name': (oldMap['artist2trackName'] as String?) ?? '',
+          'isBonus':           (oldMap['isBonus'] as bool?) ?? false,
+          'winner':            winner,
+          'voter_comment':     (oldMap['voter_comment'] as String?) ?? '',
+        };
+      }).toList()
+        ..sort((a, b) =>
+            (a['round_number'] as int).compareTo(b['round_number'] as int)));
+
+      final pairKey = makePairKey(_versus.artist1ID, _versus.artist2ID);
+
+      await FirebaseService.upsertPoll(
+        versusId:    _resolvedVersusId,
+        pairKey:     pairKey,
+        entityType:  'artist',
+        voterId:     _voterId,
+        voterName:   _voterName,
         voterAvatar: _voterAvatar,
-        artist1ID: _versus.artist1ID,
-        artist1Name: _versus.artist1Name,
-        artist1Vote: _artist1VoteCount,
-        artist2ID: _versus.artist2ID,
-        artist2Name: _versus.artist2Name,
-        artist2Vote: _artist2VoteCount,
-        trackDetails: {
-          for (final e in doc.trackDetails.entries) e.key: e.value.toMap(),
-        },
-        completionPercentage: doc.completionPercentage,
-        unvotedCount: doc.unvotedCount,
+        entity1Id:   _versus.artist1ID,
+        entity1Name: _versus.artist1Name,
+        entity2Id:   _versus.artist2ID,
+        entity2Name: _versus.artist2Name,
+        trackDetails:          trackDetailsList,
+        completionPercentage:  doc.completionPercentage,
+        unvotedCount:          doc.unvotedCount,
       );
     }
 
-    bool _samePct(double a, double b) => (a - b).abs() < 0.0001;
-
-    bool _watermarkMatches(VoteDocTemplateModel doc) {
-      return _samePct(doc.completionPercentage, _lastReconciledPct) &&
-          doc.entity1Vote == _lastReconciledEntity1Votes &&
-          doc.entity2Vote == _lastReconciledEntity2Votes;
-    }
-
-    /// After a vote change, refresh rankings whenever the poll template differs
-    /// from the last reconciled watermark (including unvotes and same-% tally changes).
-    void _requestReconcileAfterVote() {
-      unawaited(_reconcileRankingNow(reason: 'vote'));
-    }
-
-    // ── Function 2: Core reconcile engine ─────────────────────────────────────
-    Future<void> _reconcileRankingNow({required String reason}) async {
-      if (_isReconciling) {
-        debugPrint('[reconcile] skipped ($reason) — already in progress');
-        return;
-      }
-      if (_voterId.isEmpty || _resolvedVersusId.isEmpty) return;
-      if (_versus.artist1ID.trim().isEmpty ||
-          _versus.artist2ID.trim().isEmpty) {
-        debugPrint('[reconcile] skipped ($reason) — missing artist IDs');
-        return;
-      }
-
-      final doc = _buildVoteTemplateDoc();
-      final currentPct = doc.completionPercentage;
-
-      // Early restore-gap-fill: poll may show completion ahead of ranking while
-      // local _votesByIndex is still empty — do not skip on local completion.
-      final skipGapCheck = reason == 'restore-gap-fill-early';
-      if (!skipGapCheck && _watermarkMatches(doc)) {
-        debugPrint(
-          '[reconcile] skipped ($reason) — watermark unchanged '
-          '(pct=$currentPct, votes=${doc.entity1Vote},${doc.entity2Vote})',
-        );
-        return;
-      }
-
-      _isReconciling = true;
-      debugPrint(
-        '[reconcile] START reason=$reason '
-        'pct=$currentPct votes=(${doc.entity1Vote},${doc.entity2Vote})',
-      );
-
-      try {
-        await FirebaseService.reconcileRankingBatch(
-          entity1Id: _versus.artist1ID,
-          entity2Id: _versus.artist2ID,
-          versusId: _resolvedVersusId,
-          voterId: _voterId,
-          currentEntity1Votes: doc.entity1Vote,
-          currentEntity2Votes: doc.entity2Vote,
-          currentPct: currentPct,
-        );
-
-        _lastReconciledPct = currentPct;
-        _lastReconciledEntity1Votes = doc.entity1Vote;
-        _lastReconciledEntity2Votes = doc.entity2Vote;
-        debugPrint(
-          '[reconcile] DONE reason=$reason lastReconciledPct=$_lastReconciledPct '
-          'votes=($_lastReconciledEntity1Votes,$_lastReconciledEntity2Votes)',
-        );
-      } on RankingStubsMissingException {
-        debugPrint('[reconcile] ranking stubs missing — retry in 3s');
-        await Future<void>.delayed(const Duration(seconds: 3));
-        if (!mounted) return;
-        final docRetry = _buildVoteTemplateDoc();
-        final pctRetry = docRetry.completionPercentage;
-        final skipGapRetry = reason == 'restore-gap-fill-early';
-        if (!skipGapRetry && _watermarkMatches(docRetry)) {
-          debugPrint(
-            '[reconcile] retry skipped — watermark unchanged '
-            '(pct=$pctRetry)',
-          );
-          return;
-        }
-        try {
-          await FirebaseService.reconcileRankingBatch(
-            entity1Id: _versus.artist1ID,
-            entity2Id: _versus.artist2ID,
-            versusId: _resolvedVersusId,
-            voterId: _voterId,
-            currentEntity1Votes: docRetry.entity1Vote,
-            currentEntity2Votes: docRetry.entity2Vote,
-            currentPct: pctRetry,
-          );
-          _lastReconciledPct = pctRetry;
-          _lastReconciledEntity1Votes = docRetry.entity1Vote;
-          _lastReconciledEntity2Votes = docRetry.entity2Vote;
-          debugPrint(
-            '[reconcile] retry DONE lastReconciledPct=$_lastReconciledPct '
-            'votes=($_lastReconciledEntity1Votes,$_lastReconciledEntity2Votes)',
-          );
-        } catch (e) {
-          debugPrint('[reconcile] retry also failed: $e');
-        }
-      } catch (e, st) {
-        debugPrint('[reconcile] FAILED reason=$reason: $e\n$st');
-      } finally {
-        _isReconciling = false;
-      }
-    }
-
-    // ── Function 3: Back navigation hook ─────────────────────────────────────
-    /// Flush poll + reconcile, then pop. Used from [PopScope] (system back) and
-    /// from header via [Navigator.maybePop] which routes through the same [PopScope].
+    // ── Function 2: Back navigation hook ─────────────────────────────────────
     Future<void> _handleBackNavigation() async {
       _pollDebounce?.cancel();
       await _syncPollToFirestore();
-      await _reconcileRankingNow(reason: 'back-navigation');
       if (mounted) Navigator.of(context).pop();
     }
 
@@ -1078,12 +932,6 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
       if (_resolvedVersusId.isEmpty) return;
       final fresh = await FirebaseService.getArtistVersusById(_resolvedVersusId);
       if (!mounted || fresh == null) return;
-
-      unawaited(
-        FirebaseService.recalculatePollsAfterVersusTrackListChange(
-          _resolvedVersusId,
-        ),
-      );
 
       setState(() {
         _versus = fresh;

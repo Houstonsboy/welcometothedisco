@@ -442,7 +442,8 @@ class _FeedItemState extends State<_FeedItem> {
     final cardHeight = MediaQuery.sizeOf(context).height * 0.75;
 
     final rawDetails = <int, Map<String, dynamic>>{
-      for (final e in poll.trackDetails.entries) e.key: e.value.toMap(),
+      for (var i = 0; i < poll.trackDetails.length; i++)
+        i: poll.trackDetails[i].toMap(),
     };
 
     final names1 = sorted.map((r) => r.entity1TrackName).toList();

@@ -17,6 +17,7 @@ import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/utils/pair_utils.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/playable_album_cover.dart';
@@ -446,52 +447,54 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       }
     }
 
-    final data = await FirebaseService.getExistingAlbumPoll(
+    final data = await FirebaseService.getExistingPoll(
       versusId: _resolvedVersusId,
       voterId:  _voterId,
     );
     if (data == null || !mounted) return;
 
-    final rawDetails = data['track_details'] as Map<String, dynamic>?;
+    final rawDetails = data['track_details'] as List<dynamic>?;
     if (rawDetails == null || rawDetails.isEmpty) return;
 
     final restoredVotes   = <int, int>{};
     final restoredDetails = <int, AlbumTrackVoteDetail>{};
 
-    for (final entry in rawDetails.entries) {
-      final roundIndex = int.tryParse(entry.key);
-      if (roundIndex == null) continue;
-
-      final round   = entry.value as Map<String, dynamic>?;
+    for (final item in rawDetails) {
+      final round = item as Map<String, dynamic>?;
       if (round == null) continue;
+
+      final roundIndex = (round['round_number'] as num?)?.toInt();
+      if (roundIndex == null) continue;
 
       final isBonus = round['isBonus'] as bool? ?? false;
       if (isBonus) continue;
 
-      // Note: we stored these under artist1trackID/artist2trackID keys
-      // to match the shared poll schema.
-      final album1trackID   = round['artist1trackID']   as String? ?? '';
-      final album2trackID   = round['artist2trackID']   as String? ?? '';
-      final winnerId        = round['Winner']            as String? ?? '';
-      final album1trackName = round['artist1trackName'] as String? ?? '';
-      final album2trackName = round['artist2trackName'] as String? ?? '';
-      final comment         = round['voter_comment']    as String? ?? '';
+      final art1Id = (round['entity1_track_id'] as String?) ?? '';
+      final art2Id = (round['entity2_track_id'] as String?) ?? '';
+      final winnerStr = round['winner'] as String?;
 
-      if (winnerId.isEmpty || album1trackID.isEmpty || album2trackID.isEmpty) continue;
+      if (winnerStr == null || art1Id.isEmpty || art2Id.isEmpty) continue;
 
-      final int winnerAlbumIndex;
-      if (winnerId == album1trackID)      { winnerAlbumIndex = 0; }
-      else if (winnerId == album2trackID) { winnerAlbumIndex = 1; }
-      else { continue; }
+      final int winnerIndex;
+      final String winnerId;
+      if (winnerStr == 'entity1') {
+        winnerIndex = 0;
+        winnerId = art1Id;
+      } else if (winnerStr == 'entity2') {
+        winnerIndex = 1;
+        winnerId = art2Id;
+      } else {
+        continue;
+      }
 
-      restoredVotes[roundIndex] = winnerAlbumIndex;
+      restoredVotes[roundIndex] = winnerIndex;
       restoredDetails[roundIndex] = AlbumTrackVoteDetail(
-        album1trackID:   album1trackID,
-        album2trackID:   album2trackID,
+        album1trackID:   art1Id,
+        album2trackID:   art2Id,
         winnerTrackID:   winnerId,
-        album1trackName: album1trackName,
-        album2trackName: album2trackName,
-        voterComment:    comment,
+        album1trackName: (round['entity1_track_name'] as String?) ?? '',
+        album2trackName: (round['entity2_track_name'] as String?) ?? '',
+        voterComment:    (round['voter_comment'] as String?) ?? '',
         isBonus:         false,
       );
     }
@@ -536,46 +539,75 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         ? 0.0
         : ((votedCount / totalRounds) * 100).clamp(0, 100).toDouble();
 
-    // Build track_details — include bonus rounds for longer album.
-    final details = <int, Map<String, dynamic>>{
-      for (final e in _trackDetails.entries) e.key: e.value.toMap(),
-    };
+    final album1 = albums[0];
+    final album2 = albums[1];
+    final album1Id = widget.versus.album1ID;
+    final album2Id = widget.versus.album2ID;
 
+    // Build unified track_details list.
+    final trackDetailsList = <Map<String, dynamic>>[];
+    for (final e in _trackDetails.entries) {
+      final oldMap = e.value.toMap();
+      final art1Id = (oldMap['artist1trackID'] as String?) ?? '';
+      final art2Id = (oldMap['artist2trackID'] as String?) ?? '';
+      final winnerId = (oldMap['Winner'] as String?) ?? '';
+      final String? winner = winnerId.isEmpty
+          ? null
+          : (winnerId == art1Id
+              ? 'entity1'
+              : (winnerId == art2Id ? 'entity2' : null));
+      trackDetailsList.add({
+        'round_number':       e.key,
+        'entity1_track_id':   art1Id,
+        'entity1_track_name': (oldMap['artist1trackName'] as String?) ?? '',
+        'entity2_track_id':   art2Id,
+        'entity2_track_name': (oldMap['artist2trackName'] as String?) ?? '',
+        'isBonus':            (oldMap['isBonus'] as bool?) ?? false,
+        'winner':             winner,
+        'voter_comment':      (oldMap['voter_comment'] as String?) ?? '',
+      });
+    }
+
+    // Append bonus rounds for the longer album.
     final longerIndex = _longerSideAlbumIndex;
     if (longerIndex != null && _isVotingCompleteForPairs) {
       final longerTracks = albums[longerIndex]?.tracks ?? <SpotifyAlbumTrack>[];
       for (int i = _pairedRoundCount; i < longerTracks.length; i++) {
         final t = longerTracks[i];
-        details[i] = {
-          'artist1trackID':   longerIndex == 0 ? t.id   : null,
-          'artist2trackID':   longerIndex == 1 ? t.id   : null,
-          'Winner':           t.id,
-          'voter_comment':    '',
-          'artist1trackName': longerIndex == 0 ? t.name : null,
-          'artist2trackName': longerIndex == 1 ? t.name : null,
-          'isBonus':          true,
-        };
+        final isEnt1 = longerIndex == 0;
+        trackDetailsList.add({
+          'round_number':       i,
+          'entity1_track_id':   isEnt1 ? t.id   : '',
+          'entity1_track_name': isEnt1 ? t.name : '',
+          'entity2_track_id':   isEnt1 ? ''     : t.id,
+          'entity2_track_name': isEnt1 ? ''     : t.name,
+          'isBonus':            true,
+          'winner':             isEnt1 ? 'entity1' : 'entity2',
+          'voter_comment':      '',
+        });
       }
     }
 
-    final album1 = albums[0];
-    final album2 = albums[1];
+    trackDetailsList.sort(
+      (a, b) => (a['round_number'] as int).compareTo(b['round_number'] as int),
+    );
 
-    await FirebaseService.upsertAlbumPoll(
-      versusId:  _resolvedVersusId,
-      versusType: widget.versus.type.trim(),
-      voterId:   _voterId,
-      voterName: _voterName,
+    final pairKey = makePairKey(album1Id, album2Id);
+
+    await FirebaseService.upsertPoll(
+      versusId:    _resolvedVersusId,
+      pairKey:     pairKey,
+      entityType:  'album',
+      voterId:     _voterId,
+      voterName:   _voterName,
       voterAvatar: _voterAvatar,
-      album1ID:   widget.versus.album1ID,
-      album1Name: album1?.title ?? widget.versus.album1Name ?? '',
-      album1Vote: _album1VoteCount,
-      album2ID:   widget.versus.album2ID,
-      album2Name: album2?.title ?? widget.versus.album2Name ?? '',
-      album2Vote: _album2VoteCount,
-      trackDetails: details,
-      completionPercentage: completion,
-      unvotedCount: unvoted,
+      entity1Id:   album1Id,
+      entity1Name: album1?.title ?? widget.versus.album1Name ?? '',
+      entity2Id:   album2Id,
+      entity2Name: album2?.title ?? widget.versus.album2Name ?? '',
+      trackDetails:          trackDetailsList,
+      completionPercentage:  completion,
+      unvotedCount:          unvoted,
     );
   }
 

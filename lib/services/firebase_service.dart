@@ -1,6 +1,5 @@
 // lib/services/firebase_service.dart
 import 'dart:async';
-import 'dart:math' show min;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,22 +7,13 @@ import 'package:flutter/foundation.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
 import 'package:welcometothedisco/models/post_model.dart';
+import 'package:welcometothedisco/models/pair_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
-
-/// Thrown when [FirebaseService.reconcileRankingBatch] reads the two ranking
-/// docs in a transaction and one or both are missing (e.g. stubs still
-/// writing). Callers may retry after a short delay.
-class RankingStubsMissingException implements Exception {
-  final String message;
-  const RankingStubsMissingException(this.message);
-
-  @override
-  String toString() => 'RankingStubsMissingException: $message';
-}
+import 'package:welcometothedisco/utils/pair_utils.dart';
 
 class FirebaseService {
   static final _firestore = FirebaseFirestore.instance;
@@ -437,281 +427,6 @@ class FirebaseService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // RANKINGS — initial entity stubs (`rankings/{spotifyEntityId}`)
-  // ══════════════════════════════════════════════════════════════════════════
-  //
-  // Each Spotify artist or album can have one document in [rankings], keyed by
-  // the same ID used in versus docs. For a **pair** in a live versus we use
-  // [_ensureRankingEntityOpponentLink] on each side: create stub + nested
-  // [opponents.opponentId] on first touch, or increment root [versus_count] and
-  // that opponent's [versus_count] on rematches. Single-entity edge cases still
-  // use [ensureRankingDocIfAbsent]. Ongoing vote tallies use atomic increments
-  // (see [RankingModel] and future [updateRankingsFromPoll]).
-  //
-  // Called from: [createVersus] / [createArtistVersus] when a new versus is written
-  // already live (album + immediate-open artist versus). Collaboration *invites*
-  // stay [incomplete] until the backroom — rankings for those are created only in
-  // [_ensureRankingStubsForVersusDocIfLive] after [acceptCollaborationInvite] when
-  // status is open|active and both artists exist. [joinArtistVersus] still stubs the
-  // joiner when a public open slot is claimed (active).
-  //
-  // Pair sync is scheduled with [_scheduleRankingWritesAfterVersus] so versus
-  // creation returns as soon as the versus doc exists; ranking work runs in the
-  // background (several Firestore round-trips: per entity, read + write, ×2 entities).
-
-  /// Fire-and-forget ranking sync after the versus document is committed.
-  static void _scheduleRankingWritesAfterVersus(Future<void> Function() work) {
-    unawaited(
-      Future<void>(() async {
-        try {
-          await work();
-        } catch (e, st) {
-          debugPrint(
-            '[FirebaseService] background ranking sync failed: $e\n$st',
-          );
-        }
-      }),
-    );
-  }
-
-  /// Creates `rankings/{entityId}` with zeros + identity fields if missing.
-  static Future<void> ensureRankingDocIfAbsent({
-    required String entityId,
-    required String entityType,
-    required String entityName,
-    String entityImage = '',
-  }) async {
-    final id = entityId.trim();
-    if (id.isEmpty) return;
-
-    final type = entityType.trim().toLowerCase();
-    if (type != 'artist' && type != 'album') {
-      debugPrint(
-        '[FirebaseService] ensureRankingDocIfAbsent → skip: invalid entityType "$type"',
-      );
-      return;
-    }
-
-    final ref = _firestore.collection('rankings').doc(id);
-    try {
-      final snap = await ref.get();
-      if (snap.exists) return;
-
-      final model = RankingModel.newEntityStub(
-        entityId: id,
-        entityType: type,
-        entityName: entityName.trim().isEmpty ? 'Unknown' : entityName.trim(),
-        entityImage: entityImage.trim(),
-      );
-      await ref.set(model.toFirestore());
-      debugPrint('[FirebaseService] ensureRankingDocIfAbsent → created rankings/$id');
-    } catch (e) {
-      debugPrint('[FirebaseService] ensureRankingDocIfAbsent($id) failed: $e');
-    }
-  }
-
-  /// Dot-path fields for `opponents.{oid}.versus.{versusDocId}` when the session
-  /// is not finished yet (`entity_votes` / `opponent_votes` only; no `status`).
-  static Map<String, dynamic> _pendingVersusSubdocFields(
-    String opponentsOidPrefix,
-    String versusDocId,
-  ) {
-    final base = '$opponentsOidPrefix.versus.$versusDocId';
-      return {
-      '$base.entity_votes': 0,
-      '$base.opponent_votes': 0,
-    };
-  }
-
-  /// Ensures `rankings/{entityId}` exists and records one versus session against
-  /// [opponentId]: new doc with [RankingModel.newEntityStubWithOpponent], or
-  /// increments root [versus_count] and either adds [opponents.opponentId] with
-  /// [versus_count] 1 or increments that nested [versus_count] for rematches.
-  ///
-  /// Always writes `opponents.*.versus.{versusId}` with pending vote/status rows
-  /// for the Firestore versus doc that triggered this link.
-  static Future<void> _ensureRankingEntityOpponentLink({
-    required String entityId,
-    required String entityType,
-    required String entityName,
-    String entityImage = '',
-    required String opponentId,
-    required String opponentName,
-    String opponentImage = '',
-    required String versusId,
-  }) async {
-    final eid = entityId.trim();
-    final oid = opponentId.trim();
-    final vid = versusId.trim();
-    if (eid.isEmpty || oid.isEmpty || vid.isEmpty) return;
-
-    final type = entityType.trim().toLowerCase();
-    if (type != 'artist' && type != 'album') {
-      debugPrint(
-        '[FirebaseService] _ensureRankingEntityOpponentLink → skip: invalid '
-        'entityType "$type"',
-      );
-      return;
-    }
-
-    final ref = _firestore.collection('rankings').doc(eid);
-    final oppPrefix = 'opponents.$oid';
-
-    try {
-      final snap = await ref.get();
-      if (!snap.exists) {
-        final initialOpp = OpponentModel.newVersusOpponentStub(
-          opponentId: oid,
-          opponentName: opponentName.trim().isEmpty ? 'Unknown' : opponentName.trim(),
-          opponentImage: opponentImage.trim(),
-          sharedVersusId: vid,
-        );
-        final model = RankingModel.newEntityStubWithOpponent(
-          entityId: eid,
-          entityType: type,
-          entityName: entityName.trim().isEmpty ? 'Unknown' : entityName.trim(),
-          entityImage: entityImage.trim(),
-          initialOpponent: initialOpp,
-        );
-        await ref.set(model.toFirestore());
-        debugPrint(
-          '[FirebaseService] _ensureRankingEntityOpponentLink → created '
-          'rankings/$eid with opponent $oid versus $vid',
-        );
-        return;
-      }
-
-      final data = snap.data()!;
-      final rawOpponents = data['opponents'];
-      final hasOpp =
-          rawOpponents is Map && rawOpponents.containsKey(oid);
-
-      if (hasOpp) {
-        await ref.update({
-          'versus_count': FieldValue.increment(1),
-          '$oppPrefix.versus_count': FieldValue.increment(1),
-          '$oppPrefix.last_played': FieldValue.serverTimestamp(),
-          'last_updated': FieldValue.serverTimestamp(),
-          ..._pendingVersusSubdocFields(oppPrefix, vid),
-        });
-        debugPrint(
-          '[FirebaseService] _ensureRankingEntityOpponentLink → rematch '
-          'rankings/$eid vs $oid versus $vid',
-        );
-      } else {
-        await ref.update({
-          'versus_count': FieldValue.increment(1),
-          '$oppPrefix.opponent_name':
-              opponentName.trim().isEmpty ? 'Unknown' : opponentName.trim(),
-          '$oppPrefix.opponent_image': opponentImage.trim(),
-          '$oppPrefix.versus_count': 1,
-          '$oppPrefix.wins_against': 0,
-          '$oppPrefix.losses_to': 0,
-          '$oppPrefix.draws': 0,
-          '$oppPrefix.total_entity_votes': 0,
-          '$oppPrefix.total_opponent_votes': 0,
-          '$oppPrefix.last_played': FieldValue.serverTimestamp(),
-          'last_updated': FieldValue.serverTimestamp(),
-          ..._pendingVersusSubdocFields(oppPrefix, vid),
-        });
-        debugPrint(
-          '[FirebaseService] _ensureRankingEntityOpponentLink → new opponent '
-          '$oid on rankings/$eid versus $vid',
-        );
-      }
-    } catch (e) {
-      debugPrint(
-        '[FirebaseService] _ensureRankingEntityOpponentLink($eid) failed: $e',
-      );
-    }
-  }
-
-  static Future<void> _ensureRankingStubsForAlbumPair({
-    required String versusId,
-    required String album1ID,
-    required String album1Name,
-    String album1Image = '',
-    required String album2ID,
-    required String album2Name,
-    String album2Image = '',
-  }) async {
-    final id1 = album1ID.trim();
-    final id2 = album2ID.trim();
-    if (id1.isEmpty || id2.isEmpty) return;
-    await Future.wait([
-      _ensureRankingEntityOpponentLink(
-        entityId: id1,
-        entityType: 'album',
-        entityName: album1Name,
-        entityImage: album1Image,
-        opponentId: id2,
-        opponentName: album2Name,
-        opponentImage: album2Image,
-        versusId: versusId,
-      ),
-      _ensureRankingEntityOpponentLink(
-        entityId: id2,
-        entityType: 'album',
-        entityName: album2Name,
-        entityImage: album2Image,
-        opponentId: id1,
-        opponentName: album1Name,
-        opponentImage: album1Image,
-        versusId: versusId,
-      ),
-    ]);
-  }
-
-  static Future<void> _ensureRankingStubsForArtists({
-    required String versusId,
-    required String artist1ID,
-    required String artist1Name,
-    String artist1Image = '',
-    String artist2ID = '',
-    String artist2Name = '',
-    String artist2Image = '',
-  }) async {
-    final id1 = artist1ID.trim();
-    final id2 = artist2ID.trim();
-    final vid = versusId.trim();
-    if (id1.isEmpty) return;
-
-    if (id2.isEmpty) {
-      await ensureRankingDocIfAbsent(
-        entityId: id1,
-        entityType: 'artist',
-        entityName: artist1Name,
-        entityImage: artist1Image,
-      );
-      return;
-    }
-
-    if (vid.isEmpty) return;
-
-    await Future.wait([
-      _ensureRankingEntityOpponentLink(
-        entityId: id1,
-        entityType: 'artist',
-        entityName: artist1Name,
-        entityImage: artist1Image,
-        opponentId: id2,
-        opponentName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
-        opponentImage: artist2Image,
-        versusId: vid,
-      ),
-      _ensureRankingEntityOpponentLink(
-        entityId: id2,
-        entityType: 'artist',
-        entityName: artist2Name.trim().isEmpty ? 'Unknown' : artist2Name.trim(),
-        entityImage: artist2Image,
-        opponentId: id1,
-        opponentName: artist1Name,
-        opponentImage: artist1Image,
-        versusId: vid,
-      ),
-    ]);
-  }
-
   /// Fetch ranking profile for one entity from `rankings/{entityId}`.
   ///
   /// Returns null when the ID is empty or the document does not exist.
@@ -726,395 +441,11 @@ class FirebaseService {
         return null;
       }
       final model = RankingModel.fromFirestore(doc.data()!, doc.id);
-      debugPrint(
-        '[getRankingProfile] $id → ${model.opponents.length} opponent(s)',
-      );
+      debugPrint('[getRankingProfile] $id → ${model.entityName} (provisional=${model.provisional})');
       return model;
     } catch (e) {
       debugPrint('[getRankingProfile] $id failed: $e');
       return null;
-    }
-  }
-
-  /// Resolves missing opponent images from Spotify for display use.
-  ///
-  /// This does not write back to Firestore; it returns a rebuilt model.
-  static Future<RankingModel> resolveRankingOpponentImages(
-    RankingModel ranking,
-    SpotifyApi spotifyApi,
-  ) async {
-    final toResolve = ranking.opponents.entries
-        .where((e) => e.value.opponentImage.trim().isEmpty)
-        .map((e) => e.key)
-        .toList();
-
-    if (toResolve.isEmpty) return ranking;
-
-    final resolved = <String, String>{};
-    await Future.wait(
-      toResolve.map((opponentId) async {
-        try {
-          final details = await spotifyApi.getArtistDetails(opponentId);
-          final url = details?.imageUrl?.trim() ?? '';
-          if (url.isNotEmpty) {
-            resolved[opponentId] = url;
-          }
-        } catch (e) {
-          debugPrint(
-            '[resolveRankingOpponentImages] failed for $opponentId: $e',
-          );
-        }
-      }),
-    );
-
-    if (resolved.isEmpty) return ranking;
-
-    final updatedOpponents = <String, OpponentModel>{
-      for (final entry in ranking.opponents.entries)
-        entry.key: resolved.containsKey(entry.key)
-            ? _rebuildOpponentWithImage(entry.value, resolved[entry.key]!)
-            : entry.value,
-    };
-
-    return RankingModel(
-      entityId: ranking.entityId,
-      entityType: ranking.entityType,
-      entityName: ranking.entityName,
-      entityImage: ranking.entityImage,
-      totalVotes: ranking.totalVotes,
-      versusCount: ranking.versusCount,
-      wins: ranking.wins,
-      losses: ranking.losses,
-      draws: ranking.draws,
-      winRate: ranking.winRate,
-      createdAt: ranking.createdAt,
-      lastUpdated: ranking.lastUpdated,
-      opponents: updatedOpponents,
-    );
-  }
-
-  static OpponentModel _rebuildOpponentWithImage(
-    OpponentModel opp,
-    String newImage,
-  ) {
-    return OpponentModel(
-      opponentId: opp.opponentId,
-      opponentName: opp.opponentName,
-      opponentImage: newImage,
-      versusCount: opp.versusCount,
-      winsAgainst: opp.winsAgainst,
-      lossesTo: opp.lossesTo,
-      draws: opp.draws,
-      totalentityVotes: opp.totalentityVotes,
-      totalopponentVotes: opp.totalopponentVotes,
-      lastPlayed: opp.lastPlayed,
-      versus: opp.versus,
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // RANKINGS — poll reconciliation  (Function 7)
-  // ══════════════════════════════════════════════════════════════════════════
-  //
-  // Called by _reconcileRankingNow() in ArtistVersusPlayground every time a
-  // checkpoint is crossed, the user navigates away, or the app is backgrounded.
-  //
-  // Algorithm (replace-and-recount, never delta-increment for votes):
-  //   1. Read BOTH ranking docs in a transaction.
-  //   2. Replace versus entry votes + status for this versusId in each doc.
-  //   3. Recount opponent-level tallies by scanning all versus under that opponent.
-  //   4. Recount root-level tallies by scanning all opponents.
-  //   5. Write both ranking docs + update poll's last_reconciled_pct atomically.
-  //
-  // This function will move to a Cloud Function in production. The call
-  // signature stays identical — only the invocation location changes.
-
-  static Future<void> reconcileRankingBatch({
-    required String entity1Id, // artist1ID / album1ID — their ranking doc ID
-    required String entity2Id, // artist2ID / album2ID — their ranking doc ID
-    required String versusId, // the versus doc ID
-    required String voterId, // used to locate the poll doc
-    required int currentEntity1Votes, // artist1's current vote total from local state
-    required int currentEntity2Votes, // artist2's current vote total from local state
-    required double currentPct, // completion_percentage from _buildVoteTemplateDoc()
-  }) async {
-    final e1 = entity1Id.trim();
-    final e2 = entity2Id.trim();
-    final vid = versusId.trim();
-    final uid = voterId.trim();
-
-    if (e1.isEmpty || e2.isEmpty || vid.isEmpty || uid.isEmpty) {
-      debugPrint('[reconcileRankingBatch] skipped — missing IDs');
-      return;
-    }
-
-    final ranking1Ref = _firestore.collection('rankings').doc(e1);
-    final ranking2Ref = _firestore.collection('rankings').doc(e2);
-    final pollRef = _firestore.collection('polls').doc('${vid}_$uid');
-
-    // Aggregate votes across ALL voters for this versus before entering the
-    // transaction. Each poll doc holds one voter's counts; the ranking must
-    // store the combined total, not just the last reconciler's numbers.
-    // upsertArtistPoll always writes before reconcile is called, so the
-    // current voter's poll is already present in this snapshot.
-    int aggregateE1Votes = 0;
-    int aggregateE2Votes = 0;
-    try {
-      final pollsSnap = await _firestore
-          .collection('polls')
-          .where('versus_id', isEqualTo: vid)
-          .get();
-      for (final doc in pollsSnap.docs) {
-        aggregateE1Votes += (doc.data()['artist1Vote'] as num?)?.toInt() ?? 0;
-        aggregateE2Votes += (doc.data()['artist2Vote'] as num?)?.toInt() ?? 0;
-      }
-      debugPrint(
-        '[reconcileRankingBatch] poll aggregate for $vid: '
-        'e1=$aggregateE1Votes e2=$aggregateE2Votes (${pollsSnap.docs.length} voter(s))',
-      );
-    } catch (e) {
-      // Fall back to caller's local counts so reconcile still proceeds.
-      aggregateE1Votes = currentEntity1Votes;
-      aggregateE2Votes = currentEntity2Votes;
-      debugPrint('[reconcileRankingBatch] poll aggregate failed, using local counts: $e');
-    }
-
-    try {
-      await _firestore.runTransaction((tx) async {
-        // ── 1. Read both ranking docs ──────────────────────────────────────
-        final snap1 = await tx.get(ranking1Ref);
-        final snap2 = await tx.get(ranking2Ref);
-
-        if (!snap1.exists || !snap2.exists) {
-          debugPrint(
-            '[reconcileRankingBatch] ranking doc(s) missing — '
-            'stubs may still be writing (rankings/$e1 exists=${snap1.exists}, '
-            'rankings/$e2 exists=${snap2.exists})',
-          );
-          throw RankingStubsMissingException(
-            'rankings/$e1 exists=${snap1.exists}, '
-            'rankings/$e2 exists=${snap2.exists}',
-          );
-        }
-
-        // ── 2. Build updated versus entry for each doc ─────────────────────
-        // Use aggregate votes (all voters summed) so status and vote totals
-        // reflect the full pool, not just the voter triggering this reconcile.
-        final status1 = VersusResultModel.computeStatus(
-          aggregateE1Votes,
-          aggregateE2Votes,
-        );
-        // Entity2 perspective: mirror
-        final status2 = VersusResultModel.computeStatus(
-          aggregateE2Votes,
-          aggregateE1Votes,
-        );
-
-        // ── 3. Recount helper — runs entirely on in-memory doc data ────────
-        // Mutates the rawOpponents map in place with the new versus entry,
-        // then recounts all opponent-level and root-level fields.
-        Map<String, dynamic> buildRankingUpdate({
-          required Map<String, dynamic> existingData,
-          required String opponentId,
-          required int myVotes,
-          required int theirVotes,
-          required String myStatus,
-        }) {
-          // Deep-copy opponents map so we can mutate safely
-          final rawOpponents = Map<String, dynamic>.from(
-            (existingData['opponents'] as Map<String, dynamic>? ?? {}),
-          );
-
-          // Ensure opponent entry exists
-          final rawOpp = Map<String, dynamic>.from(
-            (rawOpponents[opponentId] as Map<String, dynamic>? ?? {}),
-          );
-
-          // Ensure versus sub-map exists and replace this versus entry
-          final rawVersus = Map<String, dynamic>.from(
-            (rawOpp['versus'] as Map<String, dynamic>? ?? {}),
-          );
-          rawVersus[vid] = {
-            'entity_votes': myVotes,
-            'opponent_votes': theirVotes,
-            'status': myStatus,
-            'played_at': FieldValue.serverTimestamp(),
-          };
-          rawOpp['versus'] = rawVersus;
-
-          // Recount opponent-level fields from all versus entries
-          var oppWins = 0;
-          var oppLosses = 0;
-          var oppDraws = 0;
-          var oppEntityVotesTotal = 0;
-          var oppOpponentVotesTotal = 0;
-          for (final vEntry in rawVersus.values) {
-            final vMap = vEntry as Map<String, dynamic>;
-            final s = (vMap['status'] as String?) ?? '';
-            final ev = (vMap['entity_votes'] as num?)?.toInt() ?? 0;
-            final ov = (vMap['opponent_votes'] as num?)?.toInt() ?? 0;
-            if (s == 'won') oppWins++;
-            if (s == 'lost') oppLosses++;
-            if (s == 'draw') oppDraws++;
-            oppEntityVotesTotal += ev;
-            oppOpponentVotesTotal += ov;
-          }
-
-          rawOpp['wins_against'] = oppWins;
-          rawOpp['losses_to'] = oppLosses;
-          rawOpp['draws'] = oppDraws;
-          rawOpp['versus_count'] = rawVersus.length;
-          rawOpp['total_entity_votes'] = oppEntityVotesTotal;
-          rawOpp['total_opponent_votes'] = oppOpponentVotesTotal;
-          rawOpp['last_played'] = FieldValue.serverTimestamp();
-          rawOpponents[opponentId] = rawOpp;
-
-          // Recount root-level fields from all opponent entries
-          var rootWins = 0;
-          var rootLosses = 0;
-          var rootDraws = 0;
-          var rootVersusCount = 0;
-          var rootTotalVotes = 0;
-          for (final oEntry in rawOpponents.values) {
-            final oMap = oEntry as Map<String, dynamic>;
-            rootWins += (oMap['wins_against'] as num?)?.toInt() ?? 0;
-            rootLosses += (oMap['losses_to'] as num?)?.toInt() ?? 0;
-            rootDraws += (oMap['draws'] as num?)?.toInt() ?? 0;
-            rootVersusCount += (oMap['versus_count'] as num?)?.toInt() ?? 0;
-            rootTotalVotes += (oMap['total_entity_votes'] as num?)?.toInt() ?? 0;
-          }
-
-          final winRate =
-              rootVersusCount == 0 ? 0.0 : rootWins / rootVersusCount;
-
-          // Return the full Firestore update map using dot-notation for nested fields
-          final update = <String, dynamic>{
-            'wins': rootWins,
-            'losses': rootLosses,
-            'draws': rootDraws,
-            'versus_count': rootVersusCount,
-            'total_votes': rootTotalVotes,
-            'win_rate': winRate,
-            'last_updated': FieldValue.serverTimestamp(),
-          };
-
-          // Write each opponent and versus field via dot-notation to avoid
-          // overwriting sibling opponents not touched in this transaction
-          final oppPrefix = 'opponents.$opponentId';
-          update['$oppPrefix.wins_against'] = rawOpp['wins_against'];
-          update['$oppPrefix.losses_to'] = rawOpp['losses_to'];
-          update['$oppPrefix.draws'] = rawOpp['draws'];
-          update['$oppPrefix.versus_count'] = rawOpp['versus_count'];
-          update['$oppPrefix.total_entity_votes'] = rawOpp['total_entity_votes'];
-          update['$oppPrefix.total_opponent_votes'] =
-              rawOpp['total_opponent_votes'];
-          update['$oppPrefix.last_played'] = FieldValue.serverTimestamp();
-          // One field path for the whole versus row — avoids clients only updating
-          // status while entity_votes/opponent_votes fail to merge on nested paths.
-          update['$oppPrefix.versus.$vid'] = <String, dynamic>{
-            'entity_votes': myVotes,
-            'opponent_votes': theirVotes,
-            'status': myStatus,
-            'played_at': FieldValue.serverTimestamp(),
-          };
-
-          return update;
-        }
-
-        final update1 = buildRankingUpdate(
-          existingData: snap1.data()!,
-          opponentId: e2,
-          myVotes: aggregateE1Votes,
-          theirVotes: aggregateE2Votes,
-          myStatus: status1,
-        );
-
-        final update2 = buildRankingUpdate(
-          existingData: snap2.data()!,
-          opponentId: e1,
-          myVotes: aggregateE2Votes,
-          theirVotes: aggregateE1Votes,
-          myStatus: status2,
-        );
-
-        // ── 4. Write both ranking docs + stamp poll ────────────────────────
-        tx.update(ranking1Ref, update1);
-        tx.update(ranking2Ref, update2);
-
-        // Stamp the poll doc with last_reconciled_pct so gap-fill on restore
-        // knows how far reconciliation reached. merge: true creates the doc if
-        // the first reconcile runs before any upsertArtistPoll (e.g. checkpoint
-        // during debounce).
-        tx.set(
-          pollRef,
-          {'last_reconciled_pct': currentPct},
-          SetOptions(merge: true),
-        );
-      });
-
-      debugPrint(
-        '[reconcileRankingBatch] ✓ versusId=$vid '
-        'e1=$e1($aggregateE1Votes) e2=$e2($aggregateE2Votes) pct=$currentPct',
-      );
-    } on RankingStubsMissingException {
-      rethrow;
-    } catch (e, st) {
-      debugPrint('[reconcileRankingBatch] failed: $e\n$st');
-    }
-  }
-
-  /// Ensures ranking stubs for **both** artists on a versus document only when the
-  /// session is **live** (`status` is `open` or `active`) and both `artist1ID` and
-  /// `artist2ID` are non-empty. Skips `incomplete` (and other) drafts so entities are
-  /// not added to `rankings` until the match is actually votable.
-  ///
-  /// Used after [acceptCollaborationInvite] (e.g. [CollaboratorBackroom] submit).
-  static Future<void> _ensureRankingStubsForVersusDocIfLive(
-    String versusID,
-  ) async {
-    final id = versusID.trim();
-    if (id.isEmpty) return;
-
-    try {
-      final snap = await _firestore.collection('versus').doc(id).get();
-      if (!snap.exists || snap.data() == null) return;
-
-      final data = snap.data()!;
-      final status = (data['status'] as String?)?.trim() ?? '';
-      if (status != 'open' && status != 'active') {
-        debugPrint(
-          '[FirebaseService] _ensureRankingStubsForVersusDocIfLive → skip '
-          'rankings/$id: status=$status (not live yet)',
-        );
-        return;
-      }
-
-      final a1 = (data['artist1ID'] as String?)?.trim() ?? '';
-      final a2 = (data['artist2ID'] as String?)?.trim() ?? '';
-      if (a1.isEmpty || a2.isEmpty) {
-        debugPrint(
-          '[FirebaseService] _ensureRankingStubsForVersusDocIfLive → skip '
-          'rankings for versus $id: missing artist1ID or artist2ID',
-        );
-        return;
-      }
-
-      final n1 = (data['artist1Name'] as String?)?.trim() ?? 'Unknown';
-      final n2 = (data['artist2Name'] as String?)?.trim() ?? 'Unknown';
-
-      await _ensureRankingStubsForArtists(
-        versusId: id,
-        artist1ID: a1,
-        artist1Name: n1,
-        artist1Image: '',
-        artist2ID: a2,
-        artist2Name: n2,
-        artist2Image: '',
-      );
-    } catch (e) {
-      debugPrint(
-        '[FirebaseService] _ensureRankingStubsForVersusDocIfLive($id) failed: $e',
-      );
     }
   }
 
@@ -1136,6 +467,7 @@ class FirebaseService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
 
+    final selfMatchup = isSelfMatchup(album1ID, album2ID);
     final ref = await _firestore.collection('versus').add({
       'type': type,
       'status': 'open',
@@ -1144,6 +476,9 @@ class FirebaseService {
       'album1Name': album1Name,
       'album2ID': album2ID,
       'album2Name': album2Name,
+      'is_self_matchup': selfMatchup,
+      'entity_type': 'album',
+      if (!selfMatchup) 'pair_key': makePairKey(album1ID, album2ID),
       'timestamp': FieldValue.serverTimestamp(),
       // Denormalized at creation — inbox renders immediately, no Spotify call needed.
       if (album1ImageUrl.trim().isNotEmpty) 'album1ImageUrl': album1ImageUrl.trim(),
@@ -1155,18 +490,6 @@ class FirebaseService {
       if (album2Tracklist != null && album2Tracklist.isNotEmpty)
         'album2Tracklist': album2Tracklist,
     });
-
-    _scheduleRankingWritesAfterVersus(
-      () => _ensureRankingStubsForAlbumPair(
-        versusId: ref.id,
-        album1ID: album1ID.trim(),
-        album1Name: album1Name.trim(),
-        album1Image: album1ImageUrl.trim(),
-        album2ID: album2ID.trim(),
-        album2Name: album2Name.trim(),
-        album2Image: album2ImageUrl.trim(),
-      ),
-    );
 
     return ref.id;
   }
@@ -1297,32 +620,19 @@ class FirebaseService {
       artist2Tracklist: artist2Tracklist,
     );
 
-    final ref =
-        await _firestore.collection('versus').add(model.toFirestore());
+    final a1 = artist1ID.trim();
+    final a2 = artist2ID.trim();
+    final selfMatchup = a1.isNotEmpty && a2.isNotEmpty && isSelfMatchup(a1, a2);
+    final payload = {
+      ...model.toFirestore(),
+      'entity_type': 'artist',
+      'is_self_matchup': selfMatchup,
+      if (!selfMatchup && a1.isNotEmpty && a2.isNotEmpty)
+        'pair_key': makePairKey(a1, a2),
+    };
+    final ref = await _firestore.collection('versus').add(payload);
 
     debugPrint('[FirebaseService] createArtistVersus → doc: ${ref.id}');
-
-    // Rankings only when both artist IDs exist (immediate duel). If [artist2ID] is
-    // still empty, collaborator lockeroom defers side 2 to the backroom — stubs are
-    // then created in [_ensureRankingStubsForVersusDocIfLive] after
-    // [acceptCollaborationInvite] when status is open|active.
-    if (model.artist2ID.trim().isNotEmpty) {
-      _scheduleRankingWritesAfterVersus(
-        () => _ensureRankingStubsForArtists(
-          versusId: ref.id,
-          artist1ID: model.artist1ID,
-          artist1Name: model.artist1Name,
-          artist1Image: artist1ImageUrl,
-          artist2ID: model.artist2ID,
-          artist2Name: model.artist2Name,
-          artist2Image: artist2ImageUrl,
-        ),
-      );
-    } else {
-      debugPrint(
-        '[FirebaseService] createArtistVersus → defer rankings (no artist2 yet)',
-      );
-    }
 
     return ref.id;
   }
@@ -1426,20 +736,6 @@ class FirebaseService {
       });
     }
 
-    // Write ranking stubs so both artists appear in rankings immediately.
-    if (artist1ID.trim().isNotEmpty && artist2ID.trim().isNotEmpty) {
-      _scheduleRankingWritesAfterVersus(
-        () => _ensureRankingStubsForArtists(
-          versusId:    ref.id,
-          artist1ID:   artist1ID.trim(),
-          artist1Name: artist1Name.trim(),
-          artist1Image: artist1ImageUrl,
-          artist2ID:   artist2ID.trim(),
-          artist2Name: artist2Name.trim(),
-          artist2Image: artist2ImageUrl,
-        ),
-      );
-    }
   }
 
   // ── Create collaboration invite versus (status: incomplete) ──────────────
@@ -1694,36 +990,25 @@ class FirebaseService {
         throw Exception('You cannot join your own versus');
       }
 
+      final artist1Id = (data['artist1ID'] as String? ?? '').trim();
+      final a2Id = artist2ID.trim();
+      final selfMatchup = isSelfMatchup(artist1Id, a2Id);
       tx.update(ref, {
         'collaboratorID': uid,
-        'artist2ID': artist2ID.trim(),
+        'artist2ID': a2Id,
         'artist2Name': artist2Name.trim(),
-        'artist2TrackIDs':
-            artist2TrackIDs.map((e) => e.trim()).toList(),
+        'artist2TrackIDs': artist2TrackIDs.map((e) => e.trim()).toList(),
         'status': 'active',
+        'is_self_matchup': selfMatchup,
+        if ((data['entity_type'] as String? ?? '').isEmpty) 'entity_type': 'artist',
+        // pair_key: only write for non-self-matchup and only if not already set.
+        if (!selfMatchup && (data['pair_key'] as String? ?? '').isEmpty)
+          'pair_key': makePairKey(artist1Id, a2Id),
       });
     });
 
     debugPrint(
         '[FirebaseService] joinArtistVersus → $documentId claimed by $uid');
-
-    final vsSnap = await ref.get();
-    final d = vsSnap.data();
-    if (d != null) {
-      final a1 = (d['artist1ID'] as String?)?.trim() ?? '';
-      final n1 = (d['artist1Name'] as String?)?.trim() ?? 'Unknown';
-      if (a1.isNotEmpty) {
-        await _ensureRankingStubsForArtists(
-          versusId: documentId.trim(),
-          artist1ID: a1,
-          artist1Name: n1,
-          artist1Image: '',
-          artist2ID: artist2ID.trim(),
-          artist2Name: artist2Name.trim(),
-          artist2Image: '',
-        );
-      }
-    }
   }
 
   // ── Collaboration: invitee confirms artist2 + tracks ─────────────────────
@@ -1821,12 +1106,6 @@ class FirebaseService {
     debugPrint(
         '[FirebaseService] acceptCollaborationInvite → $versusID by $uid');
 
-    // Ranking stubs only when the versus doc is live and both sides have artists.
-    _scheduleRankingWritesAfterVersus(
-      () => _ensureRankingStubsForVersusDocIfLive(versusID),
-    );
-
-    unawaited(recalculatePollsAfterVersusTrackListChange(versusID));
   }
 
   // ── Author finalizes tracks after invite (stays incomplete until collaborator) ─
@@ -1860,7 +1139,6 @@ class FirebaseService {
         '[FirebaseService] openCollaborationVersus → $versusID (author tracks; status stays incomplete)');
     // Versus remains incomplete — no ranking stubs until collaborator confirms
     // and [acceptCollaborationInvite] sets status open|active.
-    unawaited(recalculatePollsAfterVersusTrackListChange(versusID));
   }
 
   // ── Update status ─────────────────────────────────────────────────────────
@@ -1891,90 +1169,6 @@ class FirebaseService {
   // POLLS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// When [artist1TrackIDs]/[artist2TrackIDs] change on the versus doc, every
-  /// voter's poll must refresh [completion_percentage], vote tallies, and align
-  /// [last_reconciled_pct] with that completion so checkpoint / gap logic works.
-  static Future<void> recalculatePollsAfterVersusTrackListChange(
-    String versusID,
-  ) async {
-    final vId = versusID.trim();
-    if (vId.isEmpty) return;
-
-    try {
-      final vsSnap = await _firestore.collection('versus').doc(vId).get();
-      if (!vsSnap.exists || vsSnap.data() == null) return;
-      final vd = vsSnap.data()!;
-      final list1 = vd['artist1TrackIDs'];
-      final list2 = vd['artist2TrackIDs'];
-      final len1 = list1 is List ? list1.length : 0;
-      final len2 = list2 is List ? list2.length : 0;
-      final paired = min(len1, len2);
-
-      final qs = await _firestore
-          .collection('polls')
-          .where('versus_id', isEqualTo: vId)
-          .get();
-
-      for (final doc in qs.docs) {
-        final d = doc.data();
-        final td = d['track_details'] as Map<String, dynamic>? ?? {};
-
-        var e1Votes = 0;
-        var e2Votes = 0;
-        var votedPaired = 0;
-
-        for (var i = 0; i < paired; i++) {
-          final round = td['$i'] as Map<String, dynamic>?;
-          if (round == null) continue;
-          if (round['isBonus'] == true) continue;
-          final w = (round['Winner'] as String?)?.trim() ?? '';
-          final a1 = (round['artist1trackID'] as String?)?.trim() ?? '';
-          final a2 = (round['artist2trackID'] as String?)?.trim() ?? '';
-          if (w.isEmpty || a1.isEmpty || a2.isEmpty) continue;
-          votedPaired++;
-          if (w == a1) {
-            e1Votes++;
-          } else if (w == a2) {
-            e2Votes++;
-          }
-        }
-
-        if (len1 != len2 && votedPaired >= paired && paired > 0) {
-          if (len1 > len2) {
-            e1Votes++;
-          } else {
-            e2Votes++;
-          }
-        }
-
-        final completion = paired == 0
-            ? 0.0
-            : ((votedPaired / paired) * 100).clamp(0, 100).toDouble();
-        final unvoted = paired > votedPaired ? paired - votedPaired : 0;
-
-        await doc.reference.update({
-          'completion_percentage': completion,
-          'unvoted_count': unvoted,
-          'artist1Vote': e1Votes,
-          'artist2Vote': e2Votes,
-          // Align with poll completion so gap / checkpoint logic is not stuck
-          // after rounds are added or completion drops.
-          'last_reconciled_pct': completion,
-        });
-      }
-
-      debugPrint(
-        '[FirebaseService] recalculatePollsAfterVersusTrackListChange → '
-        '${qs.docs.length} poll(s) for versus $vId (paired=$paired)',
-      );
-    } catch (e, st) {
-      debugPrint(
-        '[FirebaseService] recalculatePollsAfterVersusTrackListChange failed: '
-        '$e\n$st',
-      );
-    }
-  }
-
   /// Upserts a poll document for an artist versus session.
   ///
   /// Doc ID is deterministic: `{versusId}_{voterId}` — guarantees one doc
@@ -1984,203 +1178,140 @@ class FirebaseService {
   /// Called on every debounced vote tap. Uses set() with merge:false on
   /// creation, update() on subsequent taps — so only changed fields are
   /// sent on updates, keeping write costs minimal.
-  static Future<void> upsertArtistPoll({
+  // ── Unified poll write (replaces upsertArtistPoll / upsertAlbumPoll) ─────
+  static const int _minRoundsToSave = 2;
+
+  /// Writes or updates a unified poll document at `polls/{versusId}_{voterId}`.
+  ///
+  /// Gate: for new documents, skips if fewer than [_minRoundsToSave] non-bonus
+  /// rounds have been decided (winner != null). Existing documents are always
+  /// updated so in-progress state is preserved.
+  static Future<void> upsertPoll({
     required String versusId,
-    required String versusType,
+    required String pairKey,
+    required String entityType,
     required String voterId,
     required String voterName,
     required String voterAvatar,
-    required String artist1ID,
-    required String artist1Name,
-    required int artist1Vote,
-    required String artist2ID,
-    required String artist2Name,
-    required int artist2Vote,
-    required Map<int, Map<String, dynamic>> trackDetails,
+    required String entity1Id,
+    required String entity1Name,
+    required String entity2Id,
+    required String entity2Name,
+    required List<Map<String, dynamic>> trackDetails,
     required double completionPercentage,
     required int unvotedCount,
   }) async {
-    final versusIdTrim = versusId.trim();
-    final versusTypeTrim = versusType.trim();
-    final voterIdTrim = voterId.trim();
-    if (versusIdTrim.isEmpty) {
-      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty versusId');
-      return;
-    }
-    if (versusTypeTrim.isEmpty) {
-      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty versusType');
-      return;
-    }
-    if (voterIdTrim.isEmpty) {
-      debugPrint('[FirebaseService] upsertArtistPoll → skipped: empty voterId');
+    final vid = versusId.trim();
+    final uid = voterId.trim();
+    if (vid.isEmpty || uid.isEmpty) {
+      debugPrint('[FirebaseService] upsertPoll → skipped: empty versusId or voterId');
       return;
     }
 
-    // Deterministic doc ID — direct get, no query needed.
-    final docId = '${versusIdTrim}_$voterIdTrim';
+    final docId = '${vid}_$uid';
     final ref = _firestore.collection('polls').doc(docId);
-    debugPrint('[FirebaseService] voting pollID: $docId');
 
-    // Firestore requires string keys in maps.
-    final trackMap = {
-      for (final e in trackDetails.entries) '${e.key}': e.value,
-    };
+    int entity1Votes = 0, entity2Votes = 0;
+    for (final r in trackDetails) {
+      if (r['isBonus'] == true) continue;
+      if (r['winner'] == 'entity1') entity1Votes++;
+      if (r['winner'] == 'entity2') entity2Votes++;
+    }
+    final decidedRounds = entity1Votes + entity2Votes;
+    final total = decidedRounds;
+    final e1Pct = total == 0 ? 0.0 : entity1Votes / total * 100;
+    final e2Pct = total == 0 ? 0.0 : entity2Votes / total * 100;
 
+    final selfMatchup = isSelfMatchup(entity1Id, entity2Id);
     try {
       final snap = await ref.get();
-
       if (!snap.exists) {
-        // Don't create a document if the user never actually voted —
-        // dispose() fires unconditionally and would otherwise write zero-vote ghost docs.
-        if (artist1Vote + artist2Vote == 0) {
-          debugPrint('[FirebaseService] upsertArtistPoll → skipped: no votes on new poll');
+        if (decidedRounds < _minRoundsToSave) {
+          debugPrint(
+            '[FirebaseService] upsertPoll → skipped: only $decidedRounds '
+            'non-bonus round(s) decided (min $_minRoundsToSave)',
+          );
           return;
         }
-        // ── First vote: write full document ──────────────────────────────
         await ref.set({
-          'versus_id': versusIdTrim,
-          'Versus_type': versusTypeTrim,
-          'voter_id': voterIdTrim,
-          'voter_name': voterName.trim(),
+          'versus_id':   vid,
+          'voter_id':    uid,
+          'voter_name':  voterName.trim(),
           'voter_avatar': voterAvatar.trim(),
-          'timestamp': FieldValue.serverTimestamp(),
-          'artist1ID': artist1ID.trim(),
-          'artist1Name': artist1Name.trim(),
-          'artist1Vote': artist1Vote,
-          'artist2ID': artist2ID.trim(),
-          'artist2Name': artist2Name.trim(),
-          'artist2Vote': artist2Vote,
+          // Self-matchup polls are excluded from pair/ranking writes; pair_key is null.
+          'pair_key':    selfMatchup ? null : pairKey.trim(),
+          'entity_type': entityType.trim(),
+          'entity1_id':   entity1Id.trim(),
+          'entity1_name': entity1Name.trim(),
+          'entity2_id':   entity2Id.trim(),
+          'entity2_name': entity2Name.trim(),
+          'track_details': trackDetails,
+          'summary': {
+            'entity1_votes':      entity1Votes,
+            'entity2_votes':      entity2Votes,
+            'entity1_percentage': e1Pct,
+            'entity2_percentage': e2Pct,
+          },
           'completion_percentage': completionPercentage,
           'unvoted_count': unvotedCount,
-          'track_details': trackMap,
+          'created_at': FieldValue.serverTimestamp(),
+          'timestamp':  FieldValue.serverTimestamp(),
         });
-        debugPrint('[FirebaseService] upsertArtistPoll → created $docId');
+        debugPrint('[FirebaseService] upsertPoll → created $docId');
       } else {
-        // ── Subsequent vote: only update fields that change ──────────────
         await ref.update({
-          'artist1Vote': artist1Vote,
-          'artist2Vote': artist2Vote,
+          'track_details': trackDetails,
+          'summary': {
+            'entity1_votes':      entity1Votes,
+            'entity2_votes':      entity2Votes,
+            'entity1_percentage': e1Pct,
+            'entity2_percentage': e2Pct,
+          },
           'completion_percentage': completionPercentage,
           'unvoted_count': unvotedCount,
-          'track_details': trackMap,
-          'Versus_type': versusTypeTrim,
           'timestamp': FieldValue.serverTimestamp(),
         });
-        debugPrint('[FirebaseService] upsertArtistPoll → updated $docId');
+        debugPrint('[FirebaseService] upsertPoll → updated $docId');
       }
     } catch (e) {
-      debugPrint('[FirebaseService] upsertArtistPoll($docId) failed: $e');
+      debugPrint('[FirebaseService] upsertPoll($docId) failed: $e');
     }
   }
 
-  // ── Fetch existing poll for this voter + versus ───────────────────────────
-  /// Returns the raw poll document data if it exists, null otherwise.
-  /// Used by [ArtistVersusPlayground] to restore a voter's previous session.
-  static Future<Map<String, dynamic>?> getExistingArtistPoll({
+  /// Returns the raw poll document data for session restore, or null if absent.
+  static Future<Map<String, dynamic>?> getExistingPoll({
     required String versusId,
     required String voterId,
   }) async {
     final vId = versusId.trim();
     final uId = voterId.trim();
     if (vId.isEmpty || uId.isEmpty) return null;
-
     try {
       final doc = await _firestore.collection('polls').doc('${vId}_$uId').get();
       if (!doc.exists || doc.data() == null) return null;
-      debugPrint('[FirebaseService] getExistingArtistPoll → found ${vId}_$uId');
+      debugPrint('[FirebaseService] getExistingPoll → found ${vId}_$uId');
       return doc.data();
     } catch (e) {
-      debugPrint('[FirebaseService] getExistingArtistPoll failed: $e');
+      debugPrint('[FirebaseService] getExistingPoll failed: $e');
       return null;
     }
   }
 
-  static Future<void> upsertAlbumPoll({
-    required String versusId,
-    required String versusType,
-    required String voterId,
-    required String voterName,
-    required String voterAvatar,
-    required String album1ID,
-    required String album1Name,
-    required int album1Vote,
-    required String album2ID,
-    required String album2Name,
-    required int album2Vote,
-    required Map<int, Map<String, dynamic>> trackDetails,
-    required double completionPercentage,
-    required int unvotedCount,
-  }) async {
-    final versusIdTrim = versusId.trim();
-    final versusTypeTrim = versusType.trim();
-    final voterIdTrim = voterId.trim();
-    if (versusIdTrim.isEmpty || voterIdTrim.isEmpty) return;
-    if (versusTypeTrim.isEmpty) return;
-
-    final docId = '${versusIdTrim}_$voterIdTrim';
-    final ref = _firestore.collection('polls').doc(docId);
-
-    final trackMap = {
-      for (final e in trackDetails.entries) '${e.key}': e.value,
-    };
-
+  /// Queries `pairs` where `entity_ids` array-contains [entityId].
+  static Future<List<PairModel>> getPairsForEntity(String entityId) async {
+    final id = entityId.trim();
+    if (id.isEmpty) return [];
     try {
-      final snap = await ref.get();
-      if (!snap.exists) {
-        if (album1Vote + album2Vote == 0) {
-          debugPrint('[FirebaseService] upsertAlbumPoll → skipped: no votes on new poll');
-          return;
-        }
-        await ref.set({
-          'versus_id': versusIdTrim,
-          'Versus_type': versusTypeTrim,
-          'voter_id': voterIdTrim,
-          'voter_name': voterName.trim(),
-          'voter_avatar': voterAvatar.trim(),
-          'timestamp': FieldValue.serverTimestamp(),
-          'album1ID': album1ID.trim(),
-          'album1Name': album1Name.trim(),
-          'album1Vote': album1Vote,
-          'album2ID': album2ID.trim(),
-          'album2Name': album2Name.trim(),
-          'album2Vote': album2Vote,
-          'completion_percentage': completionPercentage,
-          'unvoted_count': unvotedCount,
-          'track_details': trackMap,
-        });
-        debugPrint('[FirebaseService] upsertAlbumPoll → created $docId');
-      } else {
-        await ref.update({
-          'album1Vote': album1Vote,
-          'album2Vote': album2Vote,
-          'completion_percentage': completionPercentage,
-          'unvoted_count': unvotedCount,
-          'track_details': trackMap,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-        debugPrint('[FirebaseService] upsertAlbumPoll → updated $docId');
-      }
+      final snap = await _firestore
+          .collection('pairs')
+          .where('entity_ids', arrayContains: id)
+          .get();
+      return snap.docs
+          .map((doc) => PairModel.fromFirestore(doc.id, doc.data()))
+          .toList();
     } catch (e) {
-      debugPrint('[FirebaseService] upsertAlbumPoll($docId) failed: $e');
-    }
-  }
-
-  /// Fetches an existing album poll for session restore.
-  static Future<Map<String, dynamic>?> getExistingAlbumPoll({
-    required String versusId,
-    required String voterId,
-  }) async {
-    final vId = versusId.trim();
-    final uId = voterId.trim();
-    if (vId.isEmpty || uId.isEmpty) return null;
-    try {
-      final doc =
-          await _firestore.collection('polls').doc('${vId}_$uId').get();
-      if (!doc.exists || doc.data() == null) return null;
-      return doc.data();
-    } catch (e) {
-      debugPrint('[FirebaseService] getExistingAlbumPoll failed: $e');
-      return null;
+      debugPrint('[FirebaseService] getPairsForEntity($id) failed: $e');
+      return [];
     }
   }
 
@@ -2204,6 +1335,39 @@ class FirebaseService {
       debugPrint('[FirebaseService] getPollsByVoter($voterId) failed: $e');
       return [];
     }
+  }
+
+  // ── Fetch rankings by Spotify IDs ─────────────────────────────────────────────
+  /// Fetches ranking docs for the given [ids] (Spotify entity IDs).
+  /// Deduplicates, chunks into batches of ≤30 (Firestore whereIn limit),
+  /// and returns a map of id → [RankingModel]. Missing IDs are absent from
+  /// the map (not defaulted to any value).
+  static Future<Map<String, RankingModel>> getRankingsByIds(
+    List<String> ids,
+  ) async {
+    final deduped =
+        ids.where((id) => id.isNotEmpty).toSet().toList();
+    if (deduped.isEmpty) return {};
+    final result = <String, RankingModel>{};
+    const chunkSize = 30;
+    for (var i = 0; i < deduped.length; i += chunkSize) {
+      final chunk = deduped.sublist(
+        i,
+        (i + chunkSize).clamp(0, deduped.length),
+      );
+      try {
+        final snap = await _firestore
+            .collection('rankings')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          result[doc.id] = RankingModel.fromFirestore(doc.data(), doc.id);
+        }
+      } catch (e) {
+        debugPrint('[FirebaseService] getRankingsByIds chunk failed: $e');
+      }
+    }
+    return result;
   }
 
   // ── Search users by username (prefix match, case-insensitive) ────────────

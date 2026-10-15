@@ -1,3 +1,6 @@
+# Voting reset backups (may contain PII — never commit)
+backups/
+
 # Miscellaneous
 *.class
 *.log
