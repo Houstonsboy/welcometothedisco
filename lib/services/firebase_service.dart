@@ -1689,12 +1689,19 @@ class FirebaseService {
 
   /// Cheap (1-doc) live listener on just the newest post, used to drive a
   /// "N new posts" indicator without streaming/re-fetching the full feed.
+  ///
+  /// Skips snapshots with a pending local write: a new post's `Created_at`
+  /// (a `FieldValue.serverTimestamp()`) reads back as null until the server
+  /// ack arrives, so without this filter a single `add()` emits twice —
+  /// once locally with a null timestamp, once confirmed — double-counting
+  /// the "new posts" indicator for one actual post.
   static Stream<PostModel?> watchNewestPost() {
     return _firestore
         .collection('posts')
         .orderBy('Created_at', descending: true)
         .limit(1)
         .snapshots()
+        .where((snap) => !snap.metadata.hasPendingWrites)
         .map((snap) => snap.docs.isEmpty
             ? null
             : PostModel.fromFirestore(snap.docs.first.data(), snap.docs.first.id));

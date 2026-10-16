@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/post_model.dart';
 import 'package:welcometothedisco/posts/create_post.dart';
@@ -93,6 +94,10 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
     _newestSub = FirebaseService.watchNewestPost().listen((newest) {
       if (!mounted || newest == null || _posts.isEmpty) return;
       if (newest.id == _posts.first.id) return;
+      // The current user's own new post is already spliced into the feed
+      // directly by _pullNewPosts (via the create-post FAB's onPostCreated
+      // callback) — don't also surface it behind a "new posts" banner.
+      if (newest.authorID == FirebaseAuth.instance.currentUser?.uid) return;
       final newestCreated = newest.createdAt;
       final topCreated = _topTimestamp;
       if (newestCreated != null &&

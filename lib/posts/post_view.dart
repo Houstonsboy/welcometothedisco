@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:welcometothedisco/Ranking/entity_profile.dart';
 import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
+import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -258,6 +259,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             ),
                           ),
                         ),
+
+                        if (post.mentionedUids.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: _TaggedFriendsRow(
+                                uids: post.mentionedUids),
+                          ),
 
                         SliverToBoxAdapter(
                             child: _HDivider(top: 22, bottom: 16)),
@@ -552,7 +559,13 @@ class _AuthorRow extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          _FollowPill(),
+          if (post.authorID.trim() !=
+              FirebaseAuth.instance.currentUser?.uid)
+            _FollowPill(
+              authorUid: post.authorID.trim(),
+              authorUsername: post.authorName,
+              authorAvatarPath: post.authorAvatar,
+            ),
         ],
       ),
     );
@@ -561,17 +574,63 @@ class _AuthorRow extends StatelessWidget {
 
 // ─── Follow pill ──────────────────────────────────────────────────────────────
 class _FollowPill extends StatefulWidget {
+  const _FollowPill({
+    required this.authorUid,
+    required this.authorUsername,
+    required this.authorAvatarPath,
+  });
+
+  final String authorUid;
+  final String authorUsername;
+  final String authorAvatarPath;
+
   @override
   State<_FollowPill> createState() => _FollowPillState();
 }
 
 class _FollowPillState extends State<_FollowPill> {
+  StreamSubscription<UserModel?>? _userSub;
   bool _following = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _userSub = FirebaseService.getCurrentUserStream().listen((user) {
+      if (!mounted) return;
+      final following =
+          user?.friends.any((f) => f.uid == widget.authorUid) ?? false;
+      if (following != _following) setState(() => _following = following);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    if (_following || _loading) return;
+    setState(() => _loading = true);
+    try {
+      await FirebaseService.addFriend(
+        friendUid: widget.authorUid,
+        friendUsername: widget.authorUsername,
+        friendAvatarPath: widget.authorAvatarPath,
+      );
+      if (mounted) setState(() => _following = true);
+    } catch (_) {
+      // Real state reconciles via the user stream above.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => setState(() => _following = !_following),
+      onTap: _handleTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding:
@@ -598,6 +657,84 @@ class _FollowPillState extends State<_FollowPill> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Tagged friends row ─────────────────────────────────────────────────────────
+class _TaggedFriendsRow extends StatefulWidget {
+  const _TaggedFriendsRow({required this.uids});
+  final List<String> uids;
+
+  @override
+  State<_TaggedFriendsRow> createState() => _TaggedFriendsRowState();
+}
+
+class _TaggedFriendsRowState extends State<_TaggedFriendsRow> {
+  late final Future<List<UserModel>> _usersFuture = Future.wait(
+    widget.uids.map(FirebaseService.getUserById),
+  ).then((users) => users.whereType<UserModel>().toList());
+
+  void _openProfile(BuildContext context, UserModel user) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && user.id == currentUid) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const UserProfilePage()),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FriendProfilePage(
+          uid: user.id,
+          initialUsername: user.username,
+          initialAvatarPath: user.avatarPath,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<UserModel>>(
+      future: _usersFuture,
+      builder: (context, snapshot) {
+        final users = snapshot.data ?? const [];
+        if (users.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Icon(Icons.local_offer_rounded,
+                  color: Colors.white.withValues(alpha: 0.35), size: 14),
+              Text(
+                'with',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 13,
+                ),
+              ),
+              for (final user in users)
+                GestureDetector(
+                  onTap: () => _openProfile(context, user),
+                  child: Text(
+                    '@${user.username}',
+                    style: const TextStyle(
+                      color: _kCyan,
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

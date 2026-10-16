@@ -370,19 +370,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       _Divider(),
                       const SizedBox(height: 16),
 
-                      // ── Tag friends (mentions) ───────────────────────────
-                      _TagFriendsSection(
-                        selectedUids: _mentionedUids,
-                        onToggle: _toggleMention,
-                        isOpen: _mentionsSectionOpen,
-                        onToggleOpen: () => setState(
-                            () => _mentionsSectionOpen = !_mentionsSectionOpen),
-                      ),
-
-                      const SizedBox(height: 24),
-                      _Divider(),
-                      const SizedBox(height: 16),
-
                       // ── Track section ────────────────────────────────────
                       _TrackSection(
                         artist: _selectedArtist,
@@ -397,6 +384,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         isOpen: _trackSectionOpen,
                         onToggleOpen: () =>
                             setState(() => _trackSectionOpen = !_trackSectionOpen),
+                      ),
+
+                      const SizedBox(height: 24),
+                      _Divider(),
+                      const SizedBox(height: 16),
+
+                      // ── Tag friends (mentions) ───────────────────────────
+                      _TagFriendsSection(
+                        selectedUids: _mentionedUids,
+                        onToggle: _toggleMention,
+                        isOpen: _mentionsSectionOpen,
+                        onToggleOpen: () => setState(
+                            () => _mentionsSectionOpen = !_mentionsSectionOpen),
                       ),
                     ],
                   ),
