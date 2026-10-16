@@ -29,6 +29,14 @@ import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/posts/view_posts.dart';
+import 'package:welcometothedisco/posts/post_view.dart';
+import 'package:welcometothedisco/versus/playground.dart';
+import 'package:welcometothedisco/versus/artistplayground.dart';
+import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
+
+/// Lets notification tap handling push screens without a BuildContext of its
+/// own — set as the MaterialApp's navigatorKey below.
+final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +46,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  NotificationService.onNotificationTap = _handleNotificationTap;
   await NotificationService.initialize();
 
   // Cold-start: app opened by Spotify redirect URI.
@@ -58,12 +67,73 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// Routes a tapped push notification (foreground banner, background tap, or
+/// cold-start launch) to the right screen based on its `data` payload.
+void _handleNotificationTap(Map<String, dynamic> data) {
+  final navigator = navigatorKey.currentState;
+  if (navigator == null) return;
+
+  final type = data['type'] as String?;
+  final id = data['id'] as String?;
+  if (id == null || id.isEmpty) return;
+
+  switch (type) {
+    case 'follow':
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      );
+      break;
+    case 'invite':
+      navigator.push(
+        MaterialPageRoute(builder: (_) => CollaboratorBackroom(versusID: id)),
+      );
+      break;
+    case 'versus':
+      _openVersusFromNotification(navigator, id, data['versusType'] as String?);
+      break;
+    case 'post':
+      _openPostFromNotification(navigator, id);
+      break;
+  }
+}
+
+Future<void> _openVersusFromNotification(
+  NavigatorState navigator,
+  String versusId,
+  String? versusType,
+) async {
+  if (versusType == 'artist') {
+    final model = await FirebaseService.getArtistVersusById(versusId);
+    if (model == null) return;
+    navigator.push(MaterialPageRoute(
+      builder: (_) => ArtistVersusPlayground(versus: model, versusId: versusId),
+    ));
+    return;
+  }
+
+  final model = await FirebaseService.getAlbumVersusById(versusId);
+  if (model == null) return;
+  navigator.push(MaterialPageRoute(
+    builder: (_) => VersusPlayground(versus: model, versusId: versusId),
+  ));
+}
+
+Future<void> _openPostFromNotification(
+  NavigatorState navigator,
+  String postId,
+) async {
+  final post = await FirebaseService.getPostStream(postId).first;
+  if (post == null) return;
+  navigator.push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.appTheme(),
       initialRoute: '/splash',

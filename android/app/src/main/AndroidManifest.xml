@@ -53,6 +53,12 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="true" />
+        <!-- FCM: default channel for pushes shown while the app is backgrounded/terminated.
+             Must match the AndroidNotificationChannel id created in notification_service.dart
+             so both paths post to the same (high-importance) channel. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

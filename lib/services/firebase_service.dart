@@ -11,6 +11,7 @@ import 'package:welcometothedisco/models/pair_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/utils/pair_utils.dart';
 
@@ -164,6 +165,12 @@ class FirebaseService {
 
     debugPrint(
         '[FirebaseService] _sendFollowNotification → $followerUid → $recipientUid');
+
+    await NotificationService.notifyFriendNewFollow(
+      recipientUid: recipientUid,
+      followerUid: followerUid,
+      followerName: follower.username,
+    );
   }
 
   // ── Real-time stream: true if current user has any unread notifications ────
@@ -190,6 +197,7 @@ class FirebaseService {
         .doc(uid)
         .collection('notifications')
         .orderBy('timestamp', descending: true)
+        .limit(100)
         .snapshots();
   }
 
@@ -839,10 +847,17 @@ class FirebaseService {
           'artist2Name': artist2Name?.trim() ?? '',
           if (artist2ID != null && artist2ID.trim().isNotEmpty)
             'artist2ID': artist2ID.trim(),
-            
+
         });
         debugPrint(
             '[FirebaseService] createCollaborationInvite → invite sent to $collaboratorUID');
+
+        await NotificationService.notifyFriendNewInvite(
+          recipientUid: collaboratorUID.trim(),
+          senderUid: uid,
+          senderName: author?.username ?? '',
+          versusId: versusID,
+        );
       } catch (e) {
         debugPrint(
             '[FirebaseService] createCollaborationInvite → notification failed: $e');
