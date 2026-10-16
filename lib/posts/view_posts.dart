@@ -203,7 +203,7 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
                       child: Text(
                         'Could not load posts',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 14,
                         ),
@@ -216,7 +216,7 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
                       child: Text(
                         'No posts yet — be the first!',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.40),
+                          color: Colors.white.withValues(alpha: 0.40),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 14,
                         ),
@@ -248,7 +248,7 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
                             Divider(
                               height: 1,
                               thickness: 1,
-                              color: Colors.white.withOpacity(0.24),
+                              color: Colors.white.withValues(alpha: 0.24),
                               indent: 0,
                               endIndent: 0,
                             ),
@@ -305,7 +305,7 @@ class _NewPostsBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withValues(alpha: 0.25),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -361,9 +361,9 @@ class _PostCard extends StatelessWidget {
     Widget fallback() => Container(
           width: size,
           height: size,
-          color: _kBlue.withOpacity(0.35),
+          color: _kBlue.withValues(alpha: 0.35),
           child: Icon(Icons.person_rounded,
-              color: Colors.white.withOpacity(0.75), size: 13),
+              color: Colors.white.withValues(alpha: 0.75), size: 13),
         );
 
     if (p.isEmpty) {
@@ -466,7 +466,7 @@ class _PostCard extends StatelessWidget {
                   ),
                 ),
                 Icon(Icons.more_horiz_rounded,
-                    color: Colors.white.withOpacity(0.40), size: 18),
+                    color: Colors.white.withValues(alpha: 0.40), size: 18),
               ],
             ),
 
@@ -502,7 +502,7 @@ class _PostCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.22),
+                            color: Colors.white.withValues(alpha: 0.22),
                             width: 1.5,
                           ),
                         ),
@@ -513,14 +513,14 @@ class _PostCard extends StatelessWidget {
                             height: 48,
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(
-                              color: _kBlue.withOpacity(0.35),
+                              color: _kBlue.withValues(alpha: 0.35),
                               child: Icon(Icons.music_note_rounded,
-                                  color: _kPink.withOpacity(0.9), size: 20),
+                                  color: _kPink.withValues(alpha: 0.9), size: 20),
                             ),
                             errorWidget: (_, __, ___) => Container(
-                              color: _kBlue.withOpacity(0.35),
+                              color: _kBlue.withValues(alpha: 0.35),
                               child: Icon(Icons.music_note_rounded,
-                                  color: _kPink.withOpacity(0.9), size: 20),
+                                  color: _kPink.withValues(alpha: 0.9), size: 20),
                             ),
                           ),
                         ),
@@ -555,24 +555,24 @@ class _PostCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.loop_rounded,
-                    color: _kGreen.withOpacity(0.75), size: 14),
+                    color: _kGreen.withValues(alpha: 0.75), size: 14),
                 const SizedBox(width: 4),
                 Text(
                   _fmt(post.remixCount),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.50),
+                    color: Colors.white.withValues(alpha: 0.50),
                     fontFamily: AppTheme.fontBody,
                     fontSize: 11,
                   ),
                 ),
                 const SizedBox(width: 18),
                 Icon(Icons.reply_rounded,
-                    color: Colors.white.withOpacity(0.40), size: 14),
+                    color: Colors.white.withValues(alpha: 0.40), size: 14),
                 const SizedBox(width: 4),
                 Text(
                   _fmt(post.shareCount),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.50),
+                    color: Colors.white.withValues(alpha: 0.50),
                     fontFamily: AppTheme.fontBody,
                     fontSize: 11,
                   ),
@@ -617,7 +617,7 @@ class _PostDescriptionBodyState extends State<_PostDescriptionBody> {
         : words.take(_PostDescriptionBody._previewWords).toList();
 
     final bodyStyle = TextStyle(
-      color: Colors.white.withOpacity(0.82),
+      color: Colors.white.withValues(alpha: 0.82),
       fontFamily: AppTheme.fontBody,
       fontSize: 12.5,  // reduced from 13.5
       height: 1.45,    // reduced from 1.55
@@ -710,10 +710,10 @@ class _TrackCircle extends StatelessWidget {
       height: _OverlappingTrackCovers._size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -724,14 +724,14 @@ class _TrackCircle extends StatelessWidget {
           imageUrl: url,
           fit: BoxFit.cover,
           placeholder: (_, __) => Container(
-            color: _kBlue.withOpacity(0.35),
+            color: _kBlue.withValues(alpha: 0.35),
             child: Icon(Icons.album_rounded,
-                color: _kPink.withOpacity(0.85), size: 16), // reduced from 22
+                color: _kPink.withValues(alpha: 0.85), size: 16), // reduced from 22
           ),
           errorWidget: (_, __, ___) => Container(
-            color: _kBlue.withOpacity(0.35),
+            color: _kBlue.withValues(alpha: 0.35),
             child: Icon(Icons.album_rounded,
-                color: _kPink.withOpacity(0.85), size: 16), // reduced from 22
+                color: _kPink.withValues(alpha: 0.85), size: 16), // reduced from 22
           ),
         ),
       ),
@@ -803,12 +803,12 @@ class _CreatePostFABState extends State<_CreatePostFAB>
             shape: BoxShape.circle,
             color: _kCreateCyan,
             border: Border.all(
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: _kCreateCyan.withOpacity(0.45),
+                color: _kCreateCyan.withValues(alpha: 0.45),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),

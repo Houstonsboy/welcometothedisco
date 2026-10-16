@@ -324,7 +324,7 @@ class _AppShellState extends State<_AppShell> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
           child: Container(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -337,7 +337,7 @@ class _AppShellState extends State<_AppShell> {
                       'Connecting to Spotify…\nComplete login in the browser.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 15,
                         height: 1.4,
                       ),
@@ -506,13 +506,13 @@ class _ComingSoonPage extends StatelessWidget {
           Icon(
             Icons.sports_mma_rounded,
             size: 52,
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
           ),
           const SizedBox(height: 14),
           Text(
             'COMING SOON',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               fontSize: 13,
               fontWeight: FontWeight.w800,
               letterSpacing: 3,
@@ -545,7 +545,7 @@ class _NotificationBell extends StatelessWidget {
                 hasUnread
                     ? Icons.notifications_rounded
                     : Icons.notifications_outlined,
-                color: Colors.white.withOpacity(hasUnread ? 1.0 : 0.65),
+                color: Colors.white.withValues(alpha: hasUnread ? 1.0 : 0.65),
                 size: 24,
               ),
               if (hasUnread)
@@ -625,12 +625,12 @@ class _FirebaseHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(compact ? 20 : 16),
                   gradient: AppTheme.glassPanelGradient(opacity: 0.40),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withValues(alpha: 0.18),
                     width: 0.8,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
@@ -646,14 +646,14 @@ class _FirebaseHeader extends StatelessWidget {
                             height: compact ? 16 : 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           SizedBox(width: compact ? 8 : 12),
                           Text(
                             compact ? '…' : 'Loading profile…',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontSize: compact ? 12 : 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -676,10 +676,10 @@ class _FirebaseHeader extends StatelessWidget {
                                 : Container(
                                     width: size,
                                     height: size,
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     child: Icon(
                                       Icons.person_rounded,
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(alpha: 0.8),
                                       size: compact ? 18 : 24,
                                     ),
                                   ),
@@ -694,7 +694,7 @@ class _FirebaseHeader extends StatelessWidget {
                                   Text(
                                     'Account',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Colors.white.withValues(alpha: 0.6),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
@@ -733,7 +733,7 @@ class _FirebaseHeader extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.62),
+                                  color: Colors.white.withValues(alpha: 0.62),
                                   fontSize: 11,
                                 ),
                               ),

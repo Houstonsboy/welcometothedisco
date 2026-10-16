@@ -243,10 +243,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(99),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 0.8,
                       ),
                     ),
@@ -288,15 +288,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               child: Icon(
                 Icons.notifications_off_outlined,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 38,
               ),
             ),
@@ -304,7 +304,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 Text(
               'No notifications yet',
                   style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -313,7 +313,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             Text(
               'Follows and collaboration invites will show up here',
                   style: TextStyle(
-                color: Colors.white.withOpacity(0.45),
+                color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 12,
               ),
             ),
@@ -332,7 +332,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           separatorBuilder: (_, __) => Divider(
             height: 0,
             indent: 72,
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
           itemBuilder: (context, i) {
             final item = _notifications[i];
@@ -401,7 +401,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
         SnackBar(
           content: Text('Could not follow back: $e',
               style: const TextStyle(fontSize: 13)),
-          backgroundColor: _kPink.withOpacity(0.85),
+          backgroundColor: _kPink.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -424,9 +424,9 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: isUnread ? _kGreen.withOpacity(0.13) : Colors.transparent,
+        color: isUnread ? _kGreen.withValues(alpha: 0.13) : Colors.transparent,
         border: isUnread
-            ? Border.all(color: _kGreen.withOpacity(0.28), width: 1)
+            ? Border.all(color: _kGreen.withValues(alpha: 0.28), width: 1)
             : null,
       ),
             child: Row(
@@ -476,7 +476,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                      color: Colors.white.withOpacity(0.42),
+                      color: Colors.white.withValues(alpha: 0.42),
                           fontSize: 12,
                     ),
                         ),
@@ -487,7 +487,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                    color: Colors.white.withOpacity(0.32),
+                    color: Colors.white.withValues(alpha: 0.32),
                           fontSize: 11,
                         ),
                       ),
@@ -512,17 +512,17 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                 : null,
                 color: _isFollowing || _loading
                     ? null
-                    : Colors.white.withOpacity(0.15),
+                    : Colors.white.withValues(alpha: 0.15),
                 border: Border.all(
                   color: _isFollowing
                       ? Colors.transparent
-                      : Colors.white.withOpacity(0.3),
+                      : Colors.white.withValues(alpha: 0.3),
                   width: 0.8,
                 ),
                 boxShadow: _isFollowing
                     ? [
                         BoxShadow(
-                          color: _kPink.withOpacity(0.3),
+                          color: _kPink.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         )
@@ -535,14 +535,14 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.6,
-                        color: Colors.white.withOpacity(0.65),
+                        color: Colors.white.withValues(alpha: 0.65),
                       ),
                     )
                   : Text(
                       _isFollowing ? 'Following' : 'Follow Back',
                       style: TextStyle(
                         color: Colors.white
-                            .withOpacity(_isFollowing ? 1.0 : 0.9),
+                            .withValues(alpha: _isFollowing ? 1.0 : 0.9),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -605,8 +605,8 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
       height: _avatarSize,
           decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
-        color: Colors.white.withOpacity(0.08),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+        color: Colors.white.withValues(alpha: 0.08),
       ),
       child: ClipOval(
         child: imageUrl != null && imageUrl.isNotEmpty
@@ -626,7 +626,7 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
           child: Text(
           initial,
             style: TextStyle(
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
             fontSize: 11,
               fontWeight: FontWeight.w700,
           ),
@@ -650,7 +650,7 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
                 child: Text(
                   'VS',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
@@ -722,9 +722,9 @@ class _InviteNotificationRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-            color: isUnread ? _kPink.withOpacity(0.12) : Colors.transparent,
+            color: isUnread ? _kPink.withValues(alpha: 0.12) : Colors.transparent,
             border: isUnread
-                ? Border.all(color: _kPink.withOpacity(0.35), width: 1)
+                ? Border.all(color: _kPink.withValues(alpha: 0.35), width: 1)
                 : null,
       ),
       child: Row(
@@ -765,7 +765,7 @@ class _InviteNotificationRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha: 0.55),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                   ),
@@ -776,7 +776,7 @@ class _InviteNotificationRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                        color: Colors.white.withOpacity(0.32),
+                        color: Colors.white.withValues(alpha: 0.32),
                     fontSize: 11,
                         height: 1.25,
                   ),
@@ -814,20 +814,20 @@ class _NotifAvatar extends StatelessWidget {
                 end: Alignment.bottomRight,
               )
             : null,
-        color: isUnread ? null : Colors.white.withOpacity(0.15),
+        color: isUnread ? null : Colors.white.withValues(alpha: 0.15),
         border: isUnread
             ? null
-            : Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+            : Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5),
       ),
       child: Padding(
         padding: EdgeInsets.all(isUnread ? 2.5 : 0),
         child: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.1),
+          backgroundColor: Colors.white.withValues(alpha: 0.1),
           backgroundImage:
               assetPath != null ? AssetImage(assetPath!) : null,
           child: assetPath == null
               ? Icon(Icons.person_rounded,
-                  color: Colors.white.withOpacity(0.6), size: 28)
+                  color: Colors.white.withValues(alpha: 0.6), size: 28)
               : null,
         ),
       ),

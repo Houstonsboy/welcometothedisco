@@ -26,7 +26,7 @@ class CollaboratorInviteBanner {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       enableDrag: true,
       useRootNavigator: true,
       builder: (_) => _InviteBannerSheet(
@@ -193,7 +193,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                 'No account with that exact username. Pick someone from search results.',
                 style: TextStyle(fontSize: 13),
               ),
-              backgroundColor: Colors.black.withOpacity(0.78),
+              backgroundColor: Colors.black.withValues(alpha: 0.78),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -216,7 +216,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
             SnackBar(
               content: Text('Could not look up user: $e',
                   style: const TextStyle(fontSize: 13)),
-              backgroundColor: Colors.black.withOpacity(0.78),
+              backgroundColor: Colors.black.withValues(alpha: 0.78),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -282,11 +282,11 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF0E0E1A).withOpacity(0.97),
-                const Color(0xFF14102A).withOpacity(0.97),
+                const Color(0xFF0E0E1A).withValues(alpha: 0.97),
+                const Color(0xFF14102A).withValues(alpha: 0.97),
               ],
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.09), width: 0.8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.09), width: 0.8),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -313,7 +313,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
         width: 36, height: 4,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(99),
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
         ),
       ),
     );
@@ -339,7 +339,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
               ),
               boxShadow: [
                 BoxShadow(
-                    color: (_searchVisible ? _kPurple : _kPink).withOpacity(0.40),
+                    color: (_searchVisible ? _kPurple : _kPink).withValues(alpha: 0.40),
                     blurRadius: _searchVisible ? 18 : 14,
                   offset: const Offset(0, 4),
                 ),
@@ -372,7 +372,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                   _searchVisible ? 'Search by username' : 'Pick tracks for ${widget.artistName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withOpacity(0.45),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45),
                       fontSize: 11, fontWeight: FontWeight.w500),
                 ),
               ],
@@ -384,10 +384,10 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
               width: 30, height: 30,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.10), width: 0.8),
+                color: Colors.white.withValues(alpha: 0.08),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 0.8),
               ),
-              child: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.45), size: 15),
+              child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.45), size: 15),
             ),
           ),
         ],
@@ -445,7 +445,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Text(msg,
         textAlign: TextAlign.center,
-        style: TextStyle(color: Colors.white.withOpacity(0.38),
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.38),
             fontSize: 11, fontWeight: FontWeight.w500)),
     )),
   );
@@ -498,11 +498,11 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                            color: isSelected ? ringColor : Colors.white.withOpacity(0.10),
+                            color: isSelected ? ringColor : Colors.white.withValues(alpha: 0.10),
                             width: isSelected ? 2.5 : 1.0,
                       ),
                       boxShadow: isSelected
-                              ? [BoxShadow(color: ringColor.withOpacity(0.50), blurRadius: 14)]
+                              ? [BoxShadow(color: ringColor.withValues(alpha: 0.50), blurRadius: 14)]
                               : [],
                         ),
                         child: ClipOval(child: _friendAvatar(f, 46)),
@@ -534,7 +534,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
+                        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.4),
                       fontSize: 9,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                       ),
@@ -574,8 +574,8 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              color: Colors.white.withOpacity(0.07),
-              border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.07),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
             ),
             child: TextField(
               controller: _usernameCtrl,
@@ -592,9 +592,9 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
               cursorColor: _kPink,
               decoration: InputDecoration(
                 hintText: 'Search by username…',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.28), fontSize: 14),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.28), fontSize: 14),
                 prefixIcon: Icon(Icons.alternate_email_rounded,
-                    color: Colors.white.withOpacity(0.35), size: 18),
+                    color: Colors.white.withValues(alpha: 0.35), size: 18),
                 suffixIcon: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _usernameCtrl,
                   builder: (_, val, __) => val.text.isNotEmpty
@@ -608,7 +608,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                             });
                           },
                           child: Icon(Icons.cancel_rounded,
-                              color: Colors.white.withOpacity(0.30), size: 16),
+                              color: Colors.white.withValues(alpha: 0.30), size: 16),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -650,21 +650,21 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                         end: Alignment.centerRight,
                       )
                     : null,
-            color: (!hasTarget && !_sent) ? Colors.white.withOpacity(0.07) : null,
+            color: (!hasTarget && !_sent) ? Colors.white.withValues(alpha: 0.07) : null,
             border: Border.all(
               color: _sent
-                  ? Colors.white.withOpacity(0.4)
+                  ? Colors.white.withValues(alpha: 0.4)
                   : hasTarget
                   ? Colors.transparent
-                  : Colors.white.withOpacity(0.10),
+                  : Colors.white.withValues(alpha: 0.10),
               width: 0.8,
             ),
             boxShadow: hasTarget && !_sent
-                ? [BoxShadow(color: _kPink.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 5))]
+                ? [BoxShadow(color: _kPink.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 5))]
                 : _sent
                 ? [
                     BoxShadow(
-                          color: _kInviteSentGreen.withOpacity(0.5),
+                          color: _kInviteSentGreen.withValues(alpha: 0.5),
                       blurRadius: 18,
                       offset: const Offset(0, 5),
                     ),
@@ -682,7 +682,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
                       style: TextStyle(
                         color: _sent || hasTarget
                             ? Colors.white
-                            : Colors.white.withOpacity(0.25),
+                            : Colors.white.withValues(alpha: 0.25),
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.6,
@@ -697,7 +697,7 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
 
   Widget _buildDivider() => Divider(
     height: 0, thickness: 0.6,
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
       );
 }
 
@@ -718,7 +718,9 @@ Color _accentForUid(String uid) {
     Color(0xFFFFAA00), _kPurple,
   ];
   var h = 0;
-  for (final c in uid.codeUnits) h = (h * 31 + c) & 0x7fffffff;
+  for (final c in uid.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
   return palette[h % palette.length];
 }
 
@@ -749,10 +751,10 @@ Widget _initialsPlate(FriendEntry f, double size) {
   final c = _accentForUid(f.uid);
   return Container(
     width: size, height: size,
-    color: c.withOpacity(0.35),
+    color: c.withValues(alpha: 0.35),
     alignment: Alignment.center,
     child: Text(_initialsForFriend(f),
-      style: TextStyle(color: Colors.white.withOpacity(0.92),
+      style: TextStyle(color: Colors.white.withValues(alpha: 0.92),
           fontSize: size * 0.28, fontWeight: FontWeight.w800)),
   );
 }

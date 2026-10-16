@@ -1,7 +1,6 @@
 import 'dart:async';
   import 'dart:convert';
   import 'dart:io';
-  import 'dart:typed_data';
   import 'dart:ui' as ui;
 import 'dart:math' as math;
 
@@ -208,7 +207,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
   }
 
     Future<void> _hydrateVoterContext() async {
-      final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+      final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
       if (uid.isEmpty) return;
 
       var cached = await UserProfileCacheService.readUser(expectedUid: uid);
@@ -485,8 +484,8 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
         _api.getArtistDetails(model.artist1ID),
         _api.getArtistDetails(model.artist2ID),
       ]);
-      final artist1 = results[0] as SpotifyArtistDetails?;
-      final artist2 = results[1] as SpotifyArtistDetails?;
+      final artist1 = results[0];
+      final artist2 = results[1];
       if (!mounted) return;
       final img1 = artist1?.imageUrl;
       final img2 = artist2?.imageUrl;
@@ -845,7 +844,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     Future<void> _handleCopyLink() async {
       Navigator.pop(context);
       final link =
-          'https://welcometothedisco.app/versus/${_resolvedVersusId}';
+          'https://welcometothedisco.app/versus/$_resolvedVersusId';
       await Clipboard.setData(ClipboardData(text: link));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -861,7 +860,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
       final overlay = Overlay.of(context);
       final renderObject = targetContext.findRenderObject();
-      if (overlay == null || renderObject is! RenderBox) return;
+      if (renderObject is! RenderBox) return;
 
       final offset = renderObject.localToGlobal(Offset.zero);
       final size   = renderObject.size;
@@ -876,7 +875,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
               constraints: const BoxConstraints(maxWidth: 140),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: Colors.black.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -1272,7 +1271,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
             Text(
               'Loading tracks...',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
             ),
@@ -1290,13 +1289,13 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.refresh_rounded,
-                color: Colors.white.withOpacity(0.6), size: 40),
+                color: Colors.white.withValues(alpha: 0.6), size: 40),
             const SizedBox(height: 12),
               Text(
                 _loadError ?? 'Something went wrong',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
               ),
@@ -1350,9 +1349,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
-                          color: _kSpotifyGreen.withOpacity(0.18),
+                          color: _kSpotifyGreen.withValues(alpha: 0.18),
                           border: Border.all(
-                            color: _kSpotifyGreen.withOpacity(0.45),
+                            color: _kSpotifyGreen.withValues(alpha: 0.45),
                             width: 0.85,
                           ),
                         ),
@@ -1366,7 +1365,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                                 shape: BoxShape.circle,
                                 color: _playingTrackIndex != null
                                     ? _kSpotifyGreen
-                                    : Colors.white.withOpacity(0.35),
+                                    : Colors.white.withValues(alpha: 0.35),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1384,7 +1383,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                               Icon(
                                 Icons.graphic_eq_rounded,
                                 size: 14,
-                                color: _kSpotifyGreen.withOpacity(0.95),
+                                color: _kSpotifyGreen.withValues(alpha: 0.95),
                               ),
                             ],
                           ],
@@ -1401,12 +1400,12 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
-                          color: _kSpotifyGreen.withOpacity(
-                            _isBombLoading ? 0.12 : 0.22,
+                          color: _kSpotifyGreen.withValues(
+                            alpha: _isBombLoading ? 0.12 : 0.22,
                           ),
                           border: Border.all(
-                            color: _kSpotifyGreen.withOpacity(
-                              _isBombLoading ? 0.3 : 0.55,
+                            color: _kSpotifyGreen.withValues(
+                              alpha: _isBombLoading ? 0.3 : 0.55,
                             ),
                             width: 0.85,
                           ),
@@ -1466,7 +1465,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     if (roundCount == 0) {
       return Center(
         child: Text('No tracks loaded.',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
       );
     }
     return ListView.builder(
@@ -1556,10 +1555,10 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 coverUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
-                    Container(color: accentColor.withOpacity(0.25)),
+                    Container(color: accentColor.withValues(alpha: 0.25)),
               )
             else
-              Container(color: accentColor.withOpacity(0.25)),
+              Container(color: accentColor.withValues(alpha: 0.25)),
 
             // Bottom gradient
             Container(
@@ -1570,14 +1569,14 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                   stops: const [0.3, 1.0],
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.80),
+                    Colors.black.withValues(alpha: 0.80),
                   ],
                 ),
               ),
             ),
 
             // Lock dim
-            if (isLocked) Container(color: Colors.black.withOpacity(0.35)),
+            if (isLocked) Container(color: Colors.black.withValues(alpha: 0.35)),
 
             // Active border
             if (isActive)
@@ -1595,13 +1594,13 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${roundIndex + 1}'.padLeft(2, '0'),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1628,7 +1627,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 child: Icon(
                   Icons.lock_rounded,
                   size: 16,
-                  color: Colors.white.withOpacity(0.38),
+                  color: Colors.white.withValues(alpha: 0.38),
                 ),
               ),
 
@@ -1658,7 +1657,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isLocked
-                          ? Colors.white.withOpacity(0.45)
+                          ? Colors.white.withValues(alpha: 0.45)
                           : Colors.white,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -1680,12 +1679,12 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
                           color: isVotedForMe
-                              ? _kSpotifyGreen.withOpacity(0.85)
-                              : accentColor.withOpacity(0.30),
+                              ? _kSpotifyGreen.withValues(alpha: 0.85)
+                              : accentColor.withValues(alpha: 0.30),
                           border: Border.all(
                             color: isVotedForMe
                                 ? _kSpotifyGreen
-                                : accentColor.withOpacity(0.65),
+                                : accentColor.withValues(alpha: 0.65),
                             width: 0.8,
                           ),
                         ),
@@ -1698,7 +1697,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                                   : Icons.how_to_vote_rounded,
                               size: 10,
                               color: isVoteDisabled
-                                  ? Colors.white.withOpacity(0.3)
+                                  ? Colors.white.withValues(alpha: 0.3)
                                   : Colors.white,
                             ),
                             const SizedBox(width: 3),
@@ -1708,7 +1707,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                                 color: isVoteDisabled
-                                    ? Colors.white.withOpacity(0.3)
+                                    ? Colors.white.withValues(alpha: 0.3)
                                     : Colors.white,
                               ),
                             ),
@@ -1754,9 +1753,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 width: 40, height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.2), width: 0.8),
+                      color: Colors.white.withValues(alpha: 0.2), width: 0.8),
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded,
                     color: Colors.white, size: 16),
@@ -1813,7 +1812,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                                     collaboratorAvatarPath.isNotEmpty
                                 ? _resolveAvatarWidget(collaboratorAvatarPath, 28)
                                 : Container(
-                                    color: Colors.white.withOpacity(0.08),
+                                    color: Colors.white.withValues(alpha: 0.08),
                                     child: const Icon(Icons.person_rounded,
                                         color: Colors.white70, size: 14),
                                   ),
@@ -1836,12 +1835,12 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                   width: 34, height: 34,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.25), width: 0.8),
+                        color: Colors.white.withValues(alpha: 0.25), width: 0.8),
                   ),
                   child: Icon(Icons.edit_rounded,
-                      size: 14, color: Colors.white.withOpacity(0.9)),
+                      size: 14, color: Colors.white.withValues(alpha: 0.9)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1852,9 +1851,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 width: 34, height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withValues(alpha: 0.12),
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.25), width: 0.8),
+                      color: Colors.white.withValues(alpha: 0.25), width: 0.8),
                 ),
                 child: const Icon(Icons.ios_share_rounded,
                     color: Colors.white, size: 16),
@@ -1959,7 +1958,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                   margin: const EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(99),
-                    color: accent.withOpacity(0.5),
+                    color: accent.withValues(alpha: 0.5),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1975,9 +1974,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                 if (hasComment)
                   Expanded(
                     child: Text(
-                      comment!,
+                      comment,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.52),
+                        color: Colors.white.withValues(alpha: 0.52),
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                         fontStyle: FontStyle.italic,
@@ -2047,7 +2046,7 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
                   colors: [_color1, _color2],
                 ),
                 boxShadow: [BoxShadow(
-                  color: _color2.withOpacity(0.5),
+                  color: _color2.withValues(alpha: 0.5),
                   blurRadius: 18, spreadRadius: 2,
                 )],
               ),
@@ -2079,9 +2078,9 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
 
   Widget _avatarFallback(double size) => Container(
     width: size, height: size,
-    color: Colors.white.withOpacity(0.2),
+    color: Colors.white.withValues(alpha: 0.2),
     child: Icon(Icons.person_rounded,
-        color: Colors.white.withOpacity(0.8), size: size * 0.55),
+        color: Colors.white.withValues(alpha: 0.8), size: size * 0.55),
   );
 }
 
@@ -2114,9 +2113,9 @@ class _ArtistCard extends StatelessWidget {
             child: imageUrl != null && imageUrl!.isNotEmpty
                 ? Image.network(imageUrl!, fit: BoxFit.cover)
                 : Container(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     child: Icon(Icons.person_rounded, size: 36,
-                        color: Colors.white.withOpacity(0.3)),
+                        color: Colors.white.withValues(alpha: 0.3)),
                   ),
           ),
         ),
@@ -2129,7 +2128,7 @@ class _ArtistCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
               fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
             ),
           ),
@@ -2140,8 +2139,8 @@ class _ArtistCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
-              color: accentColor.withOpacity(0.22),
-              border: Border.all(color: accentColor.withOpacity(0.55), width: 0.9),
+              color: accentColor.withValues(alpha: 0.22),
+              border: Border.all(color: accentColor.withValues(alpha: 0.55), width: 0.9),
             ),
             child: Text(
               '$voteCount',
@@ -2222,15 +2221,15 @@ class _ArtistTrackPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: accentColor.withOpacity(0.6), width: 1.2),
+                        color: accentColor.withValues(alpha: 0.6), width: 1.2),
                     boxShadow: [BoxShadow(
-                        color: accentColor.withOpacity(0.25), blurRadius: 6)],
+                        color: accentColor.withValues(alpha: 0.25), blurRadius: 6)],
                   ),
                   child: ClipOval(
                     child: artistImageUrl != null && artistImageUrl!.isNotEmpty
                         ? Image.network(artistImageUrl!, fit: BoxFit.cover)
                         : Container(
-                            color: accentColor.withOpacity(0.3),
+                            color: accentColor.withValues(alpha: 0.3),
                             child: const Icon(Icons.person_rounded,
                                 color: Colors.white, size: 14)),
                   ),
@@ -2245,12 +2244,12 @@ class _ArtistTrackPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text('TRACKS', style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5,
                 )),
                 const SizedBox(width: 8),
                 Text('${tracks.length}', style: TextStyle(
-                  color: accentColor.withOpacity(0.9),
+                  color: accentColor.withValues(alpha: 0.9),
                   fontSize: 11, fontWeight: FontWeight.w700,
                 )),
               ],
@@ -2263,7 +2262,7 @@ class _ArtistTrackPage extends StatelessWidget {
             padding: const EdgeInsets.only(top: 24),
             child: Text('No tracks found.',
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.4), fontSize: 14)),
+                  color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
           );
         }
 
@@ -2392,15 +2391,15 @@ class _ArtistTrackPage extends StatelessWidget {
                   width: 32,
                   child: isPast
                       ? Icon(Icons.check_rounded,
-                          size: 15, color: accentColor.withOpacity(0.5))
+                          size: 15, color: accentColor.withValues(alpha: 0.5))
                       : isLocked
                           ? Icon(Icons.lock_rounded,
                               size: 14,
-                              color: Colors.white.withOpacity(0.45))
+                              color: Colors.white.withValues(alpha: 0.45))
                           : Text(
                               '${index + 1}'.padLeft(2, '0'),
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.40),
+                                color: Colors.white.withValues(alpha: 0.40),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 fontFeatures: const [
@@ -2445,12 +2444,12 @@ class _ArtistTrackPage extends StatelessWidget {
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                                 colors: [
-                                  accentColor.withOpacity(0.24),
-                                  Colors.white.withOpacity(0.08),
+                                  accentColor.withValues(alpha: 0.24),
+                                  Colors.white.withValues(alpha: 0.08),
                                 ],
                               ),
                               border: Border.all(
-                                color: accentColor.withOpacity(0.50),
+                                color: accentColor.withValues(alpha: 0.50),
                                 width: 0.9,
                               ),
                             )
@@ -2465,7 +2464,7 @@ class _ArtistTrackPage extends StatelessWidget {
                             style: TextStyle(
                               color: isActive
                                   ? Colors.white
-                                  : Colors.white.withOpacity(titleOpacity),
+                                  : Colors.white.withValues(alpha: titleOpacity),
                               fontSize: isActive ? 15 : 14,
                               fontWeight:
                                   isActive ? FontWeight.w800 : FontWeight.w500,
@@ -2474,7 +2473,7 @@ class _ArtistTrackPage extends StatelessWidget {
                               shadows: isActive
                                   ? [
                                       Shadow(
-                                        color: accentColor.withOpacity(0.40),
+                                        color: accentColor.withValues(alpha: 0.40),
                                         blurRadius: 8,
                                       ),
                                     ]
@@ -2489,8 +2488,8 @@ class _ArtistTrackPage extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: isActive
-                                    ? accentColor.withOpacity(0.95)
-                                    : Colors.white.withOpacity(artistOpacity),
+                                    ? accentColor.withValues(alpha: 0.95)
+                                    : Colors.white.withValues(alpha: artistOpacity),
                                 fontSize: isActive ? 12.5 : 12,
                                 fontWeight:
                                     isActive ? FontWeight.w600 : FontWeight.w400,
@@ -2517,16 +2516,16 @@ class _ArtistTrackPage extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(99),
                         color: isVoted
-                            ? _kSpotifyGreen.withOpacity(0.5)
+                            ? _kSpotifyGreen.withValues(alpha: 0.5)
                             : isVoteDisabled
-                                    ? Colors.white.withOpacity(0.06)
-                                : _kSpotifyGreen.withOpacity(0.25),
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                : _kSpotifyGreen.withValues(alpha: 0.25),
                         border: Border.all(
                           color: isVoted
                               ? _kSpotifyGreen
                               : isVoteDisabled
-                                      ? Colors.white.withOpacity(0.1)
-                                  : _kSpotifyGreen.withOpacity(0.6),
+                                      ? Colors.white.withValues(alpha: 0.1)
+                                  : _kSpotifyGreen.withValues(alpha: 0.6),
                           width: 1,
                         ),
                       ),
@@ -2539,7 +2538,7 @@ class _ArtistTrackPage extends StatelessWidget {
                               : Icons.how_to_vote_rounded,
                           size: 14,
                           color: isVoteDisabled
-                                    ? Colors.white.withOpacity(0.2)
+                                    ? Colors.white.withValues(alpha: 0.2)
                                     : isVoted
                                         ? Colors.white
                                         : _kSpotifyGreen,
@@ -2552,7 +2551,7 @@ class _ArtistTrackPage extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
                             color: isVoteDisabled
-                                      ? Colors.white.withOpacity(0.2)
+                                      ? Colors.white.withValues(alpha: 0.2)
                                       : isVoted
                                           ? Colors.white
                                           : _kSpotifyGreen,
@@ -2573,17 +2572,17 @@ class _ArtistTrackPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(99),
                       gradient: LinearGradient(
                         colors: [
-                          accentColor.withOpacity(0.85),
-                          _kSpotifyGreen.withOpacity(0.55),
+                          accentColor.withValues(alpha: 0.85),
+                          _kSpotifyGreen.withValues(alpha: 0.55),
                         ],
                       ),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 0.8,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: accentColor.withOpacity(0.35),
+                          color: accentColor.withValues(alpha: 0.35),
                           blurRadius: 8,
                         ),
                       ],
@@ -2610,17 +2609,17 @@ class _ArtistTrackPage extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            accentColor.withOpacity(0.22),
-                            _kSpotifyGreen.withOpacity(0.14),
+                            accentColor.withValues(alpha: 0.22),
+                            _kSpotifyGreen.withValues(alpha: 0.14),
                           ],
                         ),
                         border: Border.all(
-                          color: accentColor.withOpacity(0.48),
+                          color: accentColor.withValues(alpha: 0.48),
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: accentColor.withOpacity(0.18),
+                            color: accentColor.withValues(alpha: 0.18),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
@@ -2640,7 +2639,7 @@ class _ArtistTrackPage extends StatelessWidget {
                           isDense: true,
                           hintText: 'Disclaimer...',
                           hintStyle: TextStyle(
-                            color: Colors.white.withOpacity(0.42),
+                            color: Colors.white.withValues(alpha: 0.42),
                             fontSize: 12,
                           ),
                           border: InputBorder.none,
@@ -2655,7 +2654,7 @@ class _ArtistTrackPage extends StatelessWidget {
             if (!widget.isLast)
               Divider(
                 height: 0, indent: 44,
-                color: Colors.white.withOpacity(0.06)),
+                color: Colors.white.withValues(alpha: 0.06)),
         ]),
     );
   }
@@ -2687,7 +2686,7 @@ class _ArtistTrackPage extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
@@ -2696,7 +2695,7 @@ class _ArtistTrackPage extends StatelessWidget {
               Text(
                 'Share result',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2735,9 +2734,9 @@ class _ArtistTrackPage extends StatelessWidget {
                       const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       width: 0.8,
                     ),
                   ),
@@ -2745,14 +2744,14 @@ class _ArtistTrackPage extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.photo_library_outlined,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         size: 18,
                       ),
                       const SizedBox(width: 10),
                       Text(
                         'Save to gallery',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -2770,9 +2769,9 @@ class _ArtistTrackPage extends StatelessWidget {
                       const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       width: 0.8,
                     ),
                   ),
@@ -2780,14 +2779,14 @@ class _ArtistTrackPage extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.link_rounded,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         size: 18,
                       ),
                       const SizedBox(width: 10),
                       Text(
                         'Copy link',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -2827,8 +2826,8 @@ class _ArtistTrackPage extends StatelessWidget {
               height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: color.withOpacity(0.15),
-                border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+                color: color.withValues(alpha: 0.15),
+                border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
               ),
               child: Icon(icon, color: color, size: 22),
             ),
@@ -2836,7 +2835,7 @@ class _ArtistTrackPage extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
@@ -2863,7 +2862,7 @@ class _SwipeDot extends StatelessWidget {
       height: 6,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
+        color: isActive ? color : Colors.white.withValues(alpha: 0.3),
       ),
     );
   }

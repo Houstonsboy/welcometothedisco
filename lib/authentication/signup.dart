@@ -142,17 +142,17 @@ class _SignupScreenState extends State<SignupScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _kBlue.withOpacity(0.45),
-                _kPink.withOpacity(0.45),
+                _kBlue.withValues(alpha: 0.45),
+                _kPink.withValues(alpha: 0.45),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -173,15 +173,15 @@ class _SignupScreenState extends State<SignupScreen> {
       controller: controller,
       keyboardType: TextInputType.text,
       inputFormatters: inputFormatters,
-      style: TextStyle(color: Colors.white.withOpacity(0.95)),
+      style: TextStyle(color: Colors.white.withValues(alpha: 0.95)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
         ),
         focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.8)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.8)),
         ),
       ),
     );
@@ -194,7 +194,7 @@ class _SignupScreenState extends State<SignupScreen> {
         Text(
           'CHOOSE AVATAR',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+            color: Colors.white.withValues(alpha: 0.55),
             fontSize: 9,
             fontWeight: FontWeight.w700,
             letterSpacing: 2,
@@ -223,7 +223,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             border: Border.all(
                               color: isSelected
                                   ? Colors.white
-                                  : Colors.white.withOpacity(0.2),
+                                  : Colors.white.withValues(alpha: 0.2),
                               width: isSelected ? 2.5 : 1,
                             ),
                           ),
@@ -245,7 +245,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -272,7 +272,7 @@ class _SignupScreenState extends State<SignupScreen> {
               style: TextStyle(
                 color: _errorMessage.isNotEmpty
                     ? Colors.red.shade200
-                    : Colors.white.withOpacity(0.4),
+                    : Colors.white.withValues(alpha: 0.4),
                 fontSize: 11,
               ),
             ),
@@ -292,15 +292,15 @@ class _SignupScreenState extends State<SignupScreen> {
           size: 14,
           color: done
               ? AppTheme.titleAccent
-              : Colors.white.withOpacity(0.35),
+              : Colors.white.withValues(alpha: 0.35),
         ),
         const SizedBox(width: 6),
         Text(
           label,
           style: TextStyle(
             color: done
-                ? Colors.white.withOpacity(0.85)
-                : Colors.white.withOpacity(0.45),
+                ? Colors.white.withValues(alpha: 0.85)
+                : Colors.white.withValues(alpha: 0.45),
             fontSize: 11,
             fontWeight: done ? FontWeight.w600 : FontWeight.w400,
           ),
@@ -328,7 +328,7 @@ class _SignupScreenState extends State<SignupScreen> {
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
             onPressed: () => Navigator.pop(context),
           ),
@@ -358,7 +358,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.95),
+                            color: Colors.white.withValues(alpha: 0.95),
                           ),
                         ),
                       ),
@@ -370,7 +370,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.35,
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -382,7 +382,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -432,21 +432,21 @@ class _SignupScreenState extends State<SignupScreen> {
                                     : null,
                                 icon: Icon(
                                   Icons.g_mobiledata_rounded,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   size: 26,
                                 ),
                                 label: Text(
                                   'Continue with Google',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.95),
+                                    color: Colors.white.withValues(alpha: 0.95),
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
-                                    color: Colors.white.withOpacity(
-                                      _canCreateAccount ? 0.45 : 0.2,
+                                    color: Colors.white.withValues(
+                                      alpha: _canCreateAccount ? 0.45 : 0.2,
                                     ),
                                   ),
                                   padding: const EdgeInsets.symmetric(
@@ -464,8 +464,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: _canCreateAccount
-                                ? Colors.white.withOpacity(0.35)
-                                : Colors.red.shade200.withOpacity(0.85),
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.red.shade200.withValues(alpha: 0.85),
                             fontSize: 10,
                           ),
                         ),
@@ -477,7 +477,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           child: Text(
                             'Already have an account? Sign in',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               decoration: TextDecoration.underline,
                             ),
                           ),

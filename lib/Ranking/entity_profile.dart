@@ -129,8 +129,8 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.14),
-                border: Border.all(color: Colors.white.withOpacity(0.22), width: 0.9),
+                color: Colors.white.withValues(alpha: 0.14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 0.9),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -143,7 +143,7 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
           Text(
             'RANKING PROFILE',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withValues(alpha: 0.95),
               fontSize: 13,
               fontWeight: FontWeight.w900,
               letterSpacing: 2.4,
@@ -254,9 +254,9 @@ class _ProfileHeroCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 20, 14, 18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.14),
+            color: Colors.white.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.9),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.9),
           ),
           child: Column(
             children: [
@@ -269,17 +269,17 @@ class _ProfileHeroCard extends StatelessWidget {
                     height: 110,
                     decoration: BoxDecoration(
                       borderRadius: borderRadius,
-                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1),
                     ),
                     child: ClipRRect(
                       borderRadius: borderRadius,
                       child: (imageUrl ?? '').trim().isNotEmpty
                           ? Image.network(imageUrl!, fit: BoxFit.cover)
                           : Container(
-                              color: Colors.white.withOpacity(0.12),
+                              color: Colors.white.withValues(alpha: 0.12),
                               child: Icon(
                                 isArtist ? Icons.person_rounded : Icons.album_rounded,
-                                color: Colors.white.withOpacity(0.75),
+                                color: Colors.white.withValues(alpha: 0.75),
                                 size: 44,
                               ),
                             ),
@@ -453,10 +453,10 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
       height: _avatarSize,
       decoration: BoxDecoration(
         borderRadius: br,
-        border: Border.all(color: Colors.white.withOpacity(0.30), width: 1.4),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.30), width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.28),
+            color: Colors.black.withValues(alpha: 0.28),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),
@@ -473,10 +473,10 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
   }
 
   Widget _avatarFallback() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           widget.isArtistType ? Icons.person_rounded : Icons.album_rounded,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           size: _avatarSize * 0.5,
         ),
       );
@@ -491,9 +491,9 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.9),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.9),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,7 +509,7 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
                         Text(
                           'No matchups yet.',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
+                            color: Colors.white.withValues(alpha: 0.55),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -539,7 +539,7 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
                           child: Text(
                             '${pairs.length} matchup${pairs.length == 1 ? '' : 's'}',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -553,7 +553,7 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
                           curve: Curves.easeOutCubic,
                           child: Icon(
                             Icons.expand_more_rounded,
-                            color: Colors.white.withOpacity(0.55),
+                            color: Colors.white.withValues(alpha: 0.55),
                             size: 22,
                           ),
                         ),
@@ -569,7 +569,7 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
                     Divider(
                       height: 1,
                       thickness: 1,
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                     ),
                     ...pairs.map((pair) => _PairListRow(
                           pair: pair,
@@ -610,15 +610,15 @@ class _PairListRow extends StatelessWidget {
     final won = my > their;
     final lost = their > my;
     final bgColor = won
-        ? Colors.green.withOpacity(0.22)
+        ? Colors.green.withValues(alpha: 0.22)
         : lost
-            ? Colors.red.withOpacity(0.22)
-            : Colors.white.withOpacity(0.14);
+            ? Colors.red.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.14);
     final borderColor = won
-        ? Colors.greenAccent.withOpacity(0.75)
+        ? Colors.greenAccent.withValues(alpha: 0.75)
         : lost
-            ? Colors.redAccent.withOpacity(0.78)
-            : Colors.white.withOpacity(0.30);
+            ? Colors.redAccent.withValues(alpha: 0.78)
+            : Colors.white.withValues(alpha: 0.30);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
@@ -659,17 +659,17 @@ class _PairListRow extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     borderRadius: br,
-                    border: Border.all(color: Colors.white.withOpacity(0.28), width: 0.9),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.28), width: 0.9),
                   ),
                   child: ClipRRect(
                     borderRadius: br,
                     child: img.isNotEmpty
                         ? Image.network(img, fit: BoxFit.cover)
                         : Container(
-                            color: Colors.white.withOpacity(0.12),
+                            color: Colors.white.withValues(alpha: 0.12),
                             child: Icon(
                               isArtistType ? Icons.person_rounded : Icons.album_rounded,
-                              color: Colors.white.withOpacity(0.65),
+                              color: Colors.white.withValues(alpha: 0.65),
                             ),
                           ),
                   ),
@@ -697,7 +697,7 @@ class _PairListRow extends StatelessWidget {
                           Text(
                             '${pair.versusCount}v  •  $myVotes–$theirVotes',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
@@ -710,7 +710,7 @@ class _PairListRow extends StatelessWidget {
                 Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                 ),
               ],
             ),
@@ -722,7 +722,7 @@ class _PairListRow extends StatelessWidget {
             thickness: 1,
             indent: 14,
             endIndent: 14,
-            color: Colors.white.withOpacity(0.09),
+            color: Colors.white.withValues(alpha: 0.09),
           ),
       ],
     );

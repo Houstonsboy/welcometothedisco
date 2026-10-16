@@ -48,12 +48,12 @@ class ProfilePostsSection extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _kBlue.withOpacity(0.30),
-                _kPink.withOpacity(0.30),
+                _kBlue.withValues(alpha: 0.30),
+                _kPink.withValues(alpha: 0.30),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.16),
+              color: Colors.white.withValues(alpha: 0.16),
               width: 0.8,
             ),
           ),
@@ -81,7 +81,7 @@ class ProfilePostsSection extends StatelessWidget {
                         Text(
                           'POSTS',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.8,
@@ -92,7 +92,7 @@ class ProfilePostsSection extends StatelessWidget {
                           Text(
                             '${posts.length}',
                             style: TextStyle(
-                              color: _kCreateCyan.withOpacity(0.9),
+                              color: _kCreateCyan.withValues(alpha: 0.9),
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                             ),
@@ -121,7 +121,7 @@ class ProfilePostsSection extends StatelessWidget {
                       child: Text(
                         'Could not load posts.',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -134,7 +134,7 @@ class ProfilePostsSection extends StatelessWidget {
                       child: Text(
                         'No posts yet.',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -147,7 +147,7 @@ class ProfilePostsSection extends StatelessWidget {
                         Divider(
                           height: 1,
                           thickness: 1,
-                          color: Colors.white.withOpacity(0.16),
+                          color: Colors.white.withValues(alpha: 0.16),
                         ),
                         ...posts.asMap().entries.map((entry) {
                           final index = entry.key;
@@ -166,7 +166,7 @@ class ProfilePostsSection extends StatelessWidget {
                                 Divider(
                                   height: 1,
                                   thickness: 1,
-                                  color: Colors.white.withOpacity(0.16),
+                                  color: Colors.white.withValues(alpha: 0.16),
                                 ),
                             ],
                           );
@@ -214,10 +214,10 @@ class _ProfilePostTile extends StatelessWidget {
     Widget fallback() => Container(
           width: size,
           height: size,
-          color: _kBlue.withOpacity(0.35),
+          color: _kBlue.withValues(alpha: 0.35),
           child: Icon(
             Icons.person_rounded,
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
             size: 13,
           ),
         );
@@ -299,7 +299,7 @@ class _ProfilePostTile extends StatelessWidget {
                 ),
                 Icon(
                   Icons.more_horiz_rounded,
-                  color: Colors.white.withOpacity(0.40),
+                  color: Colors.white.withValues(alpha: 0.40),
                   size: 18,
                 ),
               ],
@@ -321,7 +321,7 @@ class _ProfilePostTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.22),
+                            color: Colors.white.withValues(alpha: 0.22),
                             width: 1.5,
                           ),
                         ),
@@ -332,10 +332,10 @@ class _ProfilePostTile extends StatelessWidget {
                             height: 52,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
-                              color: _kBlue.withOpacity(0.35),
+                              color: _kBlue.withValues(alpha: 0.35),
                               child: Icon(
                                 Icons.music_note_rounded,
-                                color: _kPink.withOpacity(0.9),
+                                color: _kPink.withValues(alpha: 0.9),
                                 size: 22,
                               ),
                             ),
@@ -369,14 +369,14 @@ class _ProfilePostTile extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.loop_rounded,
-                      color: _kGreen.withOpacity(0.75),
+                      color: _kGreen.withValues(alpha: 0.75),
                       size: 14,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       _fmt(post.remixCount),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.50),
+                        color: Colors.white.withValues(alpha: 0.50),
                         fontFamily: AppTheme.fontBody,
                         fontSize: 11,
                       ),
@@ -389,14 +389,14 @@ class _ProfilePostTile extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.reply_rounded,
-                      color: Colors.white.withOpacity(0.40),
+                      color: Colors.white.withValues(alpha: 0.40),
                       size: 14,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       _fmt(post.shareCount),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.50),
+                        color: Colors.white.withValues(alpha: 0.50),
                         fontFamily: AppTheme.fontBody,
                         fontSize: 11,
                       ),
@@ -438,7 +438,7 @@ class _ProfilePostDescriptionState extends State<_ProfilePostDescription> {
         ? words.take(_ProfilePostDescription._maxWords).toList()
         : words.take(_ProfilePostDescription._previewWords).toList();
     final bodyStyle = TextStyle(
-      color: Colors.white.withOpacity(0.82),
+      color: Colors.white.withValues(alpha: 0.82),
       fontFamily: AppTheme.fontBody,
       fontSize: 12.5,
       height: 1.45,
@@ -519,10 +519,10 @@ class _ProfilePostTrackCircle extends StatelessWidget {
       height: _ProfilePostTrackCovers._size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -533,10 +533,10 @@ class _ProfilePostTrackCircle extends StatelessWidget {
           url,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
-            color: _kBlue.withOpacity(0.35),
+            color: _kBlue.withValues(alpha: 0.35),
             child: Icon(
               Icons.album_rounded,
-              color: _kPink.withOpacity(0.85),
+              color: _kPink.withValues(alpha: 0.85),
               size: 16,
             ),
           ),

@@ -35,26 +35,26 @@ class PlayableAlbumCover extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: emphasized
-                ? accentColor.withOpacity(0.95)
+                ? accentColor.withValues(alpha: 0.95)
                 : isPlaying
-                    ? accentColor.withOpacity(0.75)
-                    : accentColor.withOpacity(0.22),
+                    ? accentColor.withValues(alpha: 0.75)
+                    : accentColor.withValues(alpha: 0.22),
             width: emphasized ? 1.6 : (isPlaying ? 1.4 : 0.9),
           ),
           boxShadow: [
             if (emphasized) ...[
               BoxShadow(
-                color: accentColor.withOpacity(0.55),
+                color: accentColor.withValues(alpha: 0.55),
                 blurRadius: 16,
                 spreadRadius: 1,
               ),
               BoxShadow(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 blurRadius: 8,
               ),
             ],
             BoxShadow(
-              color: Colors.black.withOpacity(0.22),
+              color: Colors.black.withValues(alpha: 0.22),
               blurRadius: 6,
             ),
           ],
@@ -68,7 +68,7 @@ class PlayableAlbumCover extends StatelessWidget {
               Image.network(imageUrl, fit: BoxFit.cover),
               if (isLoading)
                 Container(
-                  color: Colors.black.withOpacity(0.45),
+                  color: Colors.black.withValues(alpha: 0.45),
                   child: Center(
                     child: SizedBox(
                       width: size * 0.38,
@@ -82,7 +82,7 @@ class PlayableAlbumCover extends StatelessWidget {
                 )
               else if (isPlaying)
                 Container(
-                  color: Colors.black.withOpacity(emphasized ? 0.32 : 0.42),
+                  color: Colors.black.withValues(alpha: emphasized ? 0.32 : 0.42),
                   child: Icon(
                     Icons.pause_rounded,
                     color: Colors.white,
@@ -91,10 +91,10 @@ class PlayableAlbumCover extends StatelessWidget {
                 )
               else
                 Container(
-                  color: Colors.black.withOpacity(0.28),
+                  color: Colors.black.withValues(alpha: 0.28),
                   child: Icon(
                     Icons.play_arrow_rounded,
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     size: size * 0.44,
                   ),
                 ),

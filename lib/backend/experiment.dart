@@ -33,7 +33,7 @@ Future<String> getToken() async {
     return data['access_token'];
   } catch (error) {
     print('Error getting Spotify access token: $error');
-    throw error;
+    rethrow;
   }
 }
 
@@ -61,7 +61,7 @@ Future<List<Map<String, dynamic>>> getQueue(String userId, String token) async {
     return queuedSongs;
   } catch (error) {
     print('Error getting queue: $error');
-    throw error;
+    rethrow;
   }
 }
 Future<Map<String, dynamic>> getCurrentlyPlaying(String token) async {
@@ -79,6 +79,6 @@ Future<Map<String, dynamic>> getCurrentlyPlaying(String token) async {
     return {'songName': songName, 'artistName': artistName};
   } catch (error) {
     print('Error getting currently playing track: $error');
-    throw error;
+    rethrow;
   }
 }

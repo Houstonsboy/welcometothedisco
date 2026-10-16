@@ -47,7 +47,7 @@ class CollaboratorAcceptGate extends StatelessWidget {
             Center(
               child: Text(
                 'Failed to load versus.',
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
               ),
             ),
           );
@@ -60,7 +60,7 @@ class CollaboratorAcceptGate extends StatelessWidget {
                 child: Text(
                   result.errorMessage!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14),
                 ),
               ),
             ),
@@ -71,7 +71,7 @@ class CollaboratorAcceptGate extends StatelessWidget {
             Center(
               child: Text(
                 'Sign in to collaborate.',
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
               ),
             ),
           );
@@ -81,7 +81,7 @@ class CollaboratorAcceptGate extends StatelessWidget {
             Center(
               child: Text(
                 'Versus not found.',
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
               ),
             ),
           );
@@ -728,7 +728,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     if (oldIndex < 0 ||
         newIndex < 0 ||
         oldIndex >= _mySelectedTracks.length ||
-        newIndex > _mySelectedTracks.length) return;
+        newIndex > _mySelectedTracks.length) {
+      return;
+    }
 
     setState(() {
       if (newIndex > oldIndex) newIndex -= 1;
@@ -1051,16 +1053,16 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           ),
           content: Text.rich(
             TextSpan(
-              style: TextStyle(color: Colors.white.withOpacity(0.9)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
               children: [
                 const TextSpan(text: 'your tracks are longer than '),
                 TextSpan(
-                  text: '$target',
+                  text: target,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const TextSpan(text: ', we will notify '),
                 TextSpan(
-                  text: '$target',
+                  text: target,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const TextSpan(text: ' to add more tracks'),
@@ -1108,7 +1110,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           content: Text(hasLongerTracks
               ? 'Saved. Other side will be notified to add tracks.'
               : 'Versus is now live! 🔥'),
-          backgroundColor: _kSuccessGreen.withOpacity(0.92),
+          backgroundColor: _kSuccessGreen.withValues(alpha: 0.92),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ));
@@ -1123,7 +1125,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed: $e'),
-          backgroundColor: Colors.red.withOpacity(0.85),
+          backgroundColor: Colors.red.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ));
@@ -1237,8 +1239,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.15),
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.15),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded,
                 color: Colors.white, size: 16),
@@ -1258,7 +1260,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 '@$authorName invited you to battle',
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55), fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.55), fontSize: 11,
                   fontWeight: FontWeight.w500, letterSpacing: 0.3,
                 ),
               ),
@@ -1296,12 +1298,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
         color: balanced
-            ? Colors.white.withOpacity(0.15)
-            : Colors.orange.withOpacity(0.2),
+            ? Colors.white.withValues(alpha: 0.15)
+            : Colors.orange.withValues(alpha: 0.2),
         border: Border.all(
           color: balanced
-              ? Colors.white.withOpacity(0.3)
-              : Colors.orange.withOpacity(0.5),
+              ? Colors.white.withValues(alpha: 0.3)
+              : Colors.orange.withValues(alpha: 0.5),
           width: 0.8,
         ),
       ),
@@ -1319,7 +1321,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text('vs',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 10, fontWeight: FontWeight.w600,
               ),
             ),
@@ -1334,7 +1336,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           if (balanced) ...[
             const SizedBox(width: 5),
             Icon(Icons.check_circle_rounded,
-                color: Colors.white.withOpacity(0.7), size: 13),
+                color: Colors.white.withValues(alpha: 0.7), size: 13),
           ],
         ],
       ),
@@ -1356,9 +1358,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
               begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [_kPurple.withOpacity(0.40), _kPink.withOpacity(0.40)],
+              colors: [_kPurple.withValues(alpha: 0.40), _kPink.withValues(alpha: 0.40)],
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             SizedBox(
@@ -1424,7 +1426,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text('VS', style: TextStyle(
-              color: Colors.white.withOpacity(0.6), fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.6), fontSize: 13,
               fontWeight: FontWeight.w900, letterSpacing: 2,
             )),
           ),
@@ -1511,7 +1513,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text('VS', style: TextStyle(
-            color: Colors.white.withOpacity(0.6), fontSize: 13,
+            color: Colors.white.withValues(alpha: 0.6), fontSize: 13,
             fontWeight: FontWeight.w900, letterSpacing: 2,
           )),
         ),
@@ -1585,9 +1587,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _kSpotifyGreen.withOpacity(canPlay ? 0.25 : 0.10),
+              color: _kSpotifyGreen.withValues(alpha: canPlay ? 0.25 : 0.10),
               border: Border.all(
-                color: _kSpotifyGreen.withOpacity(canPlay ? 0.6 : 0.25),
+                color: _kSpotifyGreen.withValues(alpha: canPlay ? 0.6 : 0.25),
                 width: 1.2,
               ),
             ),
@@ -1595,7 +1597,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 ? const Padding(padding: EdgeInsets.all(10),
                     child: CircularProgressIndicator(color: _kSpotifyGreen, strokeWidth: 2))
                 : Icon(Icons.play_arrow_rounded,
-                    color: _kSpotifyGreen.withOpacity(canPlay ? 1 : 0.35), size: 24),
+                    color: _kSpotifyGreen.withValues(alpha: canPlay ? 1 : 0.35), size: 24),
           ),
         ),
         const SizedBox(width: 10),
@@ -1605,8 +1607,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
-              color: _kSpotifyGreen.withOpacity(0.2),
-              border: Border.all(color: _kSpotifyGreen.withOpacity(0.5), width: 0.8),
+              color: _kSpotifyGreen.withValues(alpha: 0.2),
+              border: Border.all(color: _kSpotifyGreen.withValues(alpha: 0.5), width: 0.8),
             ),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Container(
@@ -1623,7 +1625,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 const SizedBox(width: 10),
                 Text('PLAY ${_playingRound! + 1}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.82),
+                    color: Colors.white.withValues(alpha: 0.82),
                     fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.1,
                   ),
                 ),
@@ -1639,9 +1641,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
-              color: _kSpotifyGreen.withOpacity(canPlay ? 0.25 : 0.10),
+              color: _kSpotifyGreen.withValues(alpha: canPlay ? 0.25 : 0.10),
               border: Border.all(
-                color: _kSpotifyGreen.withOpacity(canPlay ? 0.6 : 0.25),
+                color: _kSpotifyGreen.withValues(alpha: canPlay ? 0.6 : 0.25),
                 width: 1.2,
               ),
             ),
@@ -1651,12 +1653,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     child: CircularProgressIndicator(strokeWidth: 1.8, color: _kSpotifyGreen))
               else
                 Text('BOMB', style: TextStyle(
-                  color: _kSpotifyGreen.withOpacity(canPlay ? 1 : 0.35),
+                  color: _kSpotifyGreen.withValues(alpha: canPlay ? 1 : 0.35),
                   fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2,
                 )),
               const SizedBox(width: 4),
               Icon(Icons.arrow_forward_rounded,
-                  color: _kSpotifyGreen.withOpacity(canPlay ? 1 : 0.35), size: 16),
+                  color: _kSpotifyGreen.withValues(alpha: canPlay ? 1 : 0.35), size: 16),
             ]),
           ),
         ),
@@ -1752,7 +1754,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           Padding(
             padding: const EdgeInsets.only(top: 24),
             child: Center(child: Text('No tracks yet.',
-              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13))),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 13))),
           )
         else
           ..._user1Tracks.asMap().entries.map((e) {
@@ -1804,7 +1806,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                   _artistsLocked
                       ? Icons.lock_outline_rounded
                       : Icons.person_search_rounded,
-                  color: Colors.white.withOpacity(0.25),
+                  color: Colors.white.withValues(alpha: 0.25),
                   size: 44,
                 ),
                 const SizedBox(height: 10),
@@ -1814,7 +1816,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                       : 'Search for your artist above',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withValues(alpha: 0.4),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1870,11 +1872,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(99),
-                color: _kPink.withOpacity(0.18),
-                border: Border.all(color: _kPink.withOpacity(0.40), width: 0.8),
+                color: _kPink.withValues(alpha: 0.18),
+                border: Border.all(color: _kPink.withValues(alpha: 0.40), width: 0.8),
               ),
               child: Text('change', style: TextStyle(
-                color: _kPink.withOpacity(0.9),
+                color: _kPink.withValues(alpha: 0.9),
                 fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8,
               )),
             ),
@@ -1921,9 +1923,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     height: 30,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(7),
-                      color: _kPink.withOpacity(0.16),
+                      color: _kPink.withValues(alpha: 0.16),
                       border: Border.all(
-                        color: _kPink.withOpacity(0.34),
+                        color: _kPink.withValues(alpha: 0.34),
                         width: 0.8,
                       ),
                     ),
@@ -1943,9 +1945,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             Expanded(child: Container(
               height: 0.8,
               decoration: BoxDecoration(gradient: LinearGradient(colors: [
-                _kPink.withOpacity(0.0),
-                _kPink.withOpacity(0.4),
-                _kPink.withOpacity(0.0),
+                _kPink.withValues(alpha: 0.0),
+                _kPink.withValues(alpha: 0.4),
+                _kPink.withValues(alpha: 0.0),
               ])),
             )),
           ]),
@@ -1971,13 +1973,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           Padding(
             padding: const EdgeInsets.only(top: 24),
             child: Center(child: Text('No tracks found for "${_myArtist!.name}"',
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13))),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13))),
           )
         else if (tracks.isEmpty && !isSearchMode && !_isLoadingMyTracks)
           Padding(
             padding: const EdgeInsets.only(top: 24),
             child: Center(child: Text('No top tracks available',
-              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13))),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 13))),
           )
         else
           ...tracks.asMap().entries.map((entry) {
@@ -2031,7 +2033,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                   _artistsLocked
                       ? Icons.lock_outline_rounded
                       : Icons.person_search_rounded,
-                  color: Colors.white.withOpacity(0.25),
+                  color: Colors.white.withValues(alpha: 0.25),
                   size: 44,
                 ),
                 const SizedBox(height: 10),
@@ -2041,7 +2043,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                       : 'Search for the second artist above',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withValues(alpha: 0.4),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -2096,14 +2098,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(99),
-                color: _kPurple.withOpacity(0.18),
+                color: _kPurple.withValues(alpha: 0.18),
                 border: Border.all(
-                    color: _kPurple.withOpacity(0.40), width: 0.8),
+                    color: _kPurple.withValues(alpha: 0.40), width: 0.8),
               ),
               child: Text(
                 'change',
                 style: TextStyle(
-                  color: _kPurple.withOpacity(0.9),
+                  color: _kPurple.withValues(alpha: 0.9),
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -2147,9 +2149,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     height: 30,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(7),
-                      color: _kPurple.withOpacity(0.16),
+                      color: _kPurple.withValues(alpha: 0.16),
                       border: Border.all(
-                        color: _kPurple.withOpacity(0.34),
+                        color: _kPurple.withValues(alpha: 0.34),
                         width: 0.8,
                       ),
                     ),
@@ -2171,9 +2173,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 height: 0.8,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [
-                    _kPurple.withOpacity(0.0),
-                    _kPurple.withOpacity(0.4),
-                    _kPurple.withOpacity(0.0),
+                    _kPurple.withValues(alpha: 0.0),
+                    _kPurple.withValues(alpha: 0.4),
+                    _kPurple.withValues(alpha: 0.0),
                   ]),
                 ),
               ),
@@ -2204,7 +2206,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               child: Text(
                 'No tracks found for "${_soloSide2Artist!.name}"',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.4), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
               ),
             ),
           )
@@ -2215,7 +2217,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               child: Text(
                 'No top tracks available',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.35), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 13),
               ),
             ),
           )
@@ -2273,11 +2275,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     }
     if (_artistResults.isEmpty && _lastArtistQuery.isNotEmpty) {
       return Center(child: Text('No artists found',
-        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)));
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)));
     }
     if (_artistResults.isEmpty) {
       return Center(child: Text('Start typing to search',
-        style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14)));
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14)));
     }
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -2317,8 +2319,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
-              border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
             ),
             child: TextField(
               controller: _artistSearchCtrl,
@@ -2331,14 +2333,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               decoration: InputDecoration(
                 hintText: 'Search your artist...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.35), fontSize: 15),
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 15),
                 prefixIcon: Icon(Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.5), size: 20),
+                    color: Colors.white.withValues(alpha: 0.5), size: 20),
                 suffixIcon: _artistSearchCtrl.text.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _artistSearchCtrl.clear(); _onArtistSearchChanged(''); },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.4), size: 18),
+                            color: Colors.white.withValues(alpha: 0.4), size: 18),
                       )
                     : null,
                 border: InputBorder.none,
@@ -2363,8 +2365,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
-              border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
             ),
             child: TextField(
               controller: _artistSearchCtrl,
@@ -2377,9 +2379,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               decoration: InputDecoration(
                 hintText: 'Search second artist...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.35), fontSize: 15),
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 15),
                 prefixIcon: Icon(Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.5), size: 20),
+                    color: Colors.white.withValues(alpha: 0.5), size: 20),
                 suffixIcon: _artistSearchCtrl.text.isNotEmpty
                     ? GestureDetector(
                         onTap: () {
@@ -2387,7 +2389,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                           _onArtistSearchChanged('');
                         },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.4), size: 18),
+                            color: Colors.white.withValues(alpha: 0.4), size: 18),
                       )
                     : null,
                 border: InputBorder.none,
@@ -2413,12 +2415,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               color: inSearchMode
-                  ? Colors.white.withOpacity(0.14)
-                  : Colors.white.withOpacity(0.09),
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : Colors.white.withValues(alpha: 0.09),
               border: Border.all(
                 color: inSearchMode
-                    ? Colors.white.withOpacity(0.28)
-                    : Colors.white.withOpacity(0.14),
+                    ? Colors.white.withValues(alpha: 0.28)
+                    : Colors.white.withValues(alpha: 0.14),
                 width: 0.8,
               ),
             ),
@@ -2433,24 +2435,24 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     ? 'Searching Spotify...'
                     : 'Search your artist\'s tracks...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.3), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
                 prefixIcon: _isSearchingTracks
                     ? Padding(
                         padding: const EdgeInsets.all(11),
                         child: SizedBox(width: 16, height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 1.8, color: Colors.white.withOpacity(0.5))),
+                              strokeWidth: 1.8, color: Colors.white.withValues(alpha: 0.5))),
                       )
                     : Icon(
                         inSearchMode
                             ? Icons.manage_search_rounded
                             : Icons.queue_music_rounded,
-                        color: Colors.white.withOpacity(0.4), size: 18),
+                        color: Colors.white.withValues(alpha: 0.4), size: 18),
                 suffixIcon: _trackFilterQuery.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _trackSearchCtrl.clear(); _trackSearchFocus.unfocus(); },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.35), size: 16),
+                            color: Colors.white.withValues(alpha: 0.35), size: 16),
                       )
                     : null,
                 border: InputBorder.none,
@@ -2477,12 +2479,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               color: inSearchMode
-                  ? Colors.white.withOpacity(0.14)
-                  : Colors.white.withOpacity(0.09),
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : Colors.white.withValues(alpha: 0.09),
               border: Border.all(
                 color: inSearchMode
-                    ? Colors.white.withOpacity(0.28)
-                    : Colors.white.withOpacity(0.14),
+                    ? Colors.white.withValues(alpha: 0.28)
+                    : Colors.white.withValues(alpha: 0.14),
                 width: 0.8,
               ),
             ),
@@ -2497,7 +2499,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                     ? 'Searching Spotify...'
                     : 'Search this artist\'s tracks...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.3), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
                 prefixIcon: _isSearchingTracksSide2
                     ? Padding(
                         padding: const EdgeInsets.all(11),
@@ -2506,7 +2508,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.8,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                           ),
                         ),
                       )
@@ -2514,7 +2516,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                         inSearchMode
                             ? Icons.manage_search_rounded
                             : Icons.queue_music_rounded,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         size: 18,
                       ),
                 suffixIcon: _trackFilterQuerySide2.isNotEmpty
@@ -2524,7 +2526,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                           _trackSearchFocusSide2.unfocus();
                         },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.35), size: 16),
+                            color: Colors.white.withValues(alpha: 0.35), size: 16),
                       )
                     : null,
                 border: InputBorder.none,
@@ -2546,8 +2548,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.white.withOpacity(0.06),
-        border: Border.all(color: _kPink.withOpacity(0.22), width: 0.8),
+        color: Colors.white.withValues(alpha: 0.06),
+        border: Border.all(color: _kPink.withValues(alpha: 0.22), width: 0.8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2562,7 +2564,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
-                color: _kPink.withOpacity(0.18),
+                color: _kPink.withValues(alpha: 0.18),
               ),
               child: Text(_isAuthorEditor ? 'author' : 'collab', style: const TextStyle(
                 color: _kPink, fontSize: 9, fontWeight: FontWeight.w700,
@@ -2571,7 +2573,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             ),
             const SizedBox(width: 6),
             Text(username, style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 11, fontWeight: FontWeight.w700,
             )),
             const SizedBox(width: 5),
@@ -2579,7 +2581,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               child: TextField(
                 controller: _commentCtrl,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 11, fontWeight: FontWeight.w400,
                 ),
                 minLines: 1, maxLines: 3,
@@ -2590,7 +2592,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                   isDense: true,
                   hintText: 'Your take on this side (max $_maxCommentWords words)…',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.38),
+                    color: Colors.white.withValues(alpha: 0.38),
                     fontSize: 11, fontWeight: FontWeight.w400,
                   ),
                   border: InputBorder.none,
@@ -2604,7 +2606,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             child: Text('$_commentWordCount / $_maxCommentWords words',
               textAlign: TextAlign.right,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.32),
+                color: Colors.white.withValues(alpha: 0.32),
                 fontSize: 10, fontWeight: FontWeight.w500,
               ),
             ),
@@ -2625,8 +2627,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.white.withOpacity(0.06),
-        border: Border.all(color: accentColor.withOpacity(0.22), width: 0.8),
+        color: Colors.white.withValues(alpha: 0.06),
+        border: Border.all(color: accentColor.withValues(alpha: 0.22), width: 0.8),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         _MiniAvatar(avatarPath: avatarPath, accentColor: accentColor, size: 22),
@@ -2635,7 +2637,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
-            color: accentColor.withOpacity(0.18),
+            color: accentColor.withValues(alpha: 0.18),
           ),
           child: Text(roleLabel, style: TextStyle(
             color: accentColor, fontSize: 9,
@@ -2645,13 +2647,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         const SizedBox(width: 6),
         Text('@$username',
           style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 11, fontWeight: FontWeight.w700)),
         const SizedBox(width: 5),
         Expanded(child: Text(comment,
           maxLines: 2, overflow: TextOverflow.ellipsis,
           style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 11, fontWeight: FontWeight.w400))),
       ]),
     );
@@ -2669,13 +2671,13 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       width: 32, height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: accentColor.withOpacity(0.7), width: 1.5),
-        boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 8)],
+        border: Border.all(color: accentColor.withValues(alpha: 0.7), width: 1.5),
+        boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.3), blurRadius: 8)],
       ),
       child: ClipOval(
         child: imageUrl != null && imageUrl.isNotEmpty
             ? Image.network(imageUrl, fit: BoxFit.cover)
-            : Container(color: accentColor.withOpacity(0.3),
+            : Container(color: accentColor.withValues(alpha: 0.3),
                 child: const Icon(Icons.person_rounded, color: Colors.white, size: 16)),
       ),
     );
@@ -2684,11 +2686,11 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: accentColor.withOpacity(0.2),
-        border: Border.all(color: accentColor.withOpacity(0.4), width: 0.8),
+        color: accentColor.withValues(alpha: 0.2),
+        border: Border.all(color: accentColor.withValues(alpha: 0.4), width: 0.8),
       ),
       child: Text(roleLabel, style: TextStyle(
-        color: accentColor.withOpacity(0.9),
+        color: accentColor.withValues(alpha: 0.9),
         fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5,
       )),
     );
@@ -2737,10 +2739,10 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 2),
       child: Row(children: [
-        Icon(icon, size: 13, color: accentColor.withOpacity(dimmed ? 0.35 : 0.7)),
+        Icon(icon, size: 13, color: accentColor.withValues(alpha: dimmed ? 0.35 : 0.7)),
         const SizedBox(width: 6),
         Text(label, style: TextStyle(
-          color: Colors.white.withOpacity(dimmed ? 0.3 : 0.5),
+          color: Colors.white.withValues(alpha: dimmed ? 0.3 : 0.5),
           fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2,
         )),
         const SizedBox(width: 6),
@@ -2748,10 +2750,10 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
-            color: accentColor.withOpacity(dimmed ? 0.1 : 0.2),
+            color: accentColor.withValues(alpha: dimmed ? 0.1 : 0.2),
           ),
           child: Text('$count', style: TextStyle(
-            color: accentColor.withOpacity(dimmed ? 0.4 : 0.9),
+            color: accentColor.withValues(alpha: dimmed ? 0.4 : 0.9),
             fontSize: 9, fontWeight: FontWeight.w800,
           )),
         ),
@@ -2786,7 +2788,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                           need > 0 && have > 0 && have != need
                               ? Icons.balance_rounded
                               : Icons.info_outline_rounded,
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           size: 13,
                         ),
                         const SizedBox(width: 6),
@@ -2795,7 +2797,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                             hint,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.45),
+                              color: Colors.white.withValues(alpha: 0.45),
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
@@ -2817,16 +2819,16 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 gradient: _canSubmit
                     ? const LinearGradient(colors: [_kPurple, _kPink])
                     : null,
-                color: _canSubmit ? null : Colors.white.withOpacity(0.08),
+                color: _canSubmit ? null : Colors.white.withValues(alpha: 0.08),
                 border: Border.all(
                   color: _canSubmit
                       ? Colors.transparent
-                      : Colors.white.withOpacity(0.12),
+                      : Colors.white.withValues(alpha: 0.12),
                   width: 0.8,
                 ),
                 boxShadow: _canSubmit
                     ? [BoxShadow(
-                        color: _kPink.withOpacity(0.35),
+                        color: _kPink.withValues(alpha: 0.35),
                         blurRadius: 18, offset: const Offset(0, 5))]
                     : [],
               ),
@@ -2842,14 +2844,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                               : Icons.lock_outline_rounded,
                           color: _canSubmit
                               ? Colors.white
-                              : Colors.white.withOpacity(0.3),
+                              : Colors.white.withValues(alpha: 0.3),
                           size: 16,
                         ),
                         const SizedBox(width: 8),
                         Text(_submitLabel, style: TextStyle(
                           color: _canSubmit
                               ? Colors.white
-                              : Colors.white.withOpacity(0.3),
+                              : Colors.white.withValues(alpha: 0.3),
                           fontSize: 13, fontWeight: FontWeight.w800,
                           letterSpacing: 1.5,
                         )),
@@ -2885,9 +2887,9 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   Widget _avatarFallback(double size) => ClipRRect(
     borderRadius: BorderRadius.circular(size / 2),
     child: Container(
-      width: size, height: size, color: Colors.white.withOpacity(0.2),
+      width: size, height: size, color: Colors.white.withValues(alpha: 0.2),
       child: Icon(Icons.person_rounded,
-          color: Colors.white.withOpacity(0.8), size: size * 0.55),
+          color: Colors.white.withValues(alpha: 0.8), size: size * 0.55),
     ),
   );
 }
@@ -2937,12 +2939,12 @@ class _SlotChip extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: artist != null
-                  ? accentColor.withOpacity(isActive ? 0.30 : 0.18)
-                  : Colors.white.withOpacity(0.07),
+                  ? accentColor.withValues(alpha: isActive ? 0.30 : 0.18)
+                  : Colors.white.withValues(alpha: 0.07),
               border: Border.all(
                 color: artist != null
-                    ? accentColor.withOpacity(isActive ? 0.8 : 0.45)
-                    : Colors.white.withOpacity(0.10),
+                    ? accentColor.withValues(alpha: isActive ? 0.8 : 0.45)
+                    : Colors.white.withValues(alpha: 0.10),
                 width: isActive ? 1.5 : 1.0,
               ),
             ),
@@ -2953,13 +2955,13 @@ class _SlotChip extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.15), width: 1)),
+                            color: Colors.white.withValues(alpha: 0.15), width: 1)),
                       child: Icon(Icons.add_rounded,
-                          color: Colors.white.withOpacity(0.25), size: 14),
+                          color: Colors.white.withValues(alpha: 0.25), size: 14),
                     ),
                     const SizedBox(width: 8),
                     Expanded(child: Text(label, style: TextStyle(
-                      color: Colors.white.withOpacity(0.3), fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.3), fontSize: 11,
                       fontWeight: FontWeight.w700, letterSpacing: 1.2,
                     ))),
                   ])
@@ -2973,7 +2975,7 @@ class _SlotChip extends StatelessWidget {
                         child: artist!.imageUrl != null &&
                                 artist!.imageUrl!.isNotEmpty
                             ? Image.network(artist!.imageUrl!, fit: BoxFit.cover)
-                            : Container(color: accentColor.withOpacity(0.3),
+                            : Container(color: accentColor.withValues(alpha: 0.3),
                                 child: const Icon(Icons.person_rounded,
                                     color: Colors.white, size: 14)),
                       ),
@@ -2989,7 +2991,7 @@ class _SlotChip extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
-                          color: accentColor.withOpacity(0.35),
+                          color: accentColor.withValues(alpha: 0.35),
                         ),
                         child: Text('$trackCount',
                           style: const TextStyle(color: Colors.white,
@@ -3001,11 +3003,11 @@ class _SlotChip extends StatelessWidget {
                       GestureDetector(
                         onTap: onRemove,
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.45), size: 14),
+                            color: Colors.white.withValues(alpha: 0.45), size: 14),
                       )
                     else if (isReadOnly)
                       Icon(Icons.lock_rounded,
-                          color: accentColor.withOpacity(0.55), size: 13),
+                          color: accentColor.withValues(alpha: 0.55), size: 13),
                   ]),
           ),
         ),
@@ -3052,9 +3054,9 @@ class _ReadOnlyTrackRow extends StatelessWidget {
           decoration: isActive
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: accentColor.withOpacity(0.42),
+                  color: accentColor.withValues(alpha: 0.42),
                   border: Border.all(
-                      color: accentColor.withOpacity(0.65), width: 1.2))
+                      color: accentColor.withValues(alpha: 0.65), width: 1.2))
               : null,
           padding: isActive
               ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
@@ -3066,15 +3068,15 @@ class _ReadOnlyTrackRow extends StatelessWidget {
                 width: 32,
                 child: isPast
                     ? Icon(Icons.check_rounded,
-                        size: 15, color: accentColor.withOpacity(0.5))
+                        size: 15, color: accentColor.withValues(alpha: 0.5))
                     : isLocked
                         ? Icon(Icons.lock_rounded,
-                            size: 14, color: Colors.white.withOpacity(0.45))
+                            size: 14, color: Colors.white.withValues(alpha: 0.45))
                         : Text('${index + 1}'.padLeft(2, '0'),
                             style: TextStyle(
                               color: isActive
                                   ? accentColor
-                                  : Colors.white.withOpacity(0.42),
+                                  : Colors.white.withValues(alpha: 0.42),
                               fontSize: 12, fontWeight: FontWeight.w700,
                             )),
               ),
@@ -3098,7 +3100,7 @@ class _ReadOnlyTrackRow extends StatelessWidget {
                   Text(track.name,
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(textOpacity),
+                      color: Colors.white.withValues(alpha: textOpacity),
                       fontSize: 14,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                     )),
@@ -3107,7 +3109,7 @@ class _ReadOnlyTrackRow extends StatelessWidget {
                     Text(track.artistName,
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: Colors.white.withOpacity(textOpacity * 0.6),
+                          color: Colors.white.withValues(alpha: textOpacity * 0.6),
                           fontSize: 12, fontWeight: FontWeight.w400)),
                   ],
                 ],
@@ -3117,7 +3119,7 @@ class _ReadOnlyTrackRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(99),
-                    color: accentColor.withOpacity(0.55),
+                    color: accentColor.withValues(alpha: 0.55),
                   ),
                   child: const Text('NOW', style: TextStyle(
                     color: Colors.white, fontSize: 9,
@@ -3128,7 +3130,7 @@ class _ReadOnlyTrackRow extends StatelessWidget {
           ),
         ),
         if (!isLast)
-          Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
+          Divider(height: 0, indent: 44, color: Colors.white.withValues(alpha: 0.06)),
       ]),
     );
   }
@@ -3175,7 +3177,7 @@ class _SelectedTrackTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: accentColor.withOpacity(0.8),
+                  color: accentColor.withValues(alpha: 0.8),
                   fontSize: 11,
                   fontWeight: FontWeight.w500)),
         ],
@@ -3198,10 +3200,10 @@ class _SelectedTrackTile extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: accentColor.withOpacity(0.18),
-              border: Border.all(color: accentColor.withOpacity(0.45), width: 1.0),
+              color: accentColor.withValues(alpha: 0.18),
+              border: Border.all(color: accentColor.withValues(alpha: 0.45), width: 1.0),
               boxShadow: [BoxShadow(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Padding(
@@ -3230,12 +3232,12 @@ class _SelectedTrackTile extends StatelessWidget {
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: accentColor.withOpacity(0.2),
+                      color: accentColor.withValues(alpha: 0.2),
                       border: Border.all(
-                          color: accentColor.withOpacity(0.35), width: 0.8),
+                          color: accentColor.withValues(alpha: 0.35), width: 0.8),
                     ),
                     child: Icon(Icons.remove_rounded,
-                        color: Colors.white.withOpacity(0.8), size: 14),
+                        color: Colors.white.withValues(alpha: 0.8), size: 14),
                   ),
                 ),
               ]),
@@ -3278,7 +3280,7 @@ class _SelectableTrackRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(7),
                   boxShadow: [BoxShadow(
-                      color: Colors.black.withOpacity(0.2), blurRadius: 6)],
+                      color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(7),
@@ -3294,14 +3296,14 @@ class _SelectableTrackRow extends StatelessWidget {
                     color: Colors.white, fontSize: 14,
                     fontWeight: FontWeight.w600, letterSpacing: -0.1,
                     decoration: isSelected ? TextDecoration.lineThrough : null,
-                    decorationColor: Colors.white.withOpacity(0.4),
+                    decorationColor: Colors.white.withValues(alpha: 0.4),
                   )),
                 if (track.artistName.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(track.artistName,
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.45),
+                        color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 12, fontWeight: FontWeight.w400)),
                 ],
               ],
@@ -3315,14 +3317,14 @@ class _SelectableTrackRow extends StatelessWidget {
                   width: 30, height: 30,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: accentColor.withOpacity(0.22),
+                    color: accentColor.withValues(alpha: 0.22),
                     border: Border.all(
-                        color: accentColor.withOpacity(0.55), width: 1.0),
+                        color: accentColor.withValues(alpha: 0.55), width: 1.0),
                     boxShadow: [BoxShadow(
-                        color: accentColor.withOpacity(0.2), blurRadius: 8)],
+                        color: accentColor.withValues(alpha: 0.2), blurRadius: 8)],
                   ),
                   child: Icon(Icons.add_rounded,
-                      color: Colors.white.withOpacity(0.9), size: 16),
+                      color: Colors.white.withValues(alpha: 0.9), size: 16),
                 ),
               )
             else
@@ -3330,17 +3332,17 @@ class _SelectableTrackRow extends StatelessWidget {
                 width: 30, height: 30,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   border: Border.all(
-                      color: accentColor.withOpacity(0.3), width: 0.8),
+                      color: accentColor.withValues(alpha: 0.3), width: 0.8),
                 ),
                 child: Icon(Icons.check_rounded,
-                    color: accentColor.withOpacity(0.5), size: 14),
+                    color: accentColor.withValues(alpha: 0.5), size: 14),
               ),
           ]),
         ),
         if (!isLast)
-          Divider(height: 0, color: Colors.white.withOpacity(0.06)),
+          Divider(height: 0, color: Colors.white.withValues(alpha: 0.06)),
       ]),
     );
   }
@@ -3376,22 +3378,22 @@ class _ArtistGridCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isSelected
-                          ? accentColor.withOpacity(0.8)
-                          : Colors.white.withOpacity(0.12),
+                          ? accentColor.withValues(alpha: 0.8)
+                          : Colors.white.withValues(alpha: 0.12),
                       width: isSelected ? 2.5 : 1,
                     ),
                     boxShadow: isSelected ? [BoxShadow(
-                        color: accentColor.withOpacity(0.45),
+                        color: accentColor.withValues(alpha: 0.45),
                         blurRadius: 18, spreadRadius: 2)] : [],
                   ),
                   child: ClipOval(
                     child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
                         ? Image.network(artist.imageUrl!, fit: BoxFit.cover)
                         : Container(
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withValues(alpha: 0.08),
                             child: Icon(Icons.person_rounded,
                                 size: side * 0.45,
-                                color: Colors.white.withOpacity(0.3))),
+                                color: Colors.white.withValues(alpha: 0.3))),
                   ),
                 ),
               ),
@@ -3403,7 +3405,7 @@ class _ArtistGridCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: accentColor,
                       boxShadow: [BoxShadow(
-                          color: accentColor.withOpacity(0.6), blurRadius: 8)],
+                          color: accentColor.withValues(alpha: 0.6), blurRadius: 8)],
                     ),
                     child: const Center(child: Icon(Icons.check_rounded,
                         color: Colors.white, size: 11)),
@@ -3416,7 +3418,7 @@ class _ArtistGridCard extends StatelessWidget {
             maxLines: 2, overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               height: 1.3,
@@ -3440,7 +3442,7 @@ class _MiniAvatar extends StatelessWidget {
       width: size, height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: accentColor.withOpacity(0.5), width: 1),
+        border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 1),
       ),
       child: ClipOval(child: _resolveChild()),
     );
@@ -3459,9 +3461,9 @@ class _MiniAvatar extends StatelessWidget {
   }
 
   Widget _fallback() => Container(
-    color: accentColor.withOpacity(0.25),
+    color: accentColor.withValues(alpha: 0.25),
     child: Icon(Icons.person_rounded,
-        color: Colors.white.withOpacity(0.7), size: size * 0.55),
+        color: Colors.white.withValues(alpha: 0.7), size: size * 0.55),
   );
 }
 
@@ -3480,9 +3482,9 @@ class _ShimmerTrackRow extends StatelessWidget {
         LinearGradient shimmerGrad(double opacity) => LinearGradient(
           begin: Alignment(-1 + s * 2, 0), end: Alignment(s * 2, 0),
           colors: [
-            Colors.white.withOpacity(opacity * 0.5),
-            Colors.white.withOpacity(opacity),
-            Colors.white.withOpacity(opacity * 0.5),
+            Colors.white.withValues(alpha: opacity * 0.5),
+            Colors.white.withValues(alpha: opacity),
+            Colors.white.withValues(alpha: opacity * 0.5),
           ],
         );
         return Padding(
@@ -3520,8 +3522,8 @@ class _ShimmerArtistCard extends StatelessWidget {
         final s = shimmerController.value;
         LinearGradient shimmerGrad() => LinearGradient(
           begin: Alignment(-1 + s * 2, 0), end: Alignment(s * 2, 0),
-          colors: [Colors.white.withOpacity(0.06),
-            Colors.white.withOpacity(0.14), Colors.white.withOpacity(0.06)],
+          colors: [Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.06)],
         );
         return Column(mainAxisSize: MainAxisSize.min, children: [
           Expanded(child: Center(child: AspectRatio(aspectRatio: 1,
@@ -3552,7 +3554,7 @@ class _SwipeDot extends StatelessWidget {
       width: isActive ? 20 : 6, height: 6,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
+        color: isActive ? color : Colors.white.withValues(alpha: 0.3),
       ),
     );
   }

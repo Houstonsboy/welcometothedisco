@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +11,6 @@ import 'package:gal/gal.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
@@ -381,7 +378,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         widget.versus.album1ID,
         widget.versus.album2ID,
       ).then((list) {
-        if (!mounted || list == null || list.length < 2) return;
+        if (!mounted || list.length < 2) return;
         if (list[0] != null && list[1] != null) {
           setState(() => _albums = list);
           _extractPalette(
@@ -398,7 +395,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       );
 
       _albumsFuture.then((list) {
-        if (!mounted || list == null || list.length < 2) return;
+        if (!mounted || list.length < 2) return;
         setState(() => _albums = list);
         _extractPalette(
           list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
@@ -412,7 +409,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   // ── Voter context + session restore ──────────────────────────────────────
   Future<void> _hydrateVoterContext() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
     if (uid.isEmpty) return;
 
     var cached = await UserProfileCacheService.readUser(expectedUid: uid);
@@ -736,7 +733,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.black.withOpacity(0.88),
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -913,8 +910,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   Widget _avatarFallback(double size) => Container(
     width: size, height: size,
-    color: Colors.white.withOpacity(0.2),
-    child: Icon(Icons.person_rounded, color: Colors.white.withOpacity(0.8), size: size * 0.55),
+    color: Colors.white.withValues(alpha: 0.2),
+    child: Icon(Icons.person_rounded, color: Colors.white.withValues(alpha: 0.8), size: size * 0.55),
   );
 
   @override
@@ -984,8 +981,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(0.18),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(0.45), width: 0.85),
+                                      color: _kSpotifyGreen.withValues(alpha: 0.18),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: 0.45), width: 0.85),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -997,7 +994,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                             shape: BoxShape.circle,
                                             color: _playingTrackIndex != null
                                                 ? _kSpotifyGreen
-                                                : Colors.white.withOpacity(0.35),
+                                                : Colors.white.withValues(alpha: 0.35),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -1008,7 +1005,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                           Icon(
                                             Icons.graphic_eq_rounded,
                                             size: 14,
-                                            color: _kSpotifyGreen.withOpacity(0.95),
+                                            color: _kSpotifyGreen.withValues(alpha: 0.95),
                                           ),
                                         ],
                                       ],
@@ -1022,8 +1019,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.12 : 0.25),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.3 : 0.6), width: 1.2),
+                                      color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.12 : 0.25),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.3 : 0.6), width: 1.2),
                                     ),
                                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                                       if (_isBombLoading)
@@ -1043,7 +1040,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                 'Tap cover to play · tap title to select round & vote',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.42),
+                                  color: Colors.white.withValues(alpha: 0.42),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: 0.2,
@@ -1146,7 +1143,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     if (roundCount == 0) {
       return Center(
         child: Text('No tracks found.',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
       );
     }
     final cover1 = album1?.imageUrl ?? a1Image;
@@ -1247,10 +1244,10 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 coverUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
-                    Container(color: accentColor.withOpacity(0.25)),
+                    Container(color: accentColor.withValues(alpha: 0.25)),
               )
             else
-              Container(color: accentColor.withOpacity(0.25)),
+              Container(color: accentColor.withValues(alpha: 0.25)),
 
             // Bottom gradient
             Container(
@@ -1261,14 +1258,14 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                   stops: const [0.3, 1.0],
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.80),
+                    Colors.black.withValues(alpha: 0.80),
                   ],
                 ),
               ),
             ),
 
             // Lock dim
-            if (isLocked) Container(color: Colors.black.withOpacity(0.35)),
+            if (isLocked) Container(color: Colors.black.withValues(alpha: 0.35)),
 
             // Active border
             if (isActive)
@@ -1286,13 +1283,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${roundIndex + 1}'.padLeft(2, '0'),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1319,7 +1316,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 child: Icon(
                   Icons.lock_rounded,
                   size: 16,
-                  color: Colors.white.withOpacity(0.38),
+                  color: Colors.white.withValues(alpha: 0.38),
                 ),
               ),
 
@@ -1349,7 +1346,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isLocked
-                          ? Colors.white.withOpacity(0.45)
+                          ? Colors.white.withValues(alpha: 0.45)
                           : Colors.white,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -1371,12 +1368,12 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
                           color: isVotedForMe
-                              ? _kSpotifyGreen.withOpacity(0.85)
-                              : accentColor.withOpacity(0.30),
+                              ? _kSpotifyGreen.withValues(alpha: 0.85)
+                              : accentColor.withValues(alpha: 0.30),
                           border: Border.all(
                             color: isVotedForMe
                                 ? _kSpotifyGreen
-                                : accentColor.withOpacity(0.65),
+                                : accentColor.withValues(alpha: 0.65),
                             width: 0.8,
                           ),
                         ),
@@ -1389,7 +1386,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   : Icons.how_to_vote_rounded,
                               size: 10,
                               color: isVoteDisabled
-                                  ? Colors.white.withOpacity(0.3)
+                                  ? Colors.white.withValues(alpha: 0.3)
                                   : Colors.white,
                             ),
                             const SizedBox(width: 3),
@@ -1399,7 +1396,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                                 color: isVoteDisabled
-                                    ? Colors.white.withOpacity(0.3)
+                                    ? Colors.white.withValues(alpha: 0.3)
                                     : Colors.white,
                               ),
                             ),
@@ -1429,8 +1426,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.15),
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.15),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
           ),
@@ -1453,9 +1450,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha: 0.25),
                 width: 0.8,
               ),
             ),
@@ -1507,7 +1504,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_color1, _color2]),
-              boxShadow: [BoxShadow(color: _color2.withOpacity(0.5), blurRadius: 18, spreadRadius: 2)],
+              boxShadow: [BoxShadow(color: _color2.withValues(alpha: 0.5), blurRadius: 18, spreadRadius: 2)],
             ),
             child: const Center(child: Text('VS', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5))),
           ),
@@ -1543,7 +1540,7 @@ class _ShareSheet extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1552,7 +1549,7 @@ class _ShareSheet extends StatelessWidget {
             Text(
               'Share result',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -1591,9 +1588,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1601,14 +1598,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.photo_library_outlined,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Save to gallery',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1626,9 +1623,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1636,14 +1633,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.link_rounded,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Copy link',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1683,8 +1680,8 @@ class _ShareButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withOpacity(0.15),
-              border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+              color: color.withValues(alpha: 0.15),
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
             ),
             child: Icon(icon, color: color, size: 22),
           ),
@@ -1692,7 +1689,7 @@ class _ShareButton extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -1716,7 +1713,7 @@ class _SwipeDot extends StatelessWidget {
       width: isActive ? 20 : 6, height: 6,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
+        color: isActive ? color : Colors.white.withValues(alpha: 0.3),
       ),
     );
   }
@@ -1750,9 +1747,9 @@ class _AlbumCard extends StatelessWidget {
           child: imageUrl != null && imageUrl!.isNotEmpty
               ? Image.network(imageUrl!, fit: BoxFit.cover)
               : Container(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   child: Icon(Icons.album_rounded, size: 40,
-                      color: Colors.white.withOpacity(0.3)),
+                      color: Colors.white.withValues(alpha: 0.3)),
                 ),
         ),
         const SizedBox(height: 8),
@@ -1761,7 +1758,7 @@ class _AlbumCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
                   fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
                 )),
             if (artist.isNotEmpty) ...[
@@ -1769,8 +1766,8 @@ class _AlbumCard extends StatelessWidget {
               Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isSelected
-                        ? accentColor.withOpacity(0.9)
-                        : Colors.white.withOpacity(0.35),
+                        ? accentColor.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.35),
                     fontSize: 11, fontWeight: FontWeight.w500,
                   )),
             ],
@@ -1780,8 +1777,8 @@ class _AlbumCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: accentColor.withOpacity(0.22),
-                  border: Border.all(color: accentColor.withOpacity(0.55), width: 0.9),
+                  color: accentColor.withValues(alpha: 0.22),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.55), width: 0.9),
                 ),
                 child: Text('$voteCount',
                     style: TextStyle(
@@ -1857,9 +1854,9 @@ class _TrackPage extends StatelessWidget {
               Container(width: 3, height: 16,
                   decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(99))),
               const SizedBox(width: 10),
-              Text('TRACKS', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
+              Text('TRACKS', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
               const SizedBox(width: 8),
-              Text('${tracks.length}', style: TextStyle(color: accentColor.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w700)),
+              Text('${tracks.length}', style: TextStyle(color: accentColor.withValues(alpha: 0.9), fontSize: 11, fontWeight: FontWeight.w700)),
             ]),
           );
         }
@@ -1868,7 +1865,7 @@ class _TrackPage extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(top: 24),
             child: Text(album == null ? 'Spotify data unavailable.' : 'No tracks found.',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
           );
         }
 
@@ -1959,7 +1956,7 @@ class _TrackRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final numberColor = isActive
         ? accentColor
-        : isPast ? accentColor.withOpacity(0.5) : Colors.white.withOpacity(0.42);
+        : isPast ? accentColor.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.42);
     final titleOpacity = isPast
         ? 0.58
         : isLocked
@@ -1979,9 +1976,9 @@ class _TrackRow extends StatelessWidget {
               // Track number / state icon
               SizedBox(width: 32,
                 child: isPast
-                    ? Icon(Icons.check_rounded, size: 15, color: accentColor.withOpacity(0.5))
+                    ? Icon(Icons.check_rounded, size: 15, color: accentColor.withValues(alpha: 0.5))
                     : isLocked
-                        ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withOpacity(0.45))
+                        ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withValues(alpha: 0.45))
                         : Text('${track.trackNumber}'.padLeft(2, '0'),
                             style: TextStyle(color: numberColor, fontSize: 12, fontWeight: FontWeight.w700,
                                 fontFeatures: const [FontFeature.tabularFigures()])),
@@ -2022,12 +2019,12 @@ class _TrackRow extends StatelessWidget {
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                               colors: [
-                                accentColor.withOpacity(0.24),
-                                Colors.white.withOpacity(0.08),
+                                accentColor.withValues(alpha: 0.24),
+                                Colors.white.withValues(alpha: 0.08),
                               ],
                             ),
                             border: Border.all(
-                              color: accentColor.withOpacity(0.50),
+                              color: accentColor.withValues(alpha: 0.50),
                               width: 0.9,
                             ),
                           )
@@ -2035,7 +2032,7 @@ class _TrackRow extends StatelessWidget {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              color: isActive ? Colors.white : Colors.white.withOpacity(titleOpacity),
+                              color: isActive ? Colors.white : Colors.white.withValues(alpha: titleOpacity),
                               fontSize: isActive ? 15 : 14,
                               fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
                               letterSpacing: isActive ? 0 : -0.1,
@@ -2043,7 +2040,7 @@ class _TrackRow extends StatelessWidget {
                               shadows: isActive
                                   ? [
                                       Shadow(
-                                        color: accentColor.withOpacity(0.40),
+                                        color: accentColor.withValues(alpha: 0.40),
                                         blurRadius: 8,
                                       ),
                                     ]
@@ -2053,8 +2050,8 @@ class _TrackRow extends StatelessWidget {
                         Text(track.artistName, maxLines: 1, overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 color: isActive
-                                    ? accentColor.withOpacity(0.95)
-                                    : Colors.white.withOpacity(artistOpacity),
+                                    ? accentColor.withValues(alpha: 0.95)
+                                    : Colors.white.withValues(alpha: artistOpacity),
                                 fontSize: isActive ? 12.5 : 12,
                                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                                 height: 1.1)),
@@ -2076,26 +2073,26 @@ class _TrackRow extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
                           color: isVoted
-                              ? _kSpotifyGreen.withOpacity(0.5)
+                              ? _kSpotifyGreen.withValues(alpha: 0.5)
                               : isVoteDisabled
-                                  ? Colors.white.withOpacity(0.06)
-                                  : _kSpotifyGreen.withOpacity(0.25),
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : _kSpotifyGreen.withValues(alpha: 0.25),
                           border: Border.all(
                             color: isVoted ? _kSpotifyGreen
-                                : isVoteDisabled ? Colors.white.withOpacity(0.1)
-                                : _kSpotifyGreen.withOpacity(0.6),
+                                : isVoteDisabled ? Colors.white.withValues(alpha: 0.1)
+                                : _kSpotifyGreen.withValues(alpha: 0.6),
                             width: 1,
                           ),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Icon(isVoted ? Icons.check_rounded : Icons.how_to_vote_rounded,
                               size: 14,
-                              color: isVoteDisabled ? Colors.white.withOpacity(0.2)
+                              color: isVoteDisabled ? Colors.white.withValues(alpha: 0.2)
                                   : isVoted ? Colors.white : _kSpotifyGreen),
                           const SizedBox(width: 4),
                           Text(isVoted ? 'Voted' : 'Vote',
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5,
-                                  color: isVoteDisabled ? Colors.white.withOpacity(0.2)
+                                  color: isVoteDisabled ? Colors.white.withValues(alpha: 0.2)
                                       : isVoted ? Colors.white : _kSpotifyGreen)),
                         ]),
                       ),
@@ -2108,12 +2105,12 @@ class _TrackRow extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99), color: accentColor.withOpacity(0.75)),
+                          borderRadius: BorderRadius.circular(99), color: accentColor.withValues(alpha: 0.75)),
                       child: const Text('NOTE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
                     )
                   else if (!isActive)
                     Text(track.durationFormatted,
-                        style: TextStyle(color: Colors.white.withOpacity(titleOpacity * 0.5), fontSize: 12,
+                        style: TextStyle(color: Colors.white.withValues(alpha: titleOpacity * 0.5), fontSize: 12,
                             fontWeight: FontWeight.w500, fontFeatures: const [FontFeature.tabularFigures()])),
                 ]),
 
@@ -2123,8 +2120,8 @@ class _TrackRow extends StatelessWidget {
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(9),
-                      color: Colors.white.withOpacity(0.12),
-                      border: Border.all(color: Colors.white.withOpacity(0.20), width: 0.8),
+                      color: Colors.white.withValues(alpha: 0.12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.20), width: 0.8),
                     ),
                     child: TextField(
                       controller: commentController,
@@ -2134,7 +2131,7 @@ class _TrackRow extends StatelessWidget {
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: 'Disclaimer...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.42), fontSize: 12),
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontSize: 12),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
@@ -2144,7 +2141,7 @@ class _TrackRow extends StatelessWidget {
               ]),
             ),
         if (!isLast)
-          Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
+          Divider(height: 0, indent: 44, color: Colors.white.withValues(alpha: 0.06)),
       ]),
     );
   }

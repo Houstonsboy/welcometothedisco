@@ -11,7 +11,6 @@ import 'package:welcometothedisco/models/pair_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
-import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/utils/pair_utils.dart';
 
@@ -793,7 +792,7 @@ class FirebaseService {
 
       // Denormalized cover images — stored now so inbox renders without Spotify calls.
       if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
-      if (artist2ImageUrl != null && artist2ImageUrl.trim().isNotEmpty)
+      if (artist2ImageUrl.trim().isNotEmpty)
         'artist2ImageUrl': artist2ImageUrl.trim(),
 
       // Full track details — enables rendering without Spotify API calls.

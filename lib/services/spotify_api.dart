@@ -568,7 +568,7 @@ class SpotifyApi {
     }),
   ]);
 
-  List<SpotifyTrack> _parseTracks(http.Response resp) {
+  List<SpotifyTrack> parseTracks(http.Response resp) {
     if (resp.statusCode != 200) return [];
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final items =
@@ -578,11 +578,11 @@ class SpotifyApi {
 
   // Merge artist-scoped + broad results, then partition by artist.
   // Deduplication is by track ID within each artist's final list.
-  final artist1Scoped = _parseTracks(responses[0]);
-  final artist2Scoped = _parseTracks(responses[1]);
-  final broad = _parseTracks(responses[2]);
+  final artist1Scoped = parseTracks(responses[0]);
+  final artist2Scoped = parseTracks(responses[1]);
+  final broad = parseTracks(responses[2]);
 
-  List<SpotifyTrack> _buildList(
+  List<SpotifyTrack> buildList(
       List<SpotifyTrack> scoped, String artistId, String artistName) {
     // Start with artist-scoped results (best ranking), then append
     // any featured tracks found in the broad search not already present.
@@ -599,8 +599,8 @@ class SpotifyApi {
   }
 
   return {
-    artist1Id: _buildList(artist1Scoped, artist1Id, artist1Name),
-    artist2Id: _buildList(artist2Scoped, artist2Id, artist2Name),
+    artist1Id: buildList(artist1Scoped, artist1Id, artist1Name),
+    artist2Id: buildList(artist2Scoped, artist2Id, artist2Name),
   };
 }
   // ── Playlists ─────────────────────────────────────────────────────────────

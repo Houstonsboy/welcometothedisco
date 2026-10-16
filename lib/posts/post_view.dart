@@ -256,7 +256,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             child: Text(
                               post.description,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.78),
+                                color: Colors.white.withValues(alpha: 0.78),
                                 fontFamily: AppTheme.fontBody,
                                 fontSize: 15,
                                 height: 1.65,
@@ -284,13 +284,13 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             child: Row(
                               children: [
                                 Icon(Icons.queue_music_rounded,
-                                    color: _kCyan.withOpacity(0.75),
+                                    color: _kCyan.withValues(alpha: 0.75),
                                     size: 16),
                                 const SizedBox(width: 6),
                                 Text(
                                   'TRACKLIST',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.45),
+                                    color: Colors.white.withValues(alpha: 0.45),
                                     fontFamily: AppTheme.fontBody,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
@@ -303,12 +303,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                                       horizontal: 7, vertical: 1),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
-                                    color: _kCyan.withOpacity(0.12),
+                                    color: _kCyan.withValues(alpha: 0.12),
                                   ),
                                   child: Text(
                                     '${post.tracklist.length}',
                                     style: TextStyle(
-                                      color: _kCyan.withOpacity(0.8),
+                                      color: _kCyan.withValues(alpha: 0.8),
                                       fontFamily: AppTheme.fontBody,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w800,
@@ -403,13 +403,13 @@ class _TopBar extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.07),
+                color: Colors.white.withValues(alpha: 0.07),
                 border: Border.all(
-                    color: Colors.white.withOpacity(0.12), width: 0.8),
+                    color: Colors.white.withValues(alpha: 0.12), width: 0.8),
               ),
               child: Icon(
                 Icons.arrow_back_ios_new_rounded,
-                color: Colors.white.withOpacity(0.80),
+                color: Colors.white.withValues(alpha: 0.80),
                 size: 15,
               ),
             ),
@@ -421,7 +421,7 @@ class _TopBar extends StatelessWidget {
           GestureDetector(
             onTap: () {/* TODO: share */},
             child: Icon(Icons.ios_share_rounded,
-                color: Colors.white.withOpacity(0.55), size: 20),
+                color: Colors.white.withValues(alpha: 0.55), size: 20),
           ),
 
           const SizedBox(width: 18),
@@ -430,7 +430,7 @@ class _TopBar extends StatelessWidget {
           GestureDetector(
             onTap: () {/* TODO: options */},
             child: Icon(Icons.more_horiz_rounded,
-                color: Colors.white.withOpacity(0.55), size: 22),
+                color: Colors.white.withValues(alpha: 0.55), size: 22),
           ),
         ],
       ),
@@ -458,9 +458,9 @@ class _AuthorRow extends StatelessWidget {
     Widget fallback() => Container(
           width: size,
           height: size,
-          color: _kBlue.withOpacity(0.35),
+          color: _kBlue.withValues(alpha: 0.35),
           child: Icon(Icons.person_rounded,
-              color: Colors.white.withOpacity(0.7), size: 22),
+              color: Colors.white.withValues(alpha: 0.7), size: 22),
         );
 
     if (p.isEmpty) return ClipOval(child: fallback());
@@ -526,7 +526,7 @@ class _AuthorRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: _kGreen.withOpacity(0.5), width: 1.5),
+                        color: _kGreen.withValues(alpha: 0.5), width: 1.5),
                   ),
                   child: _avatar(),
                 ),
@@ -547,7 +547,7 @@ class _AuthorRow extends StatelessWidget {
                     Text(
                       _relativeTime(post.createdAt?.toDate()),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         fontFamily: AppTheme.fontBody,
                         fontSize: 11,
                       ),
@@ -584,13 +584,13 @@ class _FollowPillState extends State<_FollowPill> {
             const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: _following
-              ? Colors.white.withOpacity(0.07)
-              : _kGreen.withOpacity(0.13),
+              ? Colors.white.withValues(alpha: 0.07)
+              : _kGreen.withValues(alpha: 0.13),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _following
-                ? Colors.white.withOpacity(0.14)
-                : _kGreen.withOpacity(0.55),
+                ? Colors.white.withValues(alpha: 0.14)
+                : _kGreen.withValues(alpha: 0.55),
             width: 1,
           ),
         ),
@@ -649,7 +649,7 @@ class _ArtistBlock extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               gradient: AppTheme.glassPanelGradient(opacity: 0.35),
               border: Border.all(
-                  color: Colors.white.withOpacity(0.14), width: 0.8),
+                  color: Colors.white.withValues(alpha: 0.14), width: 0.8),
             ),
             child: Row(
               children: [
@@ -660,10 +660,10 @@ class _ArtistBlock extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.20), width: 1.5),
+                        color: Colors.white.withValues(alpha: 0.20), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: _kPink.withOpacity(0.20),
+                        color: _kPink.withValues(alpha: 0.20),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -702,7 +702,7 @@ class _ArtistBlock extends StatelessWidget {
                       Text(
                         '${post.tracklist.length} tracks',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.38),
+                          color: Colors.white.withValues(alpha: 0.38),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 12,
                         ),
@@ -712,7 +712,7 @@ class _ArtistBlock extends StatelessWidget {
                 ),
 
                 Icon(Icons.chevron_right_rounded,
-                    color: Colors.white.withOpacity(0.22), size: 20),
+                    color: Colors.white.withValues(alpha: 0.22), size: 20),
               ],
             ),
           ),
@@ -723,9 +723,9 @@ class _ArtistBlock extends StatelessWidget {
   }
 
   Widget _artistFallback(double size) => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(Icons.music_note_rounded,
-            color: _kPink.withOpacity(0.8), size: size * 0.5),
+            color: _kPink.withValues(alpha: 0.8), size: size * 0.5),
       );
 }
 
@@ -759,12 +759,12 @@ class _TrackTile extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: isPlaying
-                  ? _kCyan.withOpacity(0.10)
-                  : Colors.white.withOpacity(0.04),
+                  ? _kCyan.withValues(alpha: 0.10)
+                  : Colors.white.withValues(alpha: 0.04),
               border: Border.all(
                 color: isPlaying
-                    ? _kCyan.withOpacity(0.45)
-                    : Colors.white.withOpacity(0.08),
+                    ? _kCyan.withValues(alpha: 0.45)
+                    : Colors.white.withValues(alpha: 0.08),
                 width: isPlaying ? 1.0 : 0.7,
               ),
             ),
@@ -779,7 +779,7 @@ class _TrackTile extends StatelessWidget {
                     style: TextStyle(
                       color: isPlaying
                           ? _kCyan
-                          : Colors.white.withOpacity(0.25),
+                          : Colors.white.withValues(alpha: 0.25),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -815,7 +815,7 @@ class _TrackTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           color: Colors.black
-                              .withOpacity(isPlaying ? 0.45 : 0.18),
+                              .withValues(alpha: isPlaying ? 0.45 : 0.18),
                         ),
                         child: Icon(
                           isPlaying
@@ -823,7 +823,7 @@ class _TrackTile extends StatelessWidget {
                               : Icons.play_arrow_rounded,
                           color: isPlaying
                               ? _kCyan
-                              : Colors.white.withOpacity(0.70),
+                              : Colors.white.withValues(alpha: 0.70),
                           size: isPlaying ? 22 : 20,
                         ),
                       ),
@@ -845,7 +845,7 @@ class _TrackTile extends StatelessWidget {
                         style: TextStyle(
                           color: isPlaying
                               ? Colors.white
-                              : Colors.white.withOpacity(0.88),
+                              : Colors.white.withValues(alpha: 0.88),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 13.5,
                           fontWeight: isPlaying
@@ -859,7 +859,7 @@ class _TrackTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.38),
+                          color: Colors.white.withValues(alpha: 0.38),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 11.5,
                         ),
@@ -886,10 +886,10 @@ class _TrackTile extends StatelessWidget {
         height: 46,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color: _kBlue.withOpacity(0.30),
+          color: _kBlue.withValues(alpha: 0.30),
         ),
         child: Icon(Icons.album_rounded,
-            color: _kPink.withOpacity(0.75), size: 22),
+            color: _kPink.withValues(alpha: 0.75), size: 22),
       );
 }
 
@@ -975,7 +975,7 @@ class _FooterActions extends StatelessWidget {
             icon: Icons.shuffle_rounded,
             label: 'remix ${fmt(remixCount)}',
             color: post.remixEnabled == RemixEnabled.disabled
-                ? Colors.white.withOpacity(0.30)
+                ? Colors.white.withValues(alpha: 0.30)
                 : _kGreen,
             filled: post.remixEnabled != RemixEnabled.disabled,
             onTap: onRemix,
@@ -987,7 +987,7 @@ class _FooterActions extends StatelessWidget {
           _ActionBtn(
             icon: Icons.reply_rounded,
             label: fmt(post.shareCount),
-            color: Colors.white.withOpacity(0.45),
+            color: Colors.white.withValues(alpha: 0.45),
             filled: false,
             onTap: () {},
           ),
@@ -1002,13 +1002,13 @@ class _FooterActions extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
                 color: onQueueAll != null
-                    ? _kCyan.withOpacity(0.14)
-                    : Colors.white.withOpacity(0.04),
+                    ? _kCyan.withValues(alpha: 0.14)
+                    : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: onQueueAll != null
-                      ? _kCyan.withOpacity(0.55)
-                      : Colors.white.withOpacity(0.10),
+                      ? _kCyan.withValues(alpha: 0.55)
+                      : Colors.white.withValues(alpha: 0.10),
                   width: 1,
                 ),
               ),
@@ -1019,7 +1019,7 @@ class _FooterActions extends StatelessWidget {
                     Icons.queue_music_rounded,
                     color: onQueueAll != null
                         ? _kCyan
-                        : Colors.white.withOpacity(0.25),
+                        : Colors.white.withValues(alpha: 0.25),
                     size: 15,
                   ),
                   const SizedBox(width: 5),
@@ -1028,7 +1028,7 @@ class _FooterActions extends StatelessWidget {
                     style: TextStyle(
                       color: onQueueAll != null
                           ? _kCyan
-                          : Colors.white.withOpacity(0.25),
+                          : Colors.white.withValues(alpha: 0.25),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1066,12 +1066,12 @@ class _ActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: filled ? color.withOpacity(0.13) : Colors.transparent,
+          color: filled ? color.withValues(alpha: 0.13) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: filled
-                ? color.withOpacity(0.50)
-                : Colors.white.withOpacity(0.13),
+                ? color.withValues(alpha: 0.50)
+                : Colors.white.withValues(alpha: 0.13),
             width: 0.9,
           ),
         ),
@@ -1160,10 +1160,10 @@ class _RemixesSectionState extends State<_RemixesSection>
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                    color: Colors.white.withOpacity(0.10), width: 0.8),
+                    color: Colors.white.withValues(alpha: 0.10), width: 0.8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1178,13 +1178,13 @@ class _RemixesSectionState extends State<_RemixesSection>
                       child: Row(
                         children: [
                           Icon(Icons.shuffle_rounded,
-                              color: _kGreen.withOpacity(0.70), size: 14),
+                              color: _kGreen.withValues(alpha: 0.70), size: 14),
                           const SizedBox(width: 8),
                           if (remixes.isEmpty) ...[
                             Text(
                               'No remixes yet',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.38),
+                                color: Colors.white.withValues(alpha: 0.38),
                                 fontFamily: AppTheme.fontBody,
                                 fontSize: 12,
                               ),
@@ -1197,7 +1197,7 @@ class _RemixesSectionState extends State<_RemixesSection>
                               child: Text(
                                 '${remixes.length} remix${remixes.length == 1 ? '' : 'es'}',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.82),
+                                  color: Colors.white.withValues(alpha: 0.82),
                                   fontFamily: AppTheme.fontBody,
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
@@ -1211,7 +1211,7 @@ class _RemixesSectionState extends State<_RemixesSection>
                               duration: const Duration(milliseconds: 280),
                               curve: Curves.easeOutCubic,
                               child: Icon(Icons.expand_more_rounded,
-                                  color: Colors.white.withOpacity(0.50),
+                                  color: Colors.white.withValues(alpha: 0.50),
                                   size: 20),
                             ),
                         ],
@@ -1228,7 +1228,7 @@ class _RemixesSectionState extends State<_RemixesSection>
                         Divider(
                             height: 1,
                             thickness: 1,
-                            color: Colors.white.withOpacity(0.08)),
+                            color: Colors.white.withValues(alpha: 0.08)),
                         ...remixes.asMap().entries.map((e) => _RemixRow(
                               data: e.value,
                               isLast: e.key == remixes.length - 1,
@@ -1289,10 +1289,10 @@ class _RemixAvatarCircle extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border:
-            Border.all(color: _kGreen.withOpacity(0.45), width: 1.5),
+            Border.all(color: _kGreen.withValues(alpha: 0.45), width: 1.5),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.28),
+              color: Colors.black.withValues(alpha: 0.28),
               blurRadius: 5,
               offset: const Offset(0, 2)),
         ],
@@ -1308,9 +1308,9 @@ class _RemixAvatarCircle extends StatelessWidget {
   }
 
   Widget _fallback() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(Icons.music_note_rounded,
-            color: _kGreen.withOpacity(0.8), size: 13),
+            color: _kGreen.withValues(alpha: 0.8), size: 13),
       );
 }
 
@@ -1353,8 +1353,8 @@ class _RemixRow extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _openPlayground(context),
-            splashColor: Colors.white.withOpacity(0.06),
-            highlightColor: Colors.white.withOpacity(0.03),
+            splashColor: Colors.white.withValues(alpha: 0.06),
+            highlightColor: Colors.white.withValues(alpha: 0.03),
         child: Padding(
           padding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -1367,10 +1367,10 @@ class _RemixRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.20), width: 1),
+                      color: Colors.white.withValues(alpha: 0.20), width: 1),
                   boxShadow: [
                     BoxShadow(
-                        color: _kGreen.withOpacity(0.12),
+                        color: _kGreen.withValues(alpha: 0.12),
                         blurRadius: 8,
                         offset: const Offset(0, 3)),
                   ],
@@ -1424,7 +1424,7 @@ class _RemixRow extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.48),
+                                color: Colors.white.withValues(alpha: 0.48),
                                 fontFamily: AppTheme.fontBody,
                                 fontSize: 11,
                               ),
@@ -1438,7 +1438,7 @@ class _RemixRow extends StatelessWidget {
               ),
 
               Icon(Icons.chevron_right_rounded,
-                  size: 17, color: Colors.white.withOpacity(0.25)),
+                  size: 17, color: Colors.white.withValues(alpha: 0.25)),
             ],
           ),
         ),
@@ -1450,15 +1450,15 @@ class _RemixRow extends StatelessWidget {
             thickness: 1,
             indent: 14,
             endIndent: 14,
-            color: Colors.white.withOpacity(0.07),
+            color: Colors.white.withValues(alpha: 0.07),
           ),
       ],
     );
   }
 
   Widget _artistFallback() => Container(
-        color: _kBlue.withOpacity(0.30),
+        color: _kBlue.withValues(alpha: 0.30),
         child: Icon(Icons.music_note_rounded,
-            color: _kGreen.withOpacity(0.7), size: 22),
+            color: _kGreen.withValues(alpha: 0.7), size: 22),
       );
 }

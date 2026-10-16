@@ -88,7 +88,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Avatar, username and bio are required.'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -115,7 +115,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Could not update profile: $e'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -145,7 +145,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Spotify error: $e'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -207,7 +207,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               size: 18,
             ),
             onPressed: () => Navigator.pop(context),
@@ -230,9 +230,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppTheme.spotifyGreen.withOpacity(0.15),
+                    color: AppTheme.spotifyGreen.withValues(alpha: 0.15),
                     border: Border.all(
-                      color: AppTheme.spotifyGreen.withOpacity(0.45),
+                      color: AppTheme.spotifyGreen.withValues(alpha: 0.45),
                       width: 0.9,
                     ),
                   ),
@@ -264,9 +264,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.22),
+                      color: Colors.white.withValues(alpha: 0.22),
                       width: 0.9,
                     ),
                   ),
@@ -277,12 +277,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 1.8,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                           )
                         : Icon(
                             Icons.logout_rounded,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             size: 17,
                           ),
                   ),
@@ -349,17 +349,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _kBlue.withOpacity(0.45),
-                    _kPink.withOpacity(0.45),
+                    _kBlue.withValues(alpha: 0.45),
+                    _kPink.withValues(alpha: 0.45),
                   ],
                 ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   width: 0.8,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -371,7 +371,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Center(
                         child: CircularProgressIndicator(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           strokeWidth: 2,
                         ),
                       ),
@@ -393,17 +393,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _editing
-                      ? Colors.white.withOpacity(0.08)
-                      : Colors.white.withOpacity(0.18),
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.18),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.28),
+                    color: Colors.white.withValues(alpha: 0.28),
                     width: 0.9,
                   ),
                 ),
                 child: Icon(
                   Icons.edit_rounded,
                   size: 15,
-                  color: Colors.white.withOpacity(_editing ? 0.35 : 0.9),
+                  color: Colors.white.withValues(alpha: _editing ? 0.35 : 0.9),
                 ),
               ),
             ),
@@ -434,12 +434,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   width: 2.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: _kPink.withOpacity(0.32),
+                    color: _kPink.withValues(alpha: 0.32),
                     blurRadius: 18,
                     spreadRadius: 1,
                   ),
@@ -487,7 +487,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           ],
         ),
         const SizedBox(height: 16),
-        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
         const SizedBox(height: 14),
         if (_editing) ...[
           _buildAvatarPicker(),
@@ -502,7 +502,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             Text(
               email,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.38),
+                color: Colors.white.withValues(alpha: 0.38),
                 fontSize: 11,
               ),
             ),
@@ -511,7 +511,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             Text(
               user!.bio,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.78),
+                color: Colors.white.withValues(alpha: 0.78),
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 height: 1.55,
@@ -527,10 +527,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           width: 0.8,
         ),
       ),
@@ -548,7 +548,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             TextSpan(
               text: label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
+                color: Colors.white.withValues(alpha: 0.65),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -560,10 +560,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _avatarFallback() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           size: 40,
         ),
       );
@@ -579,9 +579,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.65)),
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
         ),
         focusedBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.white),
@@ -597,7 +597,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         Text(
           'Choose avatar',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -620,7 +620,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       border: Border.all(
                         color: selected
                             ? Colors.white
-                            : Colors.white.withOpacity(0.22),
+                            : Colors.white.withValues(alpha: 0.22),
                         width: selected ? 2.2 : 1,
                       ),
                     ),
@@ -647,8 +647,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: OutlinedButton(
             onPressed: _savingProfile ? null : () => _cancelEditing(user),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.2)),
-              foregroundColor: Colors.white.withOpacity(0.85),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              foregroundColor: Colors.white.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(vertical: 13),
             ),
             child: const Text('Cancel'),
@@ -659,7 +659,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: ElevatedButton(
             onPressed: _savingProfile ? null : _saveProfile,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.18),
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -670,7 +670,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white.withOpacity(0.75),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   )
                 : const Text(
@@ -816,7 +816,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Could not save: $e'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -842,12 +842,12 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _kBlue.withOpacity(0.35),
-                    _kPink.withOpacity(0.35),
+                    _kBlue.withValues(alpha: 0.35),
+                    _kPink.withValues(alpha: 0.35),
                   ],
                 ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.16),
+                  color: Colors.white.withValues(alpha: 0.16),
                   width: 0.8,
                 ),
               ),
@@ -884,16 +884,16 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                 height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.16),
+                  color: Colors.white.withValues(alpha: 0.16),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.26),
+                    color: Colors.white.withValues(alpha: 0.26),
                     width: 0.9,
                   ),
                 ),
                 child: Icon(
                   Icons.search_rounded,
                   size: 16,
-                  color: Colors.white.withOpacity(0.88),
+                  color: Colors.white.withValues(alpha: 0.88),
                 ),
               ),
             ),
@@ -909,7 +909,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           Text(
             'FAVORITE ALBUMS',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.8,
@@ -935,9 +935,9 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       width: 0.8,
                     ),
                   ),
@@ -952,7 +952,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                           ? 'Max 5 albums selected'
                           : 'Search albums…',
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.38),
+                        color: Colors.white.withValues(alpha: 0.38),
                         fontSize: 14,
                       ),
                       prefixIcon: _isSearching
@@ -963,13 +963,13 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                                 height: 14,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.8,
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                             )
                           : Icon(
                               Icons.search_rounded,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                               size: 18,
                             ),
                       suffixIcon: _searchController.text.isNotEmpty
@@ -980,7 +980,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                               },
                               child: Icon(
                                 Icons.close_rounded,
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 size: 16,
                               ),
                             )
@@ -1004,7 +1004,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
       return Text(
         'No favourite albums yet — tap 🔍 to add some.',
         style: TextStyle(
-          color: Colors.white.withOpacity(0.45),
+          color: Colors.white.withValues(alpha: 0.45),
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -1016,7 +1016,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
         return Text(
           'Search and add up to 5 albums.',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.45),
+            color: Colors.white.withValues(alpha: 0.45),
             fontSize: 12,
           ),
         );
@@ -1062,10 +1062,10 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
             child: hasImage
                 ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
                 : Container(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     child: Icon(
                       Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
           ),
@@ -1111,12 +1111,12 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                         width: tileSize,
                         height: tileSize,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
+                          color: Colors.white.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           Icons.album_rounded,
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           size: 28,
                         ),
                       ),
@@ -1131,9 +1131,9 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                     height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _kPink.withOpacity(0.9),
+                      color: _kPink.withValues(alpha: 0.9),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha: 0.55),
                         width: 0.9,
                       ),
                     ),
@@ -1170,7 +1170,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
         const SizedBox(height: 10),
         if (atMax)
           Padding(
@@ -1178,7 +1178,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
             child: Text(
               'Maximum 5 albums selected.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: Colors.white.withValues(alpha: 0.55),
                 fontSize: 11,
               ),
             ),
@@ -1215,10 +1215,10 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                                 width: double.infinity,
                               )
                             : Container(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 child: Icon(
                                   Icons.album_rounded,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha: 0.4),
                                 ),
                               ),
                       ),
@@ -1253,8 +1253,8 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           child: OutlinedButton(
             onPressed: _saving ? null : _cancelEditing,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.2)),
-              foregroundColor: Colors.white.withOpacity(0.85),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              foregroundColor: Colors.white.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(vertical: 11),
             ),
             child: const Text('Cancel'),
@@ -1265,7 +1265,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           child: ElevatedButton(
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.18),
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1307,10 +1307,10 @@ class _MyPollsCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.07),
+              color: Colors.white.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: Colors.white.withOpacity(0.14),
+                color: Colors.white.withValues(alpha: 0.14),
                 width: 0.9,
               ),
             ),
@@ -1321,9 +1321,9 @@ class _MyPollsCard extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF17B5EE).withOpacity(0.15),
+                    color: const Color(0xFF17B5EE).withValues(alpha: 0.15),
                     border: Border.all(
-                      color: const Color(0xFF17B5EE).withOpacity(0.4),
+                      color: const Color(0xFF17B5EE).withValues(alpha: 0.4),
                       width: 0.9,
                     ),
                   ),
@@ -1351,7 +1351,7 @@ class _MyPollsCard extends StatelessWidget {
                       Text(
                         'View your voting history',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1361,7 +1361,7 @@ class _MyPollsCard extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   size: 22,
                 ),
               ],

@@ -80,7 +80,7 @@ class _DevPageState extends State<DevPage> {
         height: 22,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: Colors.white.withOpacity(0.45),
+          color: Colors.white.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -99,16 +99,16 @@ class _DevPageState extends State<DevPage> {
               height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withValues(alpha: 0.12),
                   width: 1,
                 ),
               ),
               child: Icon(
                 Icons.lock_outline_rounded,
                 size: 32,
-                color: Colors.white.withOpacity(0.28),
+                color: Colors.white.withValues(alpha: 0.28),
               ),
             ),
             const SizedBox(height: 20),
@@ -116,7 +116,7 @@ class _DevPageState extends State<DevPage> {
               "you aren't admin.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.75),
+                color: Colors.white.withValues(alpha: 0.75),
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.2,
@@ -127,7 +127,7 @@ class _DevPageState extends State<DevPage> {
               "i'm sorry, i can't show you this page.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 fontSize: 13,
                 height: 1.5,
               ),
@@ -181,7 +181,7 @@ class _DevPageState extends State<DevPage> {
           Text(
             'internal utilities — handle with care',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.45),
+              color: Colors.white.withValues(alpha: 0.45),
               fontSize: 11,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.3,
@@ -196,7 +196,7 @@ class _DevPageState extends State<DevPage> {
     return Text(
       label,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.38),
+        color: Colors.white.withValues(alpha: 0.38),
         fontSize: 9,
         fontWeight: FontWeight.w700,
         letterSpacing: 2.2,
@@ -217,12 +217,12 @@ class _DevPageState extends State<DevPage> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _kBlue.withOpacity(0.40),
-                _kPink.withOpacity(0.40),
+                _kBlue.withValues(alpha: 0.40),
+                _kPink.withValues(alpha: 0.40),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.16),
+              color: Colors.white.withValues(alpha: 0.16),
               width: 0.8,
             ),
           ),
@@ -237,12 +237,12 @@ class _DevPageState extends State<DevPage> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.10),
+                      color: Colors.white.withValues(alpha: 0.10),
                     ),
                     child: Icon(
                       Icons.admin_panel_settings_outlined,
                       size: 16,
-                      color: Colors.white.withOpacity(0.75),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -262,7 +262,7 @@ class _DevPageState extends State<DevPage> {
                         Text(
                           'Adds admin: false to every user doc that is missing the field',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.48),
+                            color: Colors.white.withValues(alpha: 0.48),
                             fontSize: 11,
                             height: 1.4,
                           ),
@@ -302,11 +302,11 @@ class _DevPageState extends State<DevPage> {
                               end: Alignment.bottomRight,
                             ),
                       color: _backfillRunning
-                          ? Colors.white.withOpacity(0.07)
+                          ? Colors.white.withValues(alpha: 0.07)
                           : null,
                       border: Border.all(
-                        color: Colors.white.withOpacity(
-                            _backfillRunning ? 0.10 : 0.0),
+                        color: Colors.white.withValues(
+                            alpha: _backfillRunning ? 0.10 : 0.0),
                         width: 0.8,
                       ),
                     ),
@@ -317,7 +317,7 @@ class _DevPageState extends State<DevPage> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white.withOpacity(0.55),
+                                color: Colors.white.withValues(alpha: 0.55),
                               ),
                             )
                           : Text(
@@ -341,7 +341,7 @@ class _DevPageState extends State<DevPage> {
                 Text(
                   'Safe to re-run — skips docs that already have the admin field.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.28),
+                    color: Colors.white.withValues(alpha: 0.28),
                     fontSize: 10,
                     height: 1.4,
                   ),
@@ -359,7 +359,7 @@ class _DevPageState extends State<DevPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withValues(alpha: 0.07),
       ),
       child: Row(
         children: [
@@ -368,14 +368,14 @@ class _DevPageState extends State<DevPage> {
             height: 14,
             child: CircularProgressIndicator(
               strokeWidth: 1.6,
-              color: Colors.white.withOpacity(0.55),
+              color: Colors.white.withValues(alpha: 0.55),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             'Scanning users collection…',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 12,
             ),
           ),
@@ -391,12 +391,12 @@ class _DevPageState extends State<DevPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: allGood
-            ? Colors.greenAccent.withOpacity(0.08)
-            : Colors.white.withOpacity(0.07),
+            ? Colors.greenAccent.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.07),
         border: Border.all(
           color: allGood
-              ? Colors.greenAccent.withOpacity(0.25)
-              : Colors.white.withOpacity(0.10),
+              ? Colors.greenAccent.withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.10),
           width: 0.8,
         ),
       ),
@@ -411,14 +411,14 @@ class _DevPageState extends State<DevPage> {
                     : Icons.task_alt_rounded,
                 size: 15,
                 color: allGood
-                    ? Colors.greenAccent.withOpacity(0.75)
-                    : Colors.white.withOpacity(0.65),
+                    ? Colors.greenAccent.withValues(alpha: 0.75)
+                    : Colors.white.withValues(alpha: 0.65),
               ),
               const SizedBox(width: 8),
               Text(
                 allGood ? 'Already up-to-date' : 'Backfill complete',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -446,7 +446,7 @@ class _DevPageState extends State<DevPage> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.45),
+            color: Colors.white.withValues(alpha: 0.45),
             fontSize: 11,
           ),
         ),
@@ -454,8 +454,8 @@ class _DevPageState extends State<DevPage> {
           value,
           style: TextStyle(
             color: highlight
-                ? Colors.white.withOpacity(0.9)
-                : Colors.white.withOpacity(0.6),
+                ? Colors.white.withValues(alpha: 0.9)
+                : Colors.white.withValues(alpha: 0.6),
             fontSize: 11,
             fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
           ),
@@ -469,9 +469,9 @@ class _DevPageState extends State<DevPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.redAccent.withOpacity(0.10),
+        color: Colors.redAccent.withValues(alpha: 0.10),
         border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
+          color: Colors.redAccent.withValues(alpha: 0.25),
           width: 0.8,
         ),
       ),
@@ -479,13 +479,13 @@ class _DevPageState extends State<DevPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.error_outline_rounded,
-              size: 14, color: Colors.redAccent.withOpacity(0.7)),
+              size: 14, color: Colors.redAccent.withValues(alpha: 0.7)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               error,
               style: TextStyle(
-                color: Colors.redAccent.withOpacity(0.8),
+                color: Colors.redAccent.withValues(alpha: 0.8),
                 fontSize: 11,
                 height: 1.4,
               ),

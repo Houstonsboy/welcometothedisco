@@ -191,9 +191,9 @@ class _HistoryHeader extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.10),
+                color: Colors.white.withValues(alpha: 0.10),
                 border: Border.all(
-                    color: Colors.white.withOpacity(0.18), width: 0.9),
+                    color: Colors.white.withValues(alpha: 0.18), width: 0.9),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
                   color: Colors.white, size: 16),
@@ -216,7 +216,7 @@ class _HistoryHeader extends StatelessWidget {
               Text(
                 isOwn ? 'Your voting history' : 'Voting history',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.40),
+                  color: Colors.white.withValues(alpha: 0.40),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -365,7 +365,7 @@ class _FeedItemState extends State<_FeedItem> {
                 child: Container(
                   width: 36, height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
@@ -374,7 +374,7 @@ class _FeedItemState extends State<_FeedItem> {
               Text(
                 'Share poll result',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
@@ -566,9 +566,9 @@ class _ActionPill extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(99),
-              color: Colors.black.withOpacity(onTap != null ? 0.52 : 0.28),
+              color: Colors.black.withValues(alpha: onTap != null ? 0.52 : 0.28),
               border: Border.all(
-                color: Colors.white.withOpacity(onTap != null ? 0.22 : 0.10),
+                color: Colors.white.withValues(alpha: onTap != null ? 0.22 : 0.10),
                 width: 0.8,
               ),
             ),
@@ -580,7 +580,7 @@ class _ActionPill extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(onTap != null ? 0.90 : 0.45),
+                    color: Colors.white.withValues(alpha: onTap != null ? 0.90 : 0.45),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
@@ -616,17 +616,17 @@ class _SheetOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: Colors.white.withOpacity(0.06),
-          border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
+          color: Colors.white.withValues(alpha: 0.06),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white.withOpacity(0.70), size: 18),
+            Icon(icon, color: Colors.white.withValues(alpha: 0.70), size: 18),
             const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.80),
+                color: Colors.white.withValues(alpha: 0.80),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -649,12 +649,12 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.how_to_vote_outlined,
-              size: 40, color: Colors.white.withOpacity(0.18)),
+              size: 40, color: Colors.white.withValues(alpha: 0.18)),
           const SizedBox(height: 12),
           Text(
             'No polls yet',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.45),
+              color: Colors.white.withValues(alpha: 0.45),
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -663,7 +663,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             'Vote in a versus to see your history here.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.28),
+              color: Colors.white.withValues(alpha: 0.28),
               fontSize: 12,
             ),
           ),
