@@ -55,5 +55,7 @@
 		<array>
 			<string>remote-notification</string>
 		</array>
+		<key>NSUserNotificationUsageDescription</key>
+		<string>Used to show the unread notification count on the app icon.</string>
 	</dict>
 </plist>

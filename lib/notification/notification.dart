@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/posts/post_view.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
@@ -108,30 +109,76 @@ class InviteNotification {
   }
 }
 
-/// One row in the inbox — either a follow or a collaboration invite.
+class MentionNotification {
+  final String id;
+  final String authorID;
+  final String authorName;
+  final String authorAvatar;
+  final String postID;
+  final DateTime? timestamp;
+  final bool read;
+
+  const MentionNotification({
+    required this.id,
+    required this.authorID,
+    required this.authorName,
+    required this.authorAvatar,
+    required this.postID,
+    this.timestamp,
+    required this.read,
+  });
+
+  factory MentionNotification.fromDoc(
+      QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return MentionNotification(
+      id: doc.id,
+      authorID: d['authorID'] as String? ?? '',
+      authorName: d['authorName'] as String? ?? '',
+      authorAvatar: d['author_avatar'] as String? ?? '',
+      postID: d['postID'] as String? ?? '',
+      timestamp: (d['timestamp'] as Timestamp?)?.toDate(),
+      read: d['read'] as bool? ?? false,
+    );
+  }
+}
+
+/// One row in the inbox — a follow, a collaboration invite, or a post mention.
 class InboxNotificationItem {
   final FollowNotification? follow;
   final InviteNotification? invite;
+  final MentionNotification? mention;
 
   InboxNotificationItem._follow(FollowNotification f)
       : follow = f,
-        invite = null;
+        invite = null,
+        mention = null;
 
   InboxNotificationItem._invite(InviteNotification i)
       : invite = i,
-        follow = null;
+        follow = null,
+        mention = null;
+
+  InboxNotificationItem._mention(MentionNotification m)
+      : mention = m,
+        follow = null,
+        invite = null;
 
   bool get isFollow => follow != null;
   bool get isInvite => invite != null;
+  bool get isMention => mention != null;
 
-  String get id => follow?.id ?? invite!.id;
-  bool get read => follow?.read ?? invite!.read;
+  String get id => follow?.id ?? invite?.id ?? mention!.id;
+  bool get read => follow?.read ?? invite?.read ?? mention!.read;
 
   factory InboxNotificationItem.fromDoc(
       QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final t = doc.data()['type'] as String?;
     if (t == 'invite') {
       return InboxNotificationItem._invite(InviteNotification.fromDoc(doc));
+    }
+    if (t == 'mention') {
+      return InboxNotificationItem._mention(MentionNotification.fromDoc(doc));
     }
     return InboxNotificationItem._follow(FollowNotification.fromDoc(doc));
   }
@@ -311,7 +358,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Follows and collaboration invites will show up here',
+              'Follows, collaboration invites, and post tags will show up here',
                   style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 12,
@@ -350,11 +397,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 ),
               );
             }
-            final inv = item.invite!;
-            return _InviteNotificationRow(
+            if (item.isInvite) {
+              final inv = item.invite!;
+              return _InviteNotificationRow(
+                key: ValueKey(item.id),
+                notification: inv,
+                assetPath: _assetPath(inv.authorAvatar),
+              );
+            }
+            final mention = item.mention!;
+            return _MentionNotificationRow(
               key: ValueKey(item.id),
-              notification: inv,
-              assetPath: _assetPath(inv.authorAvatar),
+              notification: mention,
+              assetPath: _assetPath(mention.authorAvatar),
             );
           },
         ),
@@ -784,6 +839,149 @@ class _InviteNotificationRow extends StatelessWidget {
               ],
             ),
           ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mention row: "author mentioned you in a post" ──────────────────────────────
+
+class _MentionNotificationRow extends StatefulWidget {
+  final MentionNotification notification;
+  final String? assetPath;
+
+  const _MentionNotificationRow({
+    super.key,
+    required this.notification,
+    this.assetPath,
+  });
+
+  @override
+  State<_MentionNotificationRow> createState() =>
+      _MentionNotificationRowState();
+}
+
+class _MentionNotificationRowState extends State<_MentionNotificationRow> {
+  bool _opening = false;
+
+  static String _displayName(String raw) {
+    var s = raw.trim();
+    if (s.startsWith('@')) s = s.substring(1);
+    return s.isEmpty ? 'Someone' : s;
+  }
+
+  Future<void> _openPost() async {
+    final postId = widget.notification.postID.trim();
+    if (postId.isEmpty || _opening) return;
+    setState(() => _opening = true);
+    try {
+      final post = await FirebaseService.getPostStream(postId).first;
+      if (!mounted) return;
+      if (post == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This post is no longer available',
+                style: TextStyle(fontSize: 13)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => PostDetailScreen(post: post)),
+      );
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.notification;
+    final isUnread = !n.read;
+    final authorLabel = _displayName(n.authorName);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: _openPost,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isUnread ? _kPurple.withValues(alpha: 0.13) : Colors.transparent,
+            border: isUnread
+                ? Border.all(color: _kPurple.withValues(alpha: 0.32), width: 1)
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _NotifAvatar(assetPath: widget.assetPath, isUnread: isUnread),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            authorLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                        if (isUnread) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: _kPurple,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'mentioned you in a post · ${_formatTime(n.timestamp)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.32),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_opening) ...[
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.6,
+                    color: Colors.white.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

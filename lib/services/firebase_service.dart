@@ -1549,6 +1549,7 @@ class FirebaseService {
     required String description,
     required List<Map<String, dynamic>> tracklist,
     RemixEnabled remixEnabled = RemixEnabled.same,
+    List<String> mentionedUids = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Not logged in');
@@ -1560,6 +1561,12 @@ class FirebaseService {
             ? _auth.currentUser!.displayName!.trim()
             : (_auth.currentUser?.email?.split('@').first ?? 'User'));
     final authorAvatar = profile?.avatarPath.trim() ?? '';
+
+    final recipients = mentionedUids
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty && u != uid)
+        .toSet()
+        .toList();
 
     final now = FieldValue.serverTimestamp();
     final ref = await _firestore.collection('posts').add({
@@ -1574,10 +1581,64 @@ class FirebaseService {
       'Remixcount':       0,
       'remixenabled':     remixEnabled.firestoreValue,
       'Tracklist':        tracklist,
+      'mentionedUids':    recipients,
       'Created_at':       now,
       'modified_at':      now,
     });
-    return ref.id;
+    final postId = ref.id;
+
+    if (recipients.isNotEmpty) {
+      try {
+        await _sendMentionNotifications(
+          authorUid: uid,
+          authorName: authorName,
+          authorAvatar: authorAvatar,
+          postId: postId,
+          recipientUids: recipients,
+        );
+      } catch (e) {
+        debugPrint('[FirebaseService] createPost → mention notifications failed: $e');
+      }
+    }
+
+    return postId;
+  }
+
+  // ── Write a durable inbox doc + push to each friend tagged in a post ───────
+  /// Uses auto-generated doc IDs — a user can be mentioned in many posts,
+  /// unlike follow (one doc per follower) or invite (one invite at a time).
+  static Future<void> _sendMentionNotifications({
+    required String authorUid,
+    required String authorName,
+    required String authorAvatar,
+    required String postId,
+    required List<String> recipientUids,
+  }) async {
+    final batch = _firestore.batch();
+    for (final recipientUid in recipientUids) {
+      final ref = _firestore
+          .collection('users')
+          .doc(recipientUid)
+          .collection('notifications')
+          .doc();
+      batch.set(ref, {
+        'type':          'mention',
+        'read':          false,
+        'timestamp':     FieldValue.serverTimestamp(),
+        'authorID':      authorUid,
+        'authorName':    authorName,
+        'author_avatar': authorAvatar,
+        'postID':        postId,
+      });
+    }
+    await batch.commit();
+
+    await NotificationService.notifyUsersMentionedInPost(
+      recipientUids: recipientUids,
+      authorUid: authorUid,
+      authorName: authorName,
+      postId: postId,
+    );
   }
 
   /// Live stream of all posts, ordered by newest first.

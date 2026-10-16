@@ -54,6 +54,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isPublishing = false;
   RemixEnabled _remixEnabled = RemixEnabled.same;
 
+  // ── Tagged friends (mentions) ────────────────────────────────────────────────
+  bool _mentionsSectionOpen = false;
+  final Set<String> _mentionedUids = {};
+
+  void _toggleMention(FriendEntry friend) {
+    setState(() {
+      if (!_mentionedUids.remove(friend.uid)) {
+        _mentionedUids.add(friend.uid);
+      }
+    });
+  }
+
   List<SpotifyTrack> get _visibleTracks =>
       (_trackFilterQuery.isNotEmpty && _trackSearchResults != null)
           ? _trackSearchResults!
@@ -212,6 +224,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 })
             .toList(),
         remixEnabled: _remixEnabled,
+        mentionedUids: _mentionedUids.toList(),
       );
       final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
       final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
@@ -352,6 +365,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       _RemixEnabledSelector(
                         value: _remixEnabled,
                         onChanged: (v) => setState(() => _remixEnabled = v),
+                      ),
+
+                      const SizedBox(height: 24),
+                      _Divider(),
+                      const SizedBox(height: 16),
+
+                      // ── Tag friends (mentions) ───────────────────────────
+                      _TagFriendsSection(
+                        selectedUids: _mentionedUids,
+                        onToggle: _toggleMention,
+                        isOpen: _mentionsSectionOpen,
+                        onToggleOpen: () => setState(
+                            () => _mentionsSectionOpen = !_mentionsSectionOpen),
                       ),
 
                       const SizedBox(height: 24),
@@ -1291,6 +1317,321 @@ class _RemixOption extends StatelessWidget {
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Tag friends (mentions) section ───────────────────────────────────────────
+class _TagFriendsSection extends StatelessWidget {
+  const _TagFriendsSection({
+    required this.selectedUids,
+    required this.onToggle,
+    required this.isOpen,
+    required this.onToggleOpen,
+  });
+
+  final Set<String> selectedUids;
+  final ValueChanged<FriendEntry> onToggle;
+  final bool isOpen;
+  final VoidCallback onToggleOpen;
+
+  static const _kCyan = Color(0xFF17B5EE);
+
+  @override
+  Widget build(BuildContext context) {
+    final header = GestureDetector(
+      onTap: onToggleOpen,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: _kCyan.withValues(alpha: 0.12),
+              border: Border.all(color: _kCyan.withValues(alpha: 0.35), width: 1),
+            ),
+            child: Icon(Icons.alternate_email_rounded,
+                color: _kCyan.withValues(alpha: 0.85), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tag friends',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (selectedUids.isEmpty)
+                  Text(
+                    'Tagged friends get notified',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.30),
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 11,
+                    ),
+                  )
+                else
+                  Text(
+                    '${selectedUids.length} friend${selectedUids.length == 1 ? '' : 's'} tagged',
+                    style: TextStyle(
+                      color: _kCyan.withValues(alpha: 0.75),
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Icon(
+            isOpen
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: Colors.white.withValues(alpha: 0.45),
+            size: 22,
+          ),
+        ],
+      ),
+    );
+
+    if (!isOpen) return header;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        const SizedBox(height: 12),
+        StreamBuilder<UserModel?>(
+          stream: FirebaseService.getCurrentUserStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+              );
+            }
+            final friends = snapshot.data?.friends ?? const <FriendEntry>[];
+            if (friends.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Add friends from Find Friends to tag them in posts',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.30),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+            return Column(
+              children: friends.map((f) {
+                return _FriendTagTile(
+                  key: ValueKey(f.uid),
+                  friend: f,
+                  selected: selectedUids.contains(f.uid),
+                  onTap: () => onToggle(f),
+                );
+              }).toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+// Legacy friend entries (added before `friends` stored a {uid, username,
+// avatar_path} map) only carry a uid — resolve the real profile on demand
+// instead of showing the raw uid.
+class _FriendTagTile extends StatefulWidget {
+  const _FriendTagTile({
+    super.key,
+    required this.friend,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final FriendEntry friend;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_FriendTagTile> createState() => _FriendTagTileState();
+}
+
+class _FriendTagTileState extends State<_FriendTagTile> {
+  static const _kCyan = Color(0xFF17B5EE);
+
+  UserModel? _resolved;
+  bool _resolving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FriendTagTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.friend.uid != widget.friend.uid) {
+      _resolved = null;
+      _resolveIfNeeded();
+    }
+  }
+
+  void _resolveIfNeeded() {
+    if (widget.friend.username.trim().isNotEmpty) return;
+    final uid = widget.friend.uid.trim();
+    if (uid.isEmpty) return;
+    setState(() => _resolving = true);
+    FirebaseService.getUserById(uid).then((user) {
+      if (!mounted) return;
+      setState(() {
+        _resolved = user;
+        _resolving = false;
+      });
+    });
+  }
+
+  String get _label {
+    final own = widget.friend.username.trim();
+    if (own.isNotEmpty) return own;
+    final resolved = _resolved?.username.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    if (_resolving) return '…';
+    return widget.friend.uid.isNotEmpty ? widget.friend.uid : '—';
+  }
+
+  String get _avatarPath {
+    final own = widget.friend.avatarPath.trim();
+    if (own.isNotEmpty) return own;
+    return _resolved?.avatarPath.trim() ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var label = _label;
+    if (!label.startsWith('@')) label = '@$label';
+    final selected = widget.selected;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? _kCyan.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
+          border: Border.all(
+            color: selected
+                ? _kCyan.withValues(alpha: 0.50)
+                : Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            _MentionFriendAvatar(avatarPath: _avatarPath, size: 32),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.80),
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: selected
+                  ? Container(
+                      key: const ValueKey('checked'),
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _kCyan,
+                      ),
+                      child: const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 13),
+                    )
+                  : Icon(
+                      key: const ValueKey('unchecked'),
+                      Icons.add_rounded,
+                      color: Colors.white.withValues(alpha: 0.25),
+                      size: 20,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MentionFriendAvatar extends StatelessWidget {
+  const _MentionFriendAvatar({required this.avatarPath, required this.size});
+
+  final String avatarPath;
+  final double size;
+
+  String? _assetPath(String avatarPath) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    if (p.startsWith('/')) return p.substring(1);
+    return 'assets/images/$p';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _assetPath(avatarPath);
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: Colors.white.withValues(alpha: 0.10),
+        child: asset != null
+            ? Image.asset(
+                asset,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(Icons.person_rounded,
+                    color: Colors.white.withValues(alpha: 0.6),
+                    size: size * 0.55),
+              )
+            : Icon(Icons.person_rounded,
+                color: Colors.white.withValues(alpha: 0.6), size: size * 0.55),
       ),
     );
   }

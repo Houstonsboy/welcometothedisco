@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -53,7 +55,10 @@ class NotificationService {
 
     // Persist token for the current user if already signed in.
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) await saveTokenForUser(uid);
+    if (uid != null) {
+      await saveTokenForUser(uid);
+      startBadgeSync();
+    }
 
     // Refresh token whenever FCM rotates it.
     _fcm.onTokenRefresh.listen((token) async {
@@ -167,7 +172,46 @@ class NotificationService {
     if (uid.isEmpty) return;
     await _db.collection('users').doc(uid).update({'fcm_token': FieldValue.delete()});
     await _fcm.deleteToken();
+    stopBadgeSync();
     debugPrint('[FCM] token cleared for $uid');
+  }
+
+  // ── OS app-icon badge ─────────────────────────────────────────────────────
+  static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _badgeSub;
+
+  /// Keeps the app-icon badge in sync with the signed-in user's unread
+  /// notification count for as long as the app process is alive. Call on
+  /// sign-in (also called from initialize() if already signed in).
+  static void startBadgeSync() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _badgeSub?.cancel();
+    _badgeSub = _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .listen((snap) => _updateBadge(snap.docs.length));
+  }
+
+  /// Call on sign-out so the badge doesn't keep showing the previous user's
+  /// unread count.
+  static void stopBadgeSync() {
+    _badgeSub?.cancel();
+    _badgeSub = null;
+    _updateBadge(0);
+  }
+
+  static Future<void> _updateBadge(int count) async {
+    try {
+      if (await AppBadgePlus.isSupported()) {
+        await AppBadgePlus.updateBadge(count);
+      }
+    } catch (e) {
+      debugPrint('[FCM] badge update failed: $e');
+    }
   }
 
   // ── Friend token lookup ───────────────────────────────────────────────────
@@ -187,15 +231,17 @@ class NotificationService {
         .where((id) => id.isNotEmpty)
         .toList();
 
-    if (friendUids.isEmpty) return [];
+    return _getTokensForUids(friendUids);
+  }
 
-    // Batch-fetch up to 30 friend docs (Firestore whereIn limit).
+  // Returns the stored FCM tokens for an arbitrary list of uids (batched to
+  // respect Firestore's 30-value whereIn limit).
+  static Future<List<String>> _getTokensForUids(List<String> uids) async {
+    if (uids.isEmpty) return [];
+
     final tokens = <String>[];
-    for (int i = 0; i < friendUids.length; i += 30) {
-      final batch = friendUids.sublist(
-        i,
-        (i + 30).clamp(0, friendUids.length),
-      );
+    for (int i = 0; i < uids.length; i += 30) {
+      final batch = uids.sublist(i, (i + 30).clamp(0, uids.length));
       final snap = await _db
           .collection('users')
           .where(FieldPath.documentId, whereIn: batch)
@@ -253,6 +299,31 @@ class NotificationService {
       title: '$senderName invited you to a versus',
       body: 'Join the battle',
       data: {'type': 'invite', 'id': versusId},
+    );
+  }
+
+  /// Call this right after FirebaseService._sendMentionNotifications() writes
+  /// the inbox docs, to also push to each tagged friend's device.
+  static Future<void> notifyUsersMentionedInPost({
+    required List<String> recipientUids,
+    required String authorUid,
+    required String authorName,
+    required String postId,
+  }) async {
+    final uids = recipientUids
+        .where((u) => u.isNotEmpty && u != authorUid)
+        .toSet()
+        .toList();
+    if (uids.isEmpty) return;
+
+    final tokens = await _getTokensForUids(uids);
+    if (tokens.isEmpty) return;
+
+    await _callSendFunction(
+      tokens: tokens,
+      title: '$authorName mentioned you in a post',
+      body: 'Tap to view the post',
+      data: {'type': 'mention', 'id': postId},
     );
   }
 

@@ -92,6 +92,7 @@ void _handleNotificationTap(Map<String, dynamic> data) {
       _openVersusFromNotification(navigator, id, data['versusType'] as String?);
       break;
     case 'post':
+    case 'mention':
       _openPostFromNotification(navigator, id);
       break;
   }
@@ -178,6 +179,7 @@ class _AuthGateState extends State<AuthGate> {
       _initializing = false;
       unawaited(FirebaseService.ensureCurrentUserProfileCached());
       unawaited(NotificationService.saveTokenForUser(current.uid));
+      NotificationService.startBadgeSync();
     }
     // Stream handles future sign-in / sign-out events.
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -190,6 +192,7 @@ class _AuthGateState extends State<AuthGate> {
       if (user != null) {
         unawaited(FirebaseService.ensureCurrentUserProfileCached());
         unawaited(NotificationService.saveTokenForUser(user.uid));
+        NotificationService.startBadgeSync();
       }
     });
   }

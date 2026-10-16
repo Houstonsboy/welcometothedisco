@@ -95,6 +95,7 @@ class PostModel {
   final int     remixCount;
   final RemixEnabled remixEnabled;
   final List<TrackItem> tracklist;
+  final List<String> mentionedUids;
   final Timestamp? createdAt;
   final Timestamp? modifiedAt;
 
@@ -111,6 +112,7 @@ class PostModel {
     this.remixCount  = 0,
     this.remixEnabled = RemixEnabled.same,
     this.tracklist   = const [],
+    this.mentionedUids = const [],
     this.createdAt,
     this.modifiedAt,
   });
@@ -134,6 +136,9 @@ class PostModel {
       tracklist:     rawTracklist
                        .map((t) => TrackItem.fromMap(t as Map<String, dynamic>))
                        .toList(),
+      mentionedUids: (data['mentionedUids'] as List<dynamic>?)
+                       ?.map((e) => e.toString())
+                       .toList() ?? const [],
       createdAt:     data['Created_at']   as Timestamp?,
       modifiedAt:    data['modified_at']  as Timestamp?,
     );
@@ -152,6 +157,7 @@ class PostModel {
     'Remixcount':      remixCount,
     'remixenabled':    remixEnabled.firestoreValue,
     'Tracklist':       tracklist.map((t) => t.toMap()).toList(),
+    'mentionedUids':   mentionedUids,
     'Created_at':      createdAt  ?? FieldValue.serverTimestamp(),
     'modified_at':     modifiedAt ?? FieldValue.serverTimestamp(),
   };
