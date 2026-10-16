@@ -276,7 +276,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   bool    _isBombLoading    = false;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
   String? _advanceOnTrackId;
-  String? _roundTrack1Id;
   String? _roundTrack2Id;
   bool    _roundTrack2Started = false;
 
@@ -291,9 +290,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
   late final AnimationController _slideCtrl;
   late final Animation<double>   _slideAnim;
   int _currentPage = 0; // 0 = user1 (author), 1 = me (collaborator)
-
-  // ── Pre-fill: if artist2 already stored in the doc ─────────────────────────
-  bool _artist2PreFilled = false;
 
   @override
   void initState() {
@@ -400,7 +396,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         );
         _myArtistImageUrl = details?.imageUrl;
         _mySelectedTracks = preselectedTracks;
-        _artist2PreFilled = true;
       });
       _fetchMyTopTracks(id);
     } catch (_) {}
@@ -461,7 +456,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           _soloSide2ImageUrl = d2?.imageUrl;
           _soloSide2SelectedTracks = tracks2;
         }
-        _artist2PreFilled = id1.isNotEmpty || id2.isNotEmpty;
       });
       if (id1.isNotEmpty) unawaited(_fetchMyTopTracks(id1));
       if (id2.isNotEmpty) unawaited(_fetchSide2TopTracks(id2));
@@ -558,7 +552,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       return;
     }
     setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
       final item = _soloSide2SelectedTracks.removeAt(oldIndex);
       _soloSide2SelectedTracks.insert(newIndex, item);
     });
@@ -733,7 +726,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     }
 
     setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
       final item = _mySelectedTracks.removeAt(oldIndex);
       _mySelectedTracks.insert(newIndex, item);
     });
@@ -835,7 +827,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       _nowPlayingSub?.cancel();
       _nowPlayingSub = null;
       _advanceOnTrackId = null;
-      _roundTrack1Id = null;
       _roundTrack2Id = null;
       _roundTrack2Started = false;
       setState(() {
@@ -869,7 +860,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     try {
       final played = await _api.playRoundTracks(t1.uri, uri2);
       if (!played) return;
-      _roundTrack1Id     = t1.id;
       _roundTrack2Id     = id2;
       _roundTrack2Started = false;
       _advanceOnTrackId  = id2;
@@ -903,7 +893,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           setState(() => _playingRound = null);
         }
         _advanceOnTrackId = null;
-        _roundTrack1Id    = null;
         _roundTrack2Id    = null;
         _roundTrack2Started = false;
       }
@@ -937,7 +926,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     _nowPlayingSub?.cancel();
     _nowPlayingSub      = null;
     _advanceOnTrackId   = null;
-    _roundTrack1Id      = null;
     _roundTrack2Id      = null;
     _roundTrack2Started = false;
     setState(() { _activeRound = roundIndex; _playingRound = null; });
@@ -1023,8 +1011,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
     }
     return 'CONFIRM & GO LIVE';
   }
-
-  String get _otherRoleLabel => _isAuthorEditor ? 'collab' : 'author';
 
   String get _otherUsernameForNotice {
     if (_isAuthorEditor) {
@@ -1419,7 +1405,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                         _trackSearchResults = null;
                         _trackFilterQuery = '';
                         _trackSearchCtrl.clear();
-                        _artist2PreFilled = false;
                       }),
             ),
           ),
@@ -1455,7 +1440,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                         _trackSearchResultsSide2 = null;
                         _trackFilterQuerySide2 = '';
                         _trackSearchCtrlSide2.clear();
-                        _artist2PreFilled = false;
                       }),
             ),
           ),
@@ -1492,7 +1476,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                             _trackSearchResults = null;
                             _trackFilterQuery = '';
                             _trackSearchCtrl.clear();
-                            _artist2PreFilled = false;
                           }),
                 )
               : _SlotChip(
@@ -1556,7 +1539,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                         _trackSearchResults = null;
                         _trackFilterQuery = '';
                         _trackSearchCtrl.clear();
-                        _artist2PreFilled = false;
                       }),
                     )
                   : _SlotChip(
@@ -1865,7 +1847,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 _trackSearchResults    = null;
                 _trackFilterQuery      = '';
                 _trackSearchCtrl.clear();
-                _artist2PreFilled      = false;
               });
             },
             child: Container(
@@ -1903,7 +1884,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
             itemCount: picked.length,
-            onReorder: _reorderMySelectedTracks,
+            onReorderItem: _reorderMySelectedTracks,
             itemBuilder: (context, i) {
               final track = picked[i];
               return _SelectedTrackTile(
@@ -2091,7 +2072,6 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
                 _trackSearchResultsSide2      = null;
                 _trackFilterQuerySide2        = '';
                 _trackSearchCtrlSide2.clear();
-                _artist2PreFilled             = false;
               });
             },
             child: Container(
@@ -2131,7 +2111,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
             itemCount: picked.length,
-            onReorder: _reorderSide2SelectedTracks,
+            onReorderItem: _reorderSide2SelectedTracks,
             itemBuilder: (context, i) {
               final track = picked[i];
               return _SelectedTrackTile(

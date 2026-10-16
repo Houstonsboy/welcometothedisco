@@ -37,8 +37,8 @@ class _AlbumInboxTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final leftTitle = versus.album1Title ?? versus.album1Name ?? 'Album 1';
-    final rightTitle = versus.album2Title ?? versus.album2Name ?? 'Album 2';
+    final leftTitle = versus.album1Title ?? versus.album1Name;
+    final rightTitle = versus.album2Title ?? versus.album2Name;
     final leftArtist = versus.album1ArtistName ?? 'Unknown artist';
     final rightArtist = versus.album2ArtistName ?? 'Unknown artist';
 

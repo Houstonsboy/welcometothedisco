@@ -563,7 +563,7 @@ class _CollapsiblePairsWidgetState extends State<_CollapsiblePairsWidget>
               ),
               SizeTransition(
                 sizeFactor: _anim,
-                axisAlignment: -1,
+                alignment: const Alignment(-1.0, -1.0),
                 child: Column(
                   children: [
                     Divider(

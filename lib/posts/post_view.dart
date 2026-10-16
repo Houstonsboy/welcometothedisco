@@ -207,14 +207,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     }
 
     // Load current user profile for the remix screen
-    final user = await FirebaseService.getCurrentUser();
+    await FirebaseService.getCurrentUser();
     if (!mounted) return;
-
-    final username = (user?.username.trim().isNotEmpty == true)
-        ? user!.username.trim()
-        : (FirebaseAuth.instance.currentUser?.displayName?.trim().isNotEmpty == true
-            ? FirebaseAuth.instance.currentUser!.displayName!.trim()
-            : 'you');
 
     Navigator.of(context).push(slideUpRoute(
       PostRemixLockeroom(post: post),
@@ -1222,7 +1216,7 @@ class _RemixesSectionState extends State<_RemixesSection>
                   // ── Expanded list ──────────────────────────────────────
                   SizeTransition(
                     sizeFactor: _anim,
-                    axisAlignment: -1,
+                    alignment: const Alignment(-1.0, -1.0),
                     child: Column(
                       children: [
                         Divider(

@@ -13,7 +13,6 @@ import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/widgets/expanding_search_bar.dart';
 
 const _kGreen      = AppTheme.createGreen;
-const _kPink       = AppTheme.gradientEnd;
 const _kTextPrimary = Colors.white;
 const _kTextMuted  = Color(0x66FFFFFF);
 const _kDivider    = Color(0x1AFFFFFF);

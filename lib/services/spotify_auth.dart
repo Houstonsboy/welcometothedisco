@@ -247,40 +247,6 @@ class SpotifyAuth {
     }
   }
 
-  // ── Refresh ───────────────────────────────────────────────────────────────
-
-  Future<String?> _refresh() async {
-    if (_refreshToken == null) return null;
-    debugPrint('[SpotifyAuth] Refreshing token...');
-
-    try {
-      final response = await http.post(
-        Uri.parse(_tokenEndpoint),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'refresh_token',
-          'refresh_token': _refreshToken!,
-          'client_id': _clientId,
-        },
-      );
-
-      if (response.statusCode != 200) {
-        debugPrint('[SpotifyAuth] Refresh failed ${response.statusCode}: ${response.body}');
-        await logout();
-        return null;
-      }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      _applyTokenResponse(json);
-      await _persistTokens();
-      debugPrint('[SpotifyAuth] Token refreshed OK');
-      return _accessToken;
-    } catch (e) {
-      debugPrint('[SpotifyAuth] Refresh error: $e');
-      return null;
-    }
-  }
-
   // ── Public token getter ───────────────────────────────────────────────────
 
   /// Returns a valid access token. Uses [TokenStorageService] (load + refresh if expired).

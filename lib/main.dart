@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -226,8 +225,6 @@ class _AppShellState extends State<_AppShell> {
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
   final SpotifyApi _spotifyApi = SpotifyApi();
 
-  SpotifyUser? _spotifyUser;
-  bool _spotifyLoading = true;
   bool _spotifyConnecting = false;
   int _selectedIndex = 0;
   DateTime? _lastBackExitPrompt;
@@ -259,7 +256,6 @@ class _AppShellState extends State<_AppShell> {
     } else {
       await _runSpotifyAuth();
     }
-    if (mounted) setState(() => _spotifyLoading = false);
   }
 
   Future<void> _runSpotifyAuth() async {
@@ -277,8 +273,8 @@ class _AppShellState extends State<_AppShell> {
   }
 
   Future<void> _loadSpotifyProfile() async {
-    final user = await _spotifyApi.getCurrentUser();
-    if (mounted) setState(() => _spotifyUser = user);
+    // Warms the token/profile cache; the result isn't shown by this widget.
+    await _spotifyApi.getCurrentUser();
   }
 
   void _onTabTapped(int index) {
@@ -561,37 +557,6 @@ class _GlassExitHintOverlay extends StatelessWidget {
                 )
               : const SizedBox.shrink(key: ValueKey('exit-hint-off')),
         ),
-      ),
-    );
-  }
-}
-
-/// Placeholder for nav tabs that haven't been built yet.
-class _ComingSoonPage extends StatelessWidget {
-  const _ComingSoonPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.sports_mma_rounded,
-            size: 52,
-            color: Colors.white.withValues(alpha: 0.18),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'COMING SOON',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 3,
-            ),
-          ),
-        ],
       ),
     );
   }

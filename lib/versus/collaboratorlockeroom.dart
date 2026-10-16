@@ -1378,7 +1378,7 @@ class _CollaboratorSearchScreenState extends State<CollaboratorSearchScreen>
               '[CollaboratorLockeroom] createCollaborationInvite failed: $e');
         }
 
-        if (!context.mounted) return;
+        if (!mounted) return;
         final ok = versusID != null;
         if (ok) {
           setState(() {
@@ -3724,7 +3724,6 @@ class _PostRemixScreenState extends State<PostRemixScreen>
       itemCount: _searchResults.length,
       itemBuilder: (ctx, i) {
         final artist = _searchResults[i];
-        final isSameAsPost = artist.id == post.artistID;
         return _ArtistCard(
           artist: artist,
           selectedSlot: _rightArtist?.id == artist.id ? 1 : null,

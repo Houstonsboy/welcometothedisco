@@ -702,7 +702,7 @@ class FirebaseService {
     final me         = results[0];
     final postAuthor = results[1];
 
-    final ref = await _firestore.collection('versus').add({
+    await _firestore.collection('versus').add({
       'type':           'collaborator',
       'status':         'open',
       'sourcePostID':   sourcePostID,

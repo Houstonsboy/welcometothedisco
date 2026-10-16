@@ -76,9 +76,6 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
   bool _isSearchingUsername       = false;
   bool _ignoreNextUsernameChange  = false;
 
-  /// Cached friends list from the stream so we can reorder it on selection.
-  List<FriendEntry> _cachedFriends = [];
-
   @override
   void initState() {
     super.initState();
@@ -424,8 +421,6 @@ class _InviteBannerSheetState extends State<_InviteBannerSheet>
         if (friends.isEmpty) {
           return _emptyStrip('Add friends from Find Friends to invite them here');
         }
-        // Cache for reorder and bubble selected to front
-        _cachedFriends = friends;
         return _buildFriendPillRow(
           _withSelectedFirst(friends, _selectedFriend),
         );

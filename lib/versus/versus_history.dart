@@ -421,10 +421,12 @@ class _FeedItemState extends State<_FeedItem> {
                   final file = await File(
                     '${tempDir.path}/wttd_poll.png',
                   ).writeAsBytes(bytes);
-                  await Share.shareXFiles(
-                    [XFile(file.path)],
-                    text: '${poll.entity1Name} vs ${poll.entity2Name}'
-                        ' — my poll on welcometothedisco',
+                  await SharePlus.instance.share(
+                    ShareParams(
+                      files: [XFile(file.path)],
+                      text: '${poll.entity1Name} vs ${poll.entity2Name}'
+                          ' — my poll on welcometothedisco',
+                    ),
                   );
                 },
               ),

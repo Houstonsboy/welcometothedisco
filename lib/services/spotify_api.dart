@@ -866,11 +866,11 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
     final album1 = results[0];
     final album2 = results[1];
 
-    versus.album1Title = album1?.title ?? versus.album1Name ?? versus.album1ID;
+    versus.album1Title = album1?.title ?? versus.album1Name;
     versus.album1ArtistName = album1?.artistName;
     versus.album1ImageUrl = album1?.imageUrl;
 
-    versus.album2Title = album2?.title ?? versus.album2Name ?? versus.album2ID;
+    versus.album2Title = album2?.title ?? versus.album2Name;
     versus.album2ArtistName = album2?.artistName;
     versus.album2ImageUrl = album2?.imageUrl;
 
