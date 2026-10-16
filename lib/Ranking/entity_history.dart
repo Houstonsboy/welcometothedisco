@@ -146,9 +146,9 @@ class _EntityOpponentHistoryScreenState
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.14),
+                color: Colors.white.withValues(alpha: 0.14),
                 border:
-                    Border.all(color: Colors.white.withOpacity(0.22), width: 0.9),
+                    Border.all(color: Colors.white.withValues(alpha: 0.22), width: 0.9),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -165,7 +165,7 @@ class _EntityOpponentHistoryScreenState
                 Text(
                   'VERSUS HISTORY',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 2.2,
@@ -176,7 +176,7 @@ class _EntityOpponentHistoryScreenState
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
+                    color: Colors.white.withValues(alpha: 0.65),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -267,9 +267,9 @@ class _VersusHistoryCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.9),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.9),
               ),
               child: Column(
                 children: [
@@ -299,7 +299,7 @@ class _VersusHistoryCard extends StatelessWidget {
                           '$myRounds – $theirRounds',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.72),
+                            color: Colors.white.withValues(alpha: 0.72),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -322,15 +322,15 @@ class _VersusHistoryCard extends StatelessWidget {
     final lost = outcome == 'lost';
     final label = won ? 'Won' : lost ? 'Lost' : 'Draw';
     final bg = won
-        ? Colors.green.withOpacity(0.22)
+        ? Colors.green.withValues(alpha: 0.22)
         : lost
-            ? Colors.red.withOpacity(0.22)
-            : Colors.white.withOpacity(0.16);
+            ? Colors.red.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.16);
     final border = won
-        ? Colors.greenAccent.withOpacity(0.75)
+        ? Colors.greenAccent.withValues(alpha: 0.75)
         : lost
-            ? Colors.redAccent.withOpacity(0.75)
-            : Colors.white.withOpacity(0.35);
+            ? Colors.redAccent.withValues(alpha: 0.75)
+            : Colors.white.withValues(alpha: 0.35);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -364,9 +364,9 @@ class _VersusHistoryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.20), width: 0.8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -381,7 +381,7 @@ class _VersusHistoryCard extends StatelessWidget {
                 errorBuilder: (_, __, ___) => Icon(
                   Icons.person_rounded,
                   size: 14,
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
             ),
@@ -393,7 +393,7 @@ class _VersusHistoryCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -420,10 +420,10 @@ class _VersusHistoryCard extends StatelessWidget {
             child: imageUrl.trim().isNotEmpty
                 ? Image.network(imageUrl, fit: BoxFit.cover)
                 : Container(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     child: Icon(
                       isArtist ? Icons.person_rounded : Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.75),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   ),
           ),
@@ -450,8 +450,8 @@ class _VersusHistoryCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: Colors.white.withOpacity(0.13),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        color: Colors.white.withValues(alpha: 0.13),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: const Text(
         'VS',
@@ -477,7 +477,7 @@ class _EmptyState extends StatelessWidget {
         'No versus history yet with $opponentName.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.72),
+          color: Colors.white.withValues(alpha: 0.72),
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),

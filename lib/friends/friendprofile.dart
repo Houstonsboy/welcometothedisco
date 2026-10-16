@@ -78,7 +78,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               size: 18,
             ),
             onPressed: () => Navigator.pop(context),
@@ -107,7 +107,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                       child: Text(
                         'Profile not found.',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withValues(alpha: 0.75),
                           fontSize: 14,
                         ),
                       ),
@@ -152,17 +152,17 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _kBlue.withOpacity(0.45),
-                _kPink.withOpacity(0.45),
+                _kBlue.withValues(alpha: 0.45),
+                _kPink.withValues(alpha: 0.45),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -181,12 +181,12 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 2.2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: _kPink.withOpacity(0.32),
+                          color: _kPink.withValues(alpha: 0.32),
                           blurRadius: 18,
                           spreadRadius: 1,
                         ),
@@ -229,13 +229,13 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
                 ],
               ),
               const SizedBox(height: 16),
-              Divider(color: Colors.white.withOpacity(0.12), height: 1),
+              Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
               const SizedBox(height: 14),
               if (user.bio.isNotEmpty)
                 Text(
                   user.bio,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.78),
+                    color: Colors.white.withValues(alpha: 0.78),
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     height: 1.55,
@@ -252,9 +252,9 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
       ),
       child: RichText(
         text: TextSpan(
@@ -270,7 +270,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
             TextSpan(
               text: label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
+                color: Colors.white.withValues(alpha: 0.65),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -282,10 +282,10 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
   }
 
   Widget _avatarFallback() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           size: 40,
         ),
       );
@@ -313,12 +313,12 @@ class _FriendFavoriteAlbumsWidget extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                _kBlue.withOpacity(0.35),
-                _kPink.withOpacity(0.35),
+                _kBlue.withValues(alpha: 0.35),
+                _kPink.withValues(alpha: 0.35),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withOpacity(0.16),
+              color: Colors.white.withValues(alpha: 0.16),
               width: 0.8,
             ),
           ),
@@ -329,7 +329,7 @@ class _FriendFavoriteAlbumsWidget extends StatelessWidget {
               Text(
                 'FAVORITE ALBUMS',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.8,
@@ -340,7 +340,7 @@ class _FriendFavoriteAlbumsWidget extends StatelessWidget {
                   ? Text(
                       'No favourite albums added yet.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.45),
+                        color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -377,10 +377,10 @@ class _FriendFavoriteAlbumsWidget extends StatelessWidget {
             child: hasImage
                 ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
                 : Container(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     child: Icon(
                       Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
           ),
@@ -423,10 +423,10 @@ class _FriendPollsCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.07),
+              color: Colors.white.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: Colors.white.withOpacity(0.14),
+                color: Colors.white.withValues(alpha: 0.14),
                 width: 0.9,
               ),
             ),
@@ -437,9 +437,9 @@ class _FriendPollsCard extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF17B5EE).withOpacity(0.15),
+                    color: const Color(0xFF17B5EE).withValues(alpha: 0.15),
                     border: Border.all(
-                      color: const Color(0xFF17B5EE).withOpacity(0.4),
+                      color: const Color(0xFF17B5EE).withValues(alpha: 0.4),
                       width: 0.9,
                     ),
                   ),
@@ -467,7 +467,7 @@ class _FriendPollsCard extends StatelessWidget {
                       Text(
                         'View their voting history',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.45),
+                          color: Colors.white.withValues(alpha: 0.45),
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -477,7 +477,7 @@ class _FriendPollsCard extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   size: 22,
                 ),
               ],

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/InboxedSongs.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
@@ -181,7 +180,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
               borderRadius: BorderRadius.circular(20.0),
               gradient: AppTheme.glassPanelGradient(),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 0.8,
               ),
             ),
@@ -206,7 +205,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                         Text(
                           'Could not load versus right now.',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -217,7 +216,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                           child: Text(
                             'Tap to retry',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 12,
                               decoration: TextDecoration.underline,
                             ),
@@ -237,7 +236,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                     child: Text(
                       'No versus entries yet.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -253,7 +252,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                     height: 0,
                     indent: 16,
                     endIndent: 16,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                   ),
                   itemBuilder: (context, index) {
                     return InboxedSongs(entry: entries[index]);
@@ -301,9 +300,9 @@ class _InboxRefreshButton extends StatelessWidget {
         height: 28,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(isRefreshing ? 0.06 : 0.10),
+          color: Colors.white.withValues(alpha: isRefreshing ? 0.06 : 0.10),
           border: Border.all(
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             width: 0.7,
           ),
         ),
@@ -313,7 +312,7 @@ class _InboxRefreshButton extends StatelessWidget {
             child: Icon(
               Icons.refresh_rounded,
               size: 15,
-              color: Colors.white.withOpacity(isRefreshing ? 0.45 : 0.70),
+              color: Colors.white.withValues(alpha: isRefreshing ? 0.45 : 0.70),
             ),
           ),
         ),

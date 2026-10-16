@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,14 +11,12 @@ import 'package:gal/gal.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/utils/pair_utils.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
-import 'package:welcometothedisco/versus/playable_album_cover.dart';
 import 'package:welcometothedisco/widgets/versus_share_card.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
@@ -101,7 +97,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   late final AnimationController _pulseController;
   late final AnimationController _slideController;
   late final Animation<double>   _pulseAnim;
-  late final Animation<double>   _slideAnim;
 
   // ── UI state ──────────────────────────────────────────────────────────────
   int  _selectedAlbum    = 0;
@@ -114,7 +109,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   int? _coverLoadingRoundIndex;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
   String? _advanceOnTrackId;
-  String? _currentRoundTrack1Id;
   String? _currentRoundTrack2Id;
   bool    _roundTrack2Started = false;
 
@@ -330,10 +324,12 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       '${tempDir.path}/wttd_album_versus.png',
     ).writeAsBytes(bytes);
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: '$_shareAlbum1Title vs $_shareAlbum2Title '
-          '— voted on welcometothedisco',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: '$_shareAlbum1Title vs $_shareAlbum2Title '
+            '— voted on welcometothedisco',
+      ),
     );
   }
 
@@ -361,7 +357,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    _slideAnim = CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic);
     _slideController.forward();
 
     // If the versus was created with full tracklists, pre-build albums from
@@ -381,7 +376,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         widget.versus.album1ID,
         widget.versus.album2ID,
       ).then((list) {
-        if (!mounted || list == null || list.length < 2) return;
+        if (!mounted || list.length < 2) return;
         if (list[0] != null && list[1] != null) {
           setState(() => _albums = list);
           _extractPalette(
@@ -398,7 +393,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       );
 
       _albumsFuture.then((list) {
-        if (!mounted || list == null || list.length < 2) return;
+        if (!mounted || list.length < 2) return;
         setState(() => _albums = list);
         _extractPalette(
           list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
@@ -412,7 +407,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   // ── Voter context + session restore ──────────────────────────────────────
   Future<void> _hydrateVoterContext() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
     if (uid.isEmpty) return;
 
     var cached = await UserProfileCacheService.readUser(expectedUid: uid);
@@ -602,9 +597,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       voterName:   _voterName,
       voterAvatar: _voterAvatar,
       entity1Id:   album1Id,
-      entity1Name: album1?.title ?? widget.versus.album1Name ?? '',
+      entity1Name: album1?.title ?? widget.versus.album1Name,
       entity2Id:   album2Id,
-      entity2Name: album2?.title ?? widget.versus.album2Name ?? '',
+      entity2Name: album2?.title ?? widget.versus.album2Name,
       trackDetails:          trackDetailsList,
       completionPercentage:  completion,
       unvotedCount:          unvoted,
@@ -648,14 +643,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     }
 
     _schedulePollSync();
-  }
-
-  void _onCommentChanged(int trackIndex, String text) {
-    final detail = _trackDetails[trackIndex];
-    if (detail != null) {
-      setState(() => detail.voterComment = text);
-      _schedulePollSync();
-    }
   }
 
   // ── Tracklist → SpotifyAlbumWithTracks ───────────────────────────────────
@@ -726,7 +713,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _nowPlayingSub?.cancel();
     _nowPlayingSub = null;
     _advanceOnTrackId = null;
-    _currentRoundTrack1Id = null;
     _currentRoundTrack2Id = null;
     _roundTrack2Started = false;
   }
@@ -736,7 +722,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.black.withOpacity(0.88),
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -793,7 +779,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         return false;
       }
       _hasVersusPlaybackStarted = true;
-      _currentRoundTrack1Id = t1.id;
       _currentRoundTrack2Id = t2.id;
       _roundTrack2Started = false;
       _advanceOnTrackId = t2.id;
@@ -913,8 +898,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   Widget _avatarFallback(double size) => Container(
     width: size, height: size,
-    color: Colors.white.withOpacity(0.2),
-    child: Icon(Icons.person_rounded, color: Colors.white.withOpacity(0.8), size: size * 0.55),
+    color: Colors.white.withValues(alpha: 0.2),
+    child: Icon(Icons.person_rounded, color: Colors.white.withValues(alpha: 0.8), size: size * 0.55),
   );
 
   @override
@@ -952,8 +937,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                   builder: (context, snapshot) {
               final album1   = snapshot.data?[0];
               final album2   = snapshot.data?[1];
-              final a1Title  = album1?.title    ?? widget.versus.album1Name ?? 'Album 1';
-              final a2Title  = album2?.title    ?? widget.versus.album2Name ?? 'Album 2';
+              final a1Title  = album1?.title    ?? widget.versus.album1Name;
+              final a2Title  = album2?.title    ?? widget.versus.album2Name;
               final a1Image  = album1?.imageUrl ?? widget.versus.album1ImageUrl;
               final a2Image  = album2?.imageUrl ?? widget.versus.album2ImageUrl;
               final a1Artist = album1?.artistName ?? widget.versus.album1ArtistName ?? '';
@@ -984,8 +969,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(0.18),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(0.45), width: 0.85),
+                                      color: _kSpotifyGreen.withValues(alpha: 0.18),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: 0.45), width: 0.85),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -997,7 +982,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                             shape: BoxShape.circle,
                                             color: _playingTrackIndex != null
                                                 ? _kSpotifyGreen
-                                                : Colors.white.withOpacity(0.35),
+                                                : Colors.white.withValues(alpha: 0.35),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -1008,7 +993,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                           Icon(
                                             Icons.graphic_eq_rounded,
                                             size: 14,
-                                            color: _kSpotifyGreen.withOpacity(0.95),
+                                            color: _kSpotifyGreen.withValues(alpha: 0.95),
                                           ),
                                         ],
                                       ],
@@ -1022,8 +1007,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.12 : 0.25),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.3 : 0.6), width: 1.2),
+                                      color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.12 : 0.25),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.3 : 0.6), width: 1.2),
                                     ),
                                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                                       if (_isBombLoading)
@@ -1043,7 +1028,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                 'Tap cover to play · tap title to select round & vote',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.42),
+                                  color: Colors.white.withValues(alpha: 0.42),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: 0.2,
@@ -1146,7 +1131,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     if (roundCount == 0) {
       return Center(
         child: Text('No tracks found.',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
       );
     }
     final cover1 = album1?.imageUrl ?? a1Image;
@@ -1247,10 +1232,10 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 coverUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
-                    Container(color: accentColor.withOpacity(0.25)),
+                    Container(color: accentColor.withValues(alpha: 0.25)),
               )
             else
-              Container(color: accentColor.withOpacity(0.25)),
+              Container(color: accentColor.withValues(alpha: 0.25)),
 
             // Bottom gradient
             Container(
@@ -1261,14 +1246,14 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                   stops: const [0.3, 1.0],
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.80),
+                    Colors.black.withValues(alpha: 0.80),
                   ],
                 ),
               ),
             ),
 
             // Lock dim
-            if (isLocked) Container(color: Colors.black.withOpacity(0.35)),
+            if (isLocked) Container(color: Colors.black.withValues(alpha: 0.35)),
 
             // Active border
             if (isActive)
@@ -1286,13 +1271,13 @@ class _VersusPlaygroundState extends State<VersusPlayground>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${roundIndex + 1}'.padLeft(2, '0'),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1319,7 +1304,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                 child: Icon(
                   Icons.lock_rounded,
                   size: 16,
-                  color: Colors.white.withOpacity(0.38),
+                  color: Colors.white.withValues(alpha: 0.38),
                 ),
               ),
 
@@ -1349,7 +1334,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isLocked
-                          ? Colors.white.withOpacity(0.45)
+                          ? Colors.white.withValues(alpha: 0.45)
                           : Colors.white,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -1371,12 +1356,12 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
                           color: isVotedForMe
-                              ? _kSpotifyGreen.withOpacity(0.85)
-                              : accentColor.withOpacity(0.30),
+                              ? _kSpotifyGreen.withValues(alpha: 0.85)
+                              : accentColor.withValues(alpha: 0.30),
                           border: Border.all(
                             color: isVotedForMe
                                 ? _kSpotifyGreen
-                                : accentColor.withOpacity(0.65),
+                                : accentColor.withValues(alpha: 0.65),
                             width: 0.8,
                           ),
                         ),
@@ -1389,7 +1374,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                   : Icons.how_to_vote_rounded,
                               size: 10,
                               color: isVoteDisabled
-                                  ? Colors.white.withOpacity(0.3)
+                                  ? Colors.white.withValues(alpha: 0.3)
                                   : Colors.white,
                             ),
                             const SizedBox(width: 3),
@@ -1399,7 +1384,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                                 color: isVoteDisabled
-                                    ? Colors.white.withOpacity(0.3)
+                                    ? Colors.white.withValues(alpha: 0.3)
                                     : Colors.white,
                               ),
                             ),
@@ -1429,8 +1414,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.15),
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.15),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
           ),
@@ -1453,9 +1438,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha: 0.25),
                 width: 0.8,
               ),
             ),
@@ -1507,7 +1492,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_color1, _color2]),
-              boxShadow: [BoxShadow(color: _color2.withOpacity(0.5), blurRadius: 18, spreadRadius: 2)],
+              boxShadow: [BoxShadow(color: _color2.withValues(alpha: 0.5), blurRadius: 18, spreadRadius: 2)],
             ),
             child: const Center(child: Text('VS', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5))),
           ),
@@ -1543,7 +1528,7 @@ class _ShareSheet extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1552,7 +1537,7 @@ class _ShareSheet extends StatelessWidget {
             Text(
               'Share result',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -1591,9 +1576,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1601,14 +1586,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.photo_library_outlined,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Save to gallery',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1626,9 +1611,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1636,14 +1621,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.link_rounded,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Copy link',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1683,8 +1668,8 @@ class _ShareButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withOpacity(0.15),
-              border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+              color: color.withValues(alpha: 0.15),
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
             ),
             child: Icon(icon, color: color, size: 22),
           ),
@@ -1692,31 +1677,12 @@ class _ShareButton extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SwipeDot extends StatelessWidget {
-  final bool  isActive;
-  final Color color;
-  const _SwipeDot({required this.isActive, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      width: isActive ? 20 : 6, height: 6,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -1750,9 +1716,9 @@ class _AlbumCard extends StatelessWidget {
           child: imageUrl != null && imageUrl!.isNotEmpty
               ? Image.network(imageUrl!, fit: BoxFit.cover)
               : Container(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   child: Icon(Icons.album_rounded, size: 40,
-                      color: Colors.white.withOpacity(0.3)),
+                      color: Colors.white.withValues(alpha: 0.3)),
                 ),
         ),
         const SizedBox(height: 8),
@@ -1761,7 +1727,7 @@ class _AlbumCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
                   fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
                 )),
             if (artist.isNotEmpty) ...[
@@ -1769,8 +1735,8 @@ class _AlbumCard extends StatelessWidget {
               Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isSelected
-                        ? accentColor.withOpacity(0.9)
-                        : Colors.white.withOpacity(0.35),
+                        ? accentColor.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.35),
                     fontSize: 11, fontWeight: FontWeight.w500,
                   )),
             ],
@@ -1780,8 +1746,8 @@ class _AlbumCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: accentColor.withOpacity(0.22),
-                  border: Border.all(color: accentColor.withOpacity(0.55), width: 0.9),
+                  color: accentColor.withValues(alpha: 0.22),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.55), width: 0.9),
                 ),
                 child: Text('$voteCount',
                     style: TextStyle(
@@ -1797,355 +1763,3 @@ class _AlbumCard extends StatelessWidget {
   }
 }
 
-// ── Track Page ────────────────────────────────────────────────────────────────
-class _TrackPage extends StatelessWidget {
-  final SpotifyAlbumWithTracks? album;
-  final int     albumIndex;
-  final String  fallbackTitle;
-  final String  fallbackArtist;
-  final String? fallbackImageUrl;
-  final Animation<double> slideAnim;
-  final Color   accentColor;
-  final int     activeTrackIndex;
-  final int?    playingTrackIndex;
-  final int?    coverLoadingRoundIndex;
-  final int     votableRoundCount;
-  final Map<int, int> votesByIndex;
-  final void Function(int albumIndex)              onVote;
-  final void Function(int trackIndex, int albumIndex) onCoverTap;
-  final void Function(int trackIndex, int albumIndex) onTitleTap;
-  final TextEditingController Function(int)        getCommentCtrl;
-  final void Function(int roundIndex, String text) onCommentChanged;
-  final ScrollController? scrollController;
-
-  const _TrackPage({
-    required this.album,
-    required this.albumIndex,
-    required this.fallbackTitle,
-    required this.fallbackArtist,
-    required this.fallbackImageUrl,
-    required this.slideAnim,
-    required this.accentColor,
-    required this.activeTrackIndex,
-    this.playingTrackIndex,
-    this.coverLoadingRoundIndex,
-    required this.votableRoundCount,
-    required this.votesByIndex,
-    this.scrollController,
-    required this.onVote,
-    required this.onCoverTap,
-    required this.onTitleTap,
-    required this.getCommentCtrl,
-    required this.onCommentChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tracks = album?.tracks ?? <SpotifyAlbumTrack>[];
-
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
-      physics: const BouncingScrollPhysics(),
-      itemCount: tracks.isEmpty ? 2 : tracks.length + 1,
-      itemBuilder: (context, index) {
-        // Header
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12, top: 4),
-            child: Row(children: [
-              Container(width: 3, height: 16,
-                  decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(99))),
-              const SizedBox(width: 10),
-              Text('TRACKS', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
-              const SizedBox(width: 8),
-              Text('${tracks.length}', style: TextStyle(color: accentColor.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w700)),
-            ]),
-          );
-        }
-
-        if (tracks.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Text(album == null ? 'Spotify data unavailable.' : 'No tracks found.',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
-          );
-        }
-
-        final trackIndex   = index - 1;
-        if (trackIndex >= tracks.length) return const SizedBox.shrink();
-        final track        = tracks[trackIndex];
-        final isActive     = trackIndex == activeTrackIndex;
-        final isPast       = trackIndex <  activeTrackIndex;
-        final isLocked     = trackIndex >  activeTrackIndex;
-        final isBonusIndex = trackIndex >= votableRoundCount;
-
-        final votedAlbum      = votesByIndex[trackIndex];
-        final isVotedForMe    = votedAlbum == albumIndex;
-        final isVoteDisabled  = isBonusIndex || (votedAlbum != null && votedAlbum != albumIndex);
-
-        return AnimatedBuilder(
-          animation: slideAnim,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(0, 24 * (1 - slideAnim.value) * math.max(0, 1 - trackIndex * 0.05)),
-            child: Opacity(opacity: slideAnim.value.clamp(0.0, 1.0), child: child),
-          ),
-          child: _TrackRow(
-            key:               ValueKey('album-$albumIndex-track-$trackIndex'),
-            track:             track,
-            albumImageUrl:     album?.imageUrl ?? fallbackImageUrl,
-            index:             trackIndex,
-            accentColor:       accentColor,
-            isLast:            trackIndex == tracks.length - 1,
-            isActive:          isActive,
-            isPast:            isPast,
-            isLocked:          isLocked,
-            showVoteButton:    isActive || isVotedForMe,
-            isVoted:           isVotedForMe,
-            isVoteDisabled:    isVoteDisabled,
-            commentController: getCommentCtrl(trackIndex),
-            onVote:            isActive && !isBonusIndex ? () => onVote(albumIndex) : null,
-            onCommentChanged:  (text) => onCommentChanged(trackIndex, text),
-            onCoverTap:        () => onCoverTap(trackIndex, albumIndex),
-            onTitleTap:        () => onTitleTap(trackIndex, albumIndex),
-            isRoundPlaying:    playingTrackIndex == trackIndex,
-            isCoverLoading:    coverLoadingRoundIndex == trackIndex,
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Track Row ─────────────────────────────────────────────────────────────────
-class _TrackRow extends StatelessWidget {
-  final SpotifyAlbumTrack          track;
-  final String?                    albumImageUrl;
-  final int                        index;
-  final Color                      accentColor;
-  final bool                       isLast, isActive, isPast, isLocked;
-  final bool                       showVoteButton, isVoted, isVoteDisabled;
-  final TextEditingController      commentController;
-  final VoidCallback?              onVote;
-  final void Function(String)      onCommentChanged;
-  final VoidCallback               onCoverTap;
-  final VoidCallback               onTitleTap;
-  final bool                       isRoundPlaying;
-  final bool                       isCoverLoading;
-
-  const _TrackRow({
-    super.key,
-    required this.track,
-    this.albumImageUrl,
-    required this.index,
-    required this.accentColor,
-    required this.commentController,
-    required this.onCommentChanged,
-    required this.onCoverTap,
-    required this.onTitleTap,
-    this.isLast         = false,
-    this.isActive       = false,
-    this.isPast         = false,
-    this.isLocked       = false,
-    this.showVoteButton = false,
-    this.isVoted        = false,
-    this.isVoteDisabled = false,
-    this.isRoundPlaying = false,
-    this.isCoverLoading = false,
-    this.onVote,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final numberColor = isActive
-        ? accentColor
-        : isPast ? accentColor.withOpacity(0.5) : Colors.white.withOpacity(0.42);
-    final titleOpacity = isPast
-        ? 0.58
-        : isLocked
-            ? 0.46
-            : 0.68;
-    final artistOpacity = titleOpacity * 0.62;
-    final coverImageUrl = albumImageUrl?.trim() ?? '';
-
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 300),
-      opacity: isLocked ? 0.62 : 1.0,
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
-          child: Column(children: [
-            Row(children: [
-              // Track number / state icon
-              SizedBox(width: 32,
-                child: isPast
-                    ? Icon(Icons.check_rounded, size: 15, color: accentColor.withOpacity(0.5))
-                    : isLocked
-                        ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withOpacity(0.45))
-                        : Text('${track.trackNumber}'.padLeft(2, '0'),
-                            style: TextStyle(color: numberColor, fontSize: 12, fontWeight: FontWeight.w700,
-                                fontFeatures: const [FontFeature.tabularFigures()])),
-              ),
-              const SizedBox(width: 8),
-
-              if (coverImageUrl.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: PlayableAlbumCover(
-                    imageUrl: coverImageUrl,
-                    size: 40,
-                    borderRadius: 6,
-                    accentColor: accentColor,
-                    isPlaying: isRoundPlaying,
-                    isLoading: isCoverLoading,
-                    emphasized: isRoundPlaying,
-                    onTap: onCoverTap,
-                  ),
-                ),
-
-              // Title tap selects round for voting/commenting without playback.
-              Expanded(
-                child: GestureDetector(
-                  onTap: onTitleTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isActive ? 10 : 4,
-                      vertical: isActive ? 7 : 4,
-                    ),
-                    decoration: isActive
-                        ? BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                accentColor.withOpacity(0.24),
-                                Colors.white.withOpacity(0.08),
-                              ],
-                            ),
-                            border: Border.all(
-                              color: accentColor.withOpacity(0.50),
-                              width: 0.9,
-                            ),
-                          )
-                        : null,
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: isActive ? Colors.white : Colors.white.withOpacity(titleOpacity),
-                              fontSize: isActive ? 15 : 14,
-                              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
-                              letterSpacing: isActive ? 0 : -0.1,
-                              height: 1.15,
-                              shadows: isActive
-                                  ? [
-                                      Shadow(
-                                        color: accentColor.withOpacity(0.40),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : null)),
-                      if (track.artistName.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(track.artistName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: isActive
-                                    ? accentColor.withOpacity(0.95)
-                                    : Colors.white.withOpacity(artistOpacity),
-                                fontSize: isActive ? 12.5 : 12,
-                                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                                height: 1.1)),
-                      ],
-                    ]),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-                  // Vote button
-                  if (showVoteButton) ...[
-                    GestureDetector(
-                      onTap: isVoteDisabled ? null : onVote,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99),
-                          color: isVoted
-                              ? _kSpotifyGreen.withOpacity(0.5)
-                              : isVoteDisabled
-                                  ? Colors.white.withOpacity(0.06)
-                                  : _kSpotifyGreen.withOpacity(0.25),
-                          border: Border.all(
-                            color: isVoted ? _kSpotifyGreen
-                                : isVoteDisabled ? Colors.white.withOpacity(0.1)
-                                : _kSpotifyGreen.withOpacity(0.6),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(isVoted ? Icons.check_rounded : Icons.how_to_vote_rounded,
-                              size: 14,
-                              color: isVoteDisabled ? Colors.white.withOpacity(0.2)
-                                  : isVoted ? Colors.white : _kSpotifyGreen),
-                          const SizedBox(width: 4),
-                          Text(isVoted ? 'Voted' : 'Vote',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5,
-                                  color: isVoteDisabled ? Colors.white.withOpacity(0.2)
-                                      : isVoted ? Colors.white : _kSpotifyGreen)),
-                        ]),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-
-                  // Duration on non-active rows; NOTE badge on voted rows
-                  if (isVoted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99), color: accentColor.withOpacity(0.75)),
-                      child: const Text('NOTE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
-                    )
-                  else if (!isActive)
-                    Text(track.durationFormatted,
-                        style: TextStyle(color: Colors.white.withOpacity(titleOpacity * 0.5), fontSize: 12,
-                            fontWeight: FontWeight.w500, fontFeatures: const [FontFeature.tabularFigures()])),
-                ]),
-
-                // Comment field — visible when voted
-                if (isVoted) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(9),
-                      color: Colors.white.withOpacity(0.12),
-                      border: Border.all(color: Colors.white.withOpacity(0.20), width: 0.8),
-                    ),
-                    child: TextField(
-                      controller: commentController,
-                      onChanged: onCommentChanged,
-                      minLines: 1, maxLines: 3,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Disclaimer...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.42), fontSize: 12),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      ),
-                    ),
-                  ),
-                ],
-              ]),
-            ),
-        if (!isLast)
-          Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
-      ]),
-    );
-  }
-}

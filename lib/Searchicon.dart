@@ -10,7 +10,7 @@ import 'package:welcometothedisco/theme/app_theme.dart';
 // ─── Tappable search bar ──────────────────────────────────────────────────────
 
 class SearchIcon extends StatelessWidget {
-  const SearchIcon({Key? key}) : super(key: key);
+  const SearchIcon({super.key});
 
   void _open(BuildContext context) {
     showGeneralDialog<void>(
@@ -45,8 +45,8 @@ class SearchIcon extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withOpacity(0.13),
-                    Colors.white.withOpacity(0.07),
+                    Colors.white.withValues(alpha: 0.13),
+                    Colors.white.withValues(alpha: 0.07),
                   ],
                 ),
               ),
@@ -54,14 +54,14 @@ class SearchIcon extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                     size: 18,
                   ),
                   const SizedBox(width: 10),
                   Text(
                     'Search artists or albums…',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.36),
+                      color: Colors.white.withValues(alpha: 0.36),
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
@@ -203,7 +203,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
               onTap: () => Navigator.of(context).pop(),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-                child: Container(color: Colors.black.withOpacity(0.60)),
+                child: Container(color: Colors.black.withValues(alpha: 0.60)),
               ),
             ),
           ),
@@ -238,7 +238,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                color: Colors.white.withOpacity(0.13),
+                color: Colors.white.withValues(alpha: 0.13),
               ),
               child: TextField(
                 controller: _ctrl,
@@ -255,7 +255,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
                       ? 'Search Spotify artists…'
                       : 'Search Spotify albums…',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.32),
+                    color: Colors.white.withValues(alpha: 0.32),
                     fontSize: 15,
                   ),
                   border: InputBorder.none,
@@ -268,13 +268,13 @@ class _SearchOverlayState extends State<_SearchOverlay> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white.withOpacity(0.50),
+                              color: Colors.white.withValues(alpha: 0.50),
                             ),
                           ),
                         )
                       : Icon(
                           Icons.search_rounded,
-                          color: Colors.white.withOpacity(0.40),
+                          color: Colors.white.withValues(alpha: 0.40),
                           size: 20,
                         ),
                   suffixIcon: _ctrl.text.isNotEmpty
@@ -285,7 +285,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
                           },
                           child: Icon(
                             Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.35),
+                            color: Colors.white.withValues(alpha: 0.35),
                             size: 18,
                           ),
                         )
@@ -304,21 +304,21 @@ class _SearchOverlayState extends State<_SearchOverlay> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.white.withOpacity(0.13),
+                color: Colors.white.withValues(alpha: 0.13),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     _artistMode ? Icons.person_rounded : Icons.album_rounded,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     size: 15,
                   ),
                   const SizedBox(width: 5),
                   Text(
                     _artistMode ? 'Artist' : 'Album',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.90),
+                      color: Colors.white.withValues(alpha: 0.90),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -338,7 +338,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
         child: Text(
           'Search Spotify artists & albums',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.28),
+            color: Colors.white.withValues(alpha: 0.28),
             fontSize: 14,
           ),
         ),
@@ -349,7 +349,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
         child: Text(
           'No results',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 14,
           ),
         ),
@@ -391,7 +391,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.42),
+                          color: Colors.white.withValues(alpha: 0.42),
                           fontSize: 12,
                         ),
                       ),
@@ -400,7 +400,7 @@ class _SearchOverlayState extends State<_SearchOverlay> {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white.withOpacity(0.22),
+                  color: Colors.white.withValues(alpha: 0.22),
                   size: 18,
                 ),
               ],
@@ -460,10 +460,10 @@ class _Thumb extends StatelessWidget {
     return Container(
       width: 46,
       height: 46,
-      color: AppTheme.gradientStart.withOpacity(0.25),
+      color: AppTheme.gradientStart.withValues(alpha: 0.25),
       child: Icon(
         circle ? Icons.person_rounded : Icons.album_rounded,
-        color: Colors.white.withOpacity(0.50),
+        color: Colors.white.withValues(alpha: 0.50),
         size: 22,
       ),
     );

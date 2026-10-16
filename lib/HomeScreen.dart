@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
           child: Container(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Connecting to Spotify…\nComplete login in the browser.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 15,
                         height: 1.4,
                       ),
@@ -178,7 +178,7 @@ class SpotifyHeader extends StatelessWidget {
   final VoidCallback onConnect;
   final bool compact;
 
-  const SpotifyHeader({
+  const SpotifyHeader({super.key, 
     required this.user,
     required this.loading,
     required this.connecting,
@@ -204,12 +204,12 @@ class SpotifyHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(compact ? 20 : 16),
               gradient: AppTheme.glassPanelGradient(opacity: 0.40),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 0.8,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 20,
                   offset: const Offset(0, 6),
                 ),
@@ -224,14 +224,14 @@ class SpotifyHeader extends StatelessWidget {
                         height: compact ? 16 : 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                       SizedBox(width: compact ? 8 : 12),
                       Text(
                         compact ? '…' : 'Loading Spotify…',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha: 0.85),
                           fontSize: compact ? 12 : 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -254,10 +254,10 @@ class SpotifyHeader extends StatelessWidget {
                                 : Container(
                                     width: size,
                                     height: size,
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     child: Icon(
                                       Icons.person_rounded,
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(alpha: 0.8),
                                       size: compact ? 18 : 24,
                                     ),
                                   ),
@@ -272,7 +272,7 @@ class SpotifyHeader extends StatelessWidget {
                                   Text(
                                     'Spotify',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Colors.white.withValues(alpha: 0.6),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
@@ -309,7 +309,7 @@ class SpotifyHeader extends StatelessWidget {
                             ),
                           Icon(
                             Icons.check_circle_rounded,
-                            color: const Color(0xFF1DB954).withOpacity(0.95),
+                            color: const Color(0xFF1DB954).withValues(alpha: 0.95),
                             size: compact ? 18 : 22,
                           ),
                         ],
@@ -321,14 +321,14 @@ class SpotifyHeader extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.queue_music_rounded,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               size: compact ? 22 : 28,
                             ),
                             SizedBox(width: compact ? 6 : 12),
                             Text(
                               compact ? 'Connect' : 'Connect to Spotify',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: compact ? 12 : 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -336,7 +336,7 @@ class SpotifyHeader extends StatelessWidget {
                             if (!compact)
                               Icon(
                                 Icons.login_rounded,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                                 size: 22,
                               ),
                           ],
@@ -607,19 +607,19 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: isSelected
-                ? Colors.white.withOpacity(0.22)
-                : Colors.white.withOpacity(0.08),
+                ? Colors.white.withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.08),
             border: Border.all(
               color: isSelected
-                  ? Colors.white.withOpacity(0.4)
-                  : Colors.white.withOpacity(0.18),
+                  ? Colors.white.withValues(alpha: 0.4)
+                  : Colors.white.withValues(alpha: 0.18),
               width: 0.8,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(isSelected ? 0.95 : 0.7),
+              color: Colors.white.withValues(alpha: isSelected ? 0.95 : 0.7),
               fontSize: 13,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
@@ -691,12 +691,12 @@ class _CreateButton extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          _purple.withOpacity(0.5),
-                          _pink.withOpacity(0.4),
+                          _purple.withValues(alpha: 0.5),
+                          _pink.withValues(alpha: 0.4),
                         ],
                       ),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 0.8,
                       ),
                     ),
@@ -751,27 +751,27 @@ class _CreateOptionsPopup extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _purple.withOpacity(0.55),
-                  _pink.withOpacity(0.45),
+                  _purple.withValues(alpha: 0.55),
+                  _pink.withValues(alpha: 0.45),
                 ],
               ),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _purple.withOpacity(0.35),
+                  color: _purple.withValues(alpha: 0.35),
                   blurRadius: 40,
                   offset: const Offset(-8, 8),
                 ),
                 BoxShadow(
-                  color: _pink.withOpacity(0.30),
+                  color: _pink.withValues(alpha: 0.30),
                   blurRadius: 40,
                   offset: const Offset(8, 16),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.30),
+                  color: Colors.black.withValues(alpha: 0.30),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -804,7 +804,7 @@ class _CreateOptionsPopup extends StatelessWidget {
                         color: _pink,
                         boxShadow: [
                           BoxShadow(
-                            color: _pink.withOpacity(0.8),
+                            color: _pink.withValues(alpha: 0.8),
                             blurRadius: 6,
                           ),
                         ],
@@ -814,7 +814,7 @@ class _CreateOptionsPopup extends StatelessWidget {
                     Text(
                       'CREATE',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 2.4,
@@ -826,10 +826,10 @@ class _CreateOptionsPopup extends StatelessWidget {
                       height: 6,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _purple.withOpacity(0.8),
+                        color: _purple.withValues(alpha: 0.8),
                         boxShadow: [
                           BoxShadow(
-                            color: _purple.withOpacity(0.8),
+                            color: _purple.withValues(alpha: 0.8),
                             blurRadius: 6,
                           ),
                         ],
@@ -913,18 +913,18 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           color: _hovered
-              ? Colors.white.withOpacity(0.18)
-              : Colors.white.withOpacity(0.08),
+              ? Colors.white.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.08),
           border: Border.all(
             color: _hovered
-                ? widget.glowColor.withOpacity(0.6)
-                : Colors.white.withOpacity(0.10),
+                ? widget.glowColor.withValues(alpha: 0.6)
+                : Colors.white.withValues(alpha: 0.10),
             width: 1.0,
           ),
           boxShadow: _hovered
               ? [
                   BoxShadow(
-                    color: widget.glowColor.withOpacity(0.4),
+                    color: widget.glowColor.withValues(alpha: 0.4),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),
@@ -943,13 +943,13 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    widget.glowColor.withOpacity(0.7),
-                    widget.glowColor.withOpacity(0.4),
+                    widget.glowColor.withValues(alpha: 0.7),
+                    widget.glowColor.withValues(alpha: 0.4),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.glowColor.withOpacity(0.45),
+                    color: widget.glowColor.withValues(alpha: 0.45),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -957,7 +957,7 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
               ),
               child: Icon(
                 widget.icon,
-                color: Colors.white.withOpacity(0.95),
+                color: Colors.white.withValues(alpha: 0.95),
                 size: 16,
               ),
             ),
@@ -965,7 +965,7 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
             Text(
               widget.label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.92),
+                color: Colors.white.withValues(alpha: 0.92),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.4,
@@ -974,7 +974,7 @@ class _GlowOptionTileState extends State<_GlowOptionTile> {
             const Spacer(),
             Icon(
               Icons.arrow_forward_ios_rounded,
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               size: 12,
             ),
           ],
@@ -1050,7 +1050,7 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
           boxShadow: _focused
               ? [
                   BoxShadow(
-                    color: AppTheme.gradientStart.withOpacity(0.55),
+                    color: AppTheme.gradientStart.withValues(alpha: 0.55),
                     blurRadius: 18,
                     spreadRadius: 1,
                   ),
@@ -1070,14 +1070,14 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withOpacity(_focused ? 0.22 : 0.12),
-                    Colors.white.withOpacity(_focused ? 0.12 : 0.05),
+                    Colors.white.withValues(alpha: _focused ? 0.22 : 0.12),
+                    Colors.white.withValues(alpha: _focused ? 0.12 : 0.05),
                   ],
                 ),
                 border: Border.all(
                   color: _focused
-                      ? Colors.white.withOpacity(0.50)
-                      : Colors.white.withOpacity(0.15),
+                      ? Colors.white.withValues(alpha: 0.50)
+                      : Colors.white.withValues(alpha: 0.15),
                   width: _focused ? 1.2 : 0.8,
                 ),
               ),
@@ -1099,7 +1099,7 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                           ? 'Search artists…'
                           : 'Search albums…',
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.32),
+                        color: Colors.white.withValues(alpha: 0.32),
                         fontSize: 15,
                       ),
                       border: InputBorder.none,
@@ -1112,14 +1112,14 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white.withOpacity(0.50),
+                                  color: Colors.white.withValues(alpha: 0.50),
                                 ),
                               ),
                             )
                           : Icon(
                               Icons.search_rounded,
-                              color: Colors.white.withOpacity(
-                                  _focused ? 0.60 : 0.38),
+                              color: Colors.white.withValues(
+                                  alpha: _focused ? 0.60 : 0.38),
                               size: 20,
                             ),
                     ),
@@ -1137,7 +1137,7 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          color: Colors.white.withOpacity(0.12),
+                          color: Colors.white.withValues(alpha: 0.12),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1146,14 +1146,14 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                               widget.artistMode
                                   ? Icons.person_rounded
                                   : Icons.album_rounded,
-                              color: Colors.white.withOpacity(0.80),
+                              color: Colors.white.withValues(alpha: 0.80),
                               size: 13,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               widget.artistMode ? 'Artist' : 'Album',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1172,7 +1172,7 @@ class _VersusSearchBarState extends State<_VersusSearchBar> {
                       padding: const EdgeInsets.only(right: 12, left: 4),
                       child: Icon(
                         Icons.close_rounded,
-                        color: Colors.white.withOpacity(0.38),
+                        color: Colors.white.withValues(alpha: 0.38),
                         size: 18,
                       ),
                     ),
@@ -1235,7 +1235,7 @@ class _VersusSearchResults extends StatelessWidget {
               borderRadius: BorderRadius.circular(20.0),
               gradient: AppTheme.glassPanelGradient(),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 0.8,
               ),
             ),
@@ -1265,7 +1265,7 @@ class _VersusSearchResults extends StatelessWidget {
           child: Text(
             'No results for "$lastQuery"',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.40),
+              color: Colors.white.withValues(alpha: 0.40),
               fontSize: 13,
             ),
           ),
@@ -1280,7 +1280,7 @@ class _VersusSearchResults extends StatelessWidget {
         height: 0,
         indent: 16,
         endIndent: 16,
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
       ),
       itemBuilder: (_, i) {
         final item = results[i];
@@ -1313,7 +1313,7 @@ class _VersusSearchResults extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.42),
+                          color: Colors.white.withValues(alpha: 0.42),
                           fontSize: 12,
                         ),
                       ),
@@ -1322,7 +1322,7 @@ class _VersusSearchResults extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white.withOpacity(0.20),
+                  color: Colors.white.withValues(alpha: 0.20),
                   size: 16,
                 ),
               ],
@@ -1362,10 +1362,10 @@ class _ResultThumb extends StatelessWidget {
     return Container(
       width: 44,
       height: 44,
-      color: AppTheme.gradientStart.withOpacity(0.25),
+      color: AppTheme.gradientStart.withValues(alpha: 0.25),
       child: Icon(
         item.isArtist ? Icons.person_rounded : Icons.album_rounded,
-        color: Colors.white.withOpacity(0.50),
+        color: Colors.white.withValues(alpha: 0.50),
         size: 20,
       ),
     );

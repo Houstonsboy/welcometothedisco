@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/posts/post_view.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
@@ -108,30 +109,76 @@ class InviteNotification {
   }
 }
 
-/// One row in the inbox — either a follow or a collaboration invite.
+class MentionNotification {
+  final String id;
+  final String authorID;
+  final String authorName;
+  final String authorAvatar;
+  final String postID;
+  final DateTime? timestamp;
+  final bool read;
+
+  const MentionNotification({
+    required this.id,
+    required this.authorID,
+    required this.authorName,
+    required this.authorAvatar,
+    required this.postID,
+    this.timestamp,
+    required this.read,
+  });
+
+  factory MentionNotification.fromDoc(
+      QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return MentionNotification(
+      id: doc.id,
+      authorID: d['authorID'] as String? ?? '',
+      authorName: d['authorName'] as String? ?? '',
+      authorAvatar: d['author_avatar'] as String? ?? '',
+      postID: d['postID'] as String? ?? '',
+      timestamp: (d['timestamp'] as Timestamp?)?.toDate(),
+      read: d['read'] as bool? ?? false,
+    );
+  }
+}
+
+/// One row in the inbox — a follow, a collaboration invite, or a post mention.
 class InboxNotificationItem {
   final FollowNotification? follow;
   final InviteNotification? invite;
+  final MentionNotification? mention;
 
   InboxNotificationItem._follow(FollowNotification f)
       : follow = f,
-        invite = null;
+        invite = null,
+        mention = null;
 
   InboxNotificationItem._invite(InviteNotification i)
       : invite = i,
-        follow = null;
+        follow = null,
+        mention = null;
+
+  InboxNotificationItem._mention(MentionNotification m)
+      : mention = m,
+        follow = null,
+        invite = null;
 
   bool get isFollow => follow != null;
   bool get isInvite => invite != null;
+  bool get isMention => mention != null;
 
-  String get id => follow?.id ?? invite!.id;
-  bool get read => follow?.read ?? invite!.read;
+  String get id => follow?.id ?? invite?.id ?? mention!.id;
+  bool get read => follow?.read ?? invite?.read ?? mention!.read;
 
   factory InboxNotificationItem.fromDoc(
       QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final t = doc.data()['type'] as String?;
     if (t == 'invite') {
       return InboxNotificationItem._invite(InviteNotification.fromDoc(doc));
+    }
+    if (t == 'mention') {
+      return InboxNotificationItem._mention(MentionNotification.fromDoc(doc));
     }
     return InboxNotificationItem._follow(FollowNotification.fromDoc(doc));
   }
@@ -243,10 +290,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(99),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         width: 0.8,
                       ),
                     ),
@@ -288,15 +335,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               child: Icon(
                 Icons.notifications_off_outlined,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 38,
               ),
             ),
@@ -304,16 +351,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 Text(
               'No notifications yet',
                   style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              'Follows and collaboration invites will show up here',
+              'Follows, collaboration invites, and post tags will show up here',
                   style: TextStyle(
-                color: Colors.white.withOpacity(0.45),
+                color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 12,
               ),
             ),
@@ -332,7 +379,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           separatorBuilder: (_, __) => Divider(
             height: 0,
             indent: 72,
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
           itemBuilder: (context, i) {
             final item = _notifications[i];
@@ -350,11 +397,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 ),
               );
             }
-            final inv = item.invite!;
-            return _InviteNotificationRow(
+            if (item.isInvite) {
+              final inv = item.invite!;
+              return _InviteNotificationRow(
+                key: ValueKey(item.id),
+                notification: inv,
+                assetPath: _assetPath(inv.authorAvatar),
+              );
+            }
+            final mention = item.mention!;
+            return _MentionNotificationRow(
               key: ValueKey(item.id),
-              notification: inv,
-              assetPath: _assetPath(inv.authorAvatar),
+              notification: mention,
+              assetPath: _assetPath(mention.authorAvatar),
             );
           },
         ),
@@ -401,7 +456,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
         SnackBar(
           content: Text('Could not follow back: $e',
               style: const TextStyle(fontSize: 13)),
-          backgroundColor: _kPink.withOpacity(0.85),
+          backgroundColor: _kPink.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -424,9 +479,9 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: isUnread ? _kGreen.withOpacity(0.13) : Colors.transparent,
+        color: isUnread ? _kGreen.withValues(alpha: 0.13) : Colors.transparent,
         border: isUnread
-            ? Border.all(color: _kGreen.withOpacity(0.28), width: 1)
+            ? Border.all(color: _kGreen.withValues(alpha: 0.28), width: 1)
             : null,
       ),
             child: Row(
@@ -476,7 +531,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                      color: Colors.white.withOpacity(0.42),
+                      color: Colors.white.withValues(alpha: 0.42),
                           fontSize: 12,
                     ),
                         ),
@@ -487,7 +542,7 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                    color: Colors.white.withOpacity(0.32),
+                    color: Colors.white.withValues(alpha: 0.32),
                           fontSize: 11,
                         ),
                       ),
@@ -512,17 +567,17 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                 : null,
                 color: _isFollowing || _loading
                     ? null
-                    : Colors.white.withOpacity(0.15),
+                    : Colors.white.withValues(alpha: 0.15),
                 border: Border.all(
                   color: _isFollowing
                       ? Colors.transparent
-                      : Colors.white.withOpacity(0.3),
+                      : Colors.white.withValues(alpha: 0.3),
                   width: 0.8,
                 ),
                 boxShadow: _isFollowing
                     ? [
                         BoxShadow(
-                          color: _kPink.withOpacity(0.3),
+                          color: _kPink.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         )
@@ -535,14 +590,14 @@ class _FollowNotificationRowState extends State<_FollowNotificationRow> {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.6,
-                        color: Colors.white.withOpacity(0.65),
+                        color: Colors.white.withValues(alpha: 0.65),
                       ),
                     )
                   : Text(
                       _isFollowing ? 'Following' : 'Follow Back',
                       style: TextStyle(
                         color: Colors.white
-                            .withOpacity(_isFollowing ? 1.0 : 0.9),
+                            .withValues(alpha: _isFollowing ? 1.0 : 0.9),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -605,8 +660,8 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
       height: _avatarSize,
           decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
-        color: Colors.white.withOpacity(0.08),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+        color: Colors.white.withValues(alpha: 0.08),
       ),
       child: ClipOval(
         child: imageUrl != null && imageUrl.isNotEmpty
@@ -626,7 +681,7 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
           child: Text(
           initial,
             style: TextStyle(
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
             fontSize: 11,
               fontWeight: FontWeight.w700,
           ),
@@ -650,7 +705,7 @@ class _InviteArtistMatchupStripState extends State<_InviteArtistMatchupStrip> {
                 child: Text(
                   'VS',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
@@ -722,9 +777,9 @@ class _InviteNotificationRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-            color: isUnread ? _kPink.withOpacity(0.12) : Colors.transparent,
+            color: isUnread ? _kPink.withValues(alpha: 0.12) : Colors.transparent,
             border: isUnread
-                ? Border.all(color: _kPink.withOpacity(0.35), width: 1)
+                ? Border.all(color: _kPink.withValues(alpha: 0.35), width: 1)
                 : null,
       ),
       child: Row(
@@ -765,7 +820,7 @@ class _InviteNotificationRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha: 0.55),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                   ),
@@ -776,7 +831,7 @@ class _InviteNotificationRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                        color: Colors.white.withOpacity(0.32),
+                        color: Colors.white.withValues(alpha: 0.32),
                     fontSize: 11,
                         height: 1.25,
                   ),
@@ -784,6 +839,149 @@ class _InviteNotificationRow extends StatelessWidget {
               ],
             ),
           ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mention row: "author mentioned you in a post" ──────────────────────────────
+
+class _MentionNotificationRow extends StatefulWidget {
+  final MentionNotification notification;
+  final String? assetPath;
+
+  const _MentionNotificationRow({
+    super.key,
+    required this.notification,
+    this.assetPath,
+  });
+
+  @override
+  State<_MentionNotificationRow> createState() =>
+      _MentionNotificationRowState();
+}
+
+class _MentionNotificationRowState extends State<_MentionNotificationRow> {
+  bool _opening = false;
+
+  static String _displayName(String raw) {
+    var s = raw.trim();
+    if (s.startsWith('@')) s = s.substring(1);
+    return s.isEmpty ? 'Someone' : s;
+  }
+
+  Future<void> _openPost() async {
+    final postId = widget.notification.postID.trim();
+    if (postId.isEmpty || _opening) return;
+    setState(() => _opening = true);
+    try {
+      final post = await FirebaseService.getPostStream(postId).first;
+      if (!mounted) return;
+      if (post == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This post is no longer available',
+                style: TextStyle(fontSize: 13)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => PostDetailScreen(post: post)),
+      );
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.notification;
+    final isUnread = !n.read;
+    final authorLabel = _displayName(n.authorName);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: _openPost,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isUnread ? _kPurple.withValues(alpha: 0.13) : Colors.transparent,
+            border: isUnread
+                ? Border.all(color: _kPurple.withValues(alpha: 0.32), width: 1)
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _NotifAvatar(assetPath: widget.assetPath, isUnread: isUnread),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            authorLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                        if (isUnread) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: _kPurple,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'mentioned you in a post · ${_formatTime(n.timestamp)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.32),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_opening) ...[
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.6,
+                    color: Colors.white.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -814,20 +1012,20 @@ class _NotifAvatar extends StatelessWidget {
                 end: Alignment.bottomRight,
               )
             : null,
-        color: isUnread ? null : Colors.white.withOpacity(0.15),
+        color: isUnread ? null : Colors.white.withValues(alpha: 0.15),
         border: isUnread
             ? null
-            : Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+            : Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5),
       ),
       child: Padding(
         padding: EdgeInsets.all(isUnread ? 2.5 : 0),
         child: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.1),
+          backgroundColor: Colors.white.withValues(alpha: 0.1),
           backgroundImage:
               assetPath != null ? AssetImage(assetPath!) : null,
           child: assetPath == null
               ? Icon(Icons.person_rounded,
-                  color: Colors.white.withOpacity(0.6), size: 28)
+                  color: Colors.white.withValues(alpha: 0.6), size: 28)
               : null,
         ),
       ),

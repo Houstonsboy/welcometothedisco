@@ -37,8 +37,8 @@ class _AlbumInboxTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final leftTitle = versus.album1Title ?? versus.album1Name ?? 'Album 1';
-    final rightTitle = versus.album2Title ?? versus.album2Name ?? 'Album 2';
+    final leftTitle = versus.album1Title ?? versus.album1Name;
+    final rightTitle = versus.album2Title ?? versus.album2Name;
     final leftArtist = versus.album1ArtistName ?? 'Unknown artist';
     final rightArtist = versus.album2ArtistName ?? 'Unknown artist';
 
@@ -60,8 +60,8 @@ class _AlbumInboxTile extends StatelessWidget {
             ),
           );
         },
-        splashColor: Colors.white.withOpacity(0.08),
-        highlightColor: Colors.white.withOpacity(0.04),
+        splashColor: Colors.white.withValues(alpha: 0.08),
+        highlightColor: Colors.white.withValues(alpha: 0.04),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12.6, 12, 12.6, 11),
           child: Transform.scale(
@@ -139,8 +139,8 @@ class _ArtistInboxTile extends StatelessWidget {
             ),
           );
         },
-        splashColor: Colors.white.withOpacity(0.08),
-        highlightColor: Colors.white.withOpacity(0.04),
+        splashColor: Colors.white.withValues(alpha: 0.08),
+        highlightColor: Colors.white.withValues(alpha: 0.04),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12.6, 12, 12.6, 11),
           child: Transform.scale(
@@ -214,8 +214,8 @@ Widget _vsPill() {
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(999),
-      color: Colors.white.withOpacity(0.13),
-      border: Border.all(color: Colors.white.withOpacity(0.2)),
+      color: Colors.white.withValues(alpha: 0.13),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
     ),
     child: const Text(
       'VS',
@@ -261,10 +261,10 @@ class _ArtistTile extends StatelessWidget {
                             height: side,
                           )
                         : Container(
-                            color: Colors.white.withOpacity(0.12),
+                            color: Colors.white.withValues(alpha: 0.12),
                             child: Icon(
                               Icons.person_rounded,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                               size: 32,
                             ),
                           ),
@@ -369,14 +369,14 @@ class _VersusProfileChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: accentColor.withOpacity(0.18),
+            color: accentColor.withValues(alpha: 0.18),
             border: Border.all(
-              color: accentColor.withOpacity(0.5),
+              color: accentColor.withValues(alpha: 0.5),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: accentColor.withOpacity(0.15),
+                color: accentColor.withValues(alpha: 0.15),
                 blurRadius: 8,
                 spreadRadius: 0,
               ),
@@ -396,12 +396,12 @@ class _VersusProfileChip extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.left,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                     shadows: [
                       Shadow(
-                        color: accentColor.withOpacity(0.4),
+                        color: accentColor.withValues(alpha: 0.4),
                         blurRadius: 6,
                       ),
                     ],
@@ -420,10 +420,10 @@ class _VersusProfileChip extends StatelessWidget {
       return Container(
         width: size,
         height: size,
-        color: accentColor.withOpacity(0.35),
+        color: accentColor.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
           size: 12,
         ),
       );
@@ -453,10 +453,10 @@ class _VersusProfileChip extends StatelessWidget {
   Widget _avatarFallback(double size) => Container(
         width: size,
         height: size,
-        color: accentColor.withOpacity(0.35),
+        color: accentColor.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
           size: 12,
         ),
       );
@@ -488,10 +488,10 @@ class _AlbumTile extends StatelessWidget {
                     fit: BoxFit.cover,
                   )
                 : Container(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     child: Icon(
                       Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       size: 32,
                     ),
                   ),
@@ -519,7 +519,7 @@ class _AlbumTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.72),
+              color: Colors.white.withValues(alpha: 0.72),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),

@@ -15,10 +15,14 @@ service cloud.firestore {
 
         // Follow: sender is the follower — must match followerID.
         // Invite: sender is author — must match authorID; written under recipient userId.
+        // Mention: sender is the post author — must match authorID; written under each tagged userId.
         allow create: if request.auth != null && (
           request.resource.data.type == 'follow'
             && request.resource.data.followerID == request.auth.uid
           || request.resource.data.type == 'invite'
+            && request.resource.data.authorID == request.auth.uid
+            && userId != request.auth.uid
+          || request.resource.data.type == 'mention'
             && request.resource.data.authorID == request.auth.uid
             && userId != request.auth.uid
         );

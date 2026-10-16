@@ -11,7 +11,7 @@ import 'package:welcometothedisco/models/pair_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/models/users_model.dart';
-import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/utils/pair_utils.dart';
 
@@ -165,6 +165,12 @@ class FirebaseService {
 
     debugPrint(
         '[FirebaseService] _sendFollowNotification → $followerUid → $recipientUid');
+
+    await NotificationService.notifyFriendNewFollow(
+      recipientUid: recipientUid,
+      followerUid: followerUid,
+      followerName: follower.username,
+    );
   }
 
   // ── Real-time stream: true if current user has any unread notifications ────
@@ -191,6 +197,7 @@ class FirebaseService {
         .doc(uid)
         .collection('notifications')
         .orderBy('timestamp', descending: true)
+        .limit(100)
         .snapshots();
   }
 
@@ -695,7 +702,7 @@ class FirebaseService {
     final me         = results[0];
     final postAuthor = results[1];
 
-    final ref = await _firestore.collection('versus').add({
+    await _firestore.collection('versus').add({
       'type':           'collaborator',
       'status':         'open',
       'sourcePostID':   sourcePostID,
@@ -793,7 +800,7 @@ class FirebaseService {
 
       // Denormalized cover images — stored now so inbox renders without Spotify calls.
       if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
-      if (artist2ImageUrl != null && artist2ImageUrl.trim().isNotEmpty)
+      if (artist2ImageUrl.trim().isNotEmpty)
         'artist2ImageUrl': artist2ImageUrl.trim(),
 
       // Full track details — enables rendering without Spotify API calls.
@@ -840,10 +847,17 @@ class FirebaseService {
           'artist2Name': artist2Name?.trim() ?? '',
           if (artist2ID != null && artist2ID.trim().isNotEmpty)
             'artist2ID': artist2ID.trim(),
-            
+
         });
         debugPrint(
             '[FirebaseService] createCollaborationInvite → invite sent to $collaboratorUID');
+
+        await NotificationService.notifyFriendNewInvite(
+          recipientUid: collaboratorUID.trim(),
+          senderUid: uid,
+          senderName: author?.username ?? '',
+          versusId: versusID,
+        );
       } catch (e) {
         debugPrint(
             '[FirebaseService] createCollaborationInvite → notification failed: $e');
@@ -1535,6 +1549,7 @@ class FirebaseService {
     required String description,
     required List<Map<String, dynamic>> tracklist,
     RemixEnabled remixEnabled = RemixEnabled.same,
+    List<String> mentionedUids = const [],
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Not logged in');
@@ -1546,6 +1561,12 @@ class FirebaseService {
             ? _auth.currentUser!.displayName!.trim()
             : (_auth.currentUser?.email?.split('@').first ?? 'User'));
     final authorAvatar = profile?.avatarPath.trim() ?? '';
+
+    final recipients = mentionedUids
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty && u != uid)
+        .toSet()
+        .toList();
 
     final now = FieldValue.serverTimestamp();
     final ref = await _firestore.collection('posts').add({
@@ -1560,10 +1581,64 @@ class FirebaseService {
       'Remixcount':       0,
       'remixenabled':     remixEnabled.firestoreValue,
       'Tracklist':        tracklist,
+      'mentionedUids':    recipients,
       'Created_at':       now,
       'modified_at':      now,
     });
-    return ref.id;
+    final postId = ref.id;
+
+    if (recipients.isNotEmpty) {
+      try {
+        await _sendMentionNotifications(
+          authorUid: uid,
+          authorName: authorName,
+          authorAvatar: authorAvatar,
+          postId: postId,
+          recipientUids: recipients,
+        );
+      } catch (e) {
+        debugPrint('[FirebaseService] createPost → mention notifications failed: $e');
+      }
+    }
+
+    return postId;
+  }
+
+  // ── Write a durable inbox doc + push to each friend tagged in a post ───────
+  /// Uses auto-generated doc IDs — a user can be mentioned in many posts,
+  /// unlike follow (one doc per follower) or invite (one invite at a time).
+  static Future<void> _sendMentionNotifications({
+    required String authorUid,
+    required String authorName,
+    required String authorAvatar,
+    required String postId,
+    required List<String> recipientUids,
+  }) async {
+    final batch = _firestore.batch();
+    for (final recipientUid in recipientUids) {
+      final ref = _firestore
+          .collection('users')
+          .doc(recipientUid)
+          .collection('notifications')
+          .doc();
+      batch.set(ref, {
+        'type':          'mention',
+        'read':          false,
+        'timestamp':     FieldValue.serverTimestamp(),
+        'authorID':      authorUid,
+        'authorName':    authorName,
+        'author_avatar': authorAvatar,
+        'postID':        postId,
+      });
+    }
+    await batch.commit();
+
+    await NotificationService.notifyUsersMentionedInPost(
+      recipientUids: recipientUids,
+      authorUid: authorUid,
+      authorName: authorName,
+      postId: postId,
+    );
   }
 
   /// Live stream of all posts, ordered by newest first.
@@ -1614,12 +1689,19 @@ class FirebaseService {
 
   /// Cheap (1-doc) live listener on just the newest post, used to drive a
   /// "N new posts" indicator without streaming/re-fetching the full feed.
+  ///
+  /// Skips snapshots with a pending local write: a new post's `Created_at`
+  /// (a `FieldValue.serverTimestamp()`) reads back as null until the server
+  /// ack arrives, so without this filter a single `add()` emits twice —
+  /// once locally with a null timestamp, once confirmed — double-counting
+  /// the "new posts" indicator for one actual post.
   static Stream<PostModel?> watchNewestPost() {
     return _firestore
         .collection('posts')
         .orderBy('Created_at', descending: true)
         .limit(1)
         .snapshots()
+        .where((snap) => !snap.metadata.hasPendingWrites)
         .map((snap) => snap.docs.isEmpty
             ? null
             : PostModel.fromFirestore(snap.docs.first.data(), snap.docs.first.id));
