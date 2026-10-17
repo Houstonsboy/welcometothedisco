@@ -77,6 +77,8 @@ class SpotifyTrack {
   final List<String> allArtistIds;    // ALL credited artist IDs
   final List<String> allArtistNames;  // ALL credited artist names
   final String? albumArtUrl;
+  final int popularity;   // 0-100, from full track objects only
+  final String? isrc;     // international standard recording code for dedup
 
   const SpotifyTrack({
     required this.id,
@@ -87,6 +89,8 @@ class SpotifyTrack {
     this.allArtistIds = const [],
     this.allArtistNames = const [],
     this.albumArtUrl,
+    this.popularity = 0,
+    this.isrc,
   });
 
   factory SpotifyTrack.fromJson(Map<String, dynamic> json) {
@@ -95,6 +99,7 @@ class SpotifyTrack {
     final album = json['album'] as Map<String, dynamic>? ?? {};
     final images =
         (album['images'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final externalIds = json['external_ids'] as Map<String, dynamic>? ?? {};
     return SpotifyTrack(
       id: json['id'] as String? ?? '',
       uri: json['uri'] as String? ?? '',
@@ -111,6 +116,8 @@ class SpotifyTrack {
           .where((n) => n.isNotEmpty)
           .toList(),
       albumArtUrl: images.isNotEmpty ? images.first['url'] as String? : null,
+      popularity: json['popularity'] as int? ?? 0,
+      isrc: externalIds['isrc'] as String?,
     );
   }
 
@@ -296,6 +303,7 @@ class SpotifyApi {
     }
     final resp = await http.get(uri, headers: h);
     debugPrint('[SpotifyApi] GET $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] GET $path error body: ${resp.body}');
     return resp;
   }
 
@@ -308,6 +316,7 @@ class SpotifyApi {
     }
     final resp = await http.put(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] PUT $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] PUT $path error body: ${resp.body}');
     return resp;
   }
 
@@ -320,6 +329,7 @@ class SpotifyApi {
     }
     final resp = await http.post(uri, headers: h, body: body != null ? jsonEncode(body) : null);
     debugPrint('[SpotifyApi] POST $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] POST $path error body: ${resp.body}');
     return resp;
   }
 
@@ -558,7 +568,7 @@ class SpotifyApi {
     }),
   ]);
 
-  List<SpotifyTrack> _parseTracks(http.Response resp) {
+  List<SpotifyTrack> parseTracks(http.Response resp) {
     if (resp.statusCode != 200) return [];
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final items =
@@ -568,11 +578,11 @@ class SpotifyApi {
 
   // Merge artist-scoped + broad results, then partition by artist.
   // Deduplication is by track ID within each artist's final list.
-  final artist1Scoped = _parseTracks(responses[0]);
-  final artist2Scoped = _parseTracks(responses[1]);
-  final broad = _parseTracks(responses[2]);
+  final artist1Scoped = parseTracks(responses[0]);
+  final artist2Scoped = parseTracks(responses[1]);
+  final broad = parseTracks(responses[2]);
 
-  List<SpotifyTrack> _buildList(
+  List<SpotifyTrack> buildList(
       List<SpotifyTrack> scoped, String artistId, String artistName) {
     // Start with artist-scoped results (best ranking), then append
     // any featured tracks found in the broad search not already present.
@@ -589,8 +599,8 @@ class SpotifyApi {
   }
 
   return {
-    artist1Id: _buildList(artist1Scoped, artist1Id, artist1Name),
-    artist2Id: _buildList(artist2Scoped, artist2Id, artist2Name),
+    artist1Id: buildList(artist1Scoped, artist1Id, artist1Name),
+    artist2Id: buildList(artist2Scoped, artist2Id, artist2Name),
   };
 }
   // ── Playlists ─────────────────────────────────────────────────────────────
@@ -679,6 +689,109 @@ class SpotifyApi {
     return results;
   }
 
+  /// Fetches an artist's full discography (albums + singles), collects all
+  /// track IDs, batch-fetches full track details for popularity scores, then
+  /// deduplicates by ISRC and returns tracks sorted by popularity descending.
+  Future<List<SpotifyTrack>> getArtistDiscographyTracks(
+    String artistId, {
+    String market = 'US',
+  }) async {
+    if (artistId.isEmpty) return [];
+
+    // Step 1: get artist's own albums and singles (up to 50 — covers most artists)
+    final albumsResp = await _get(
+      '/artists/$artistId/albums',
+      query: {
+        'include_groups': 'album,single',
+        'market': market,
+        'limit': '50',
+      },
+    );
+    if (albumsResp.statusCode != 200) return [];
+
+    final albumsJson = jsonDecode(albumsResp.body) as Map<String, dynamic>;
+    final albumItems =
+        (albumsJson['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final albumIds = albumItems
+        .map((a) => a['id'] as String? ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (albumIds.isEmpty) return [];
+
+    // Step 2: batch-fetch full album objects (includes first 50 tracks each)
+    final albumBatches = <List<String>>[];
+    for (int i = 0; i < albumIds.length; i += 20) {
+      albumBatches.add(albumIds.sublist(i, math.min(i + 20, albumIds.length)));
+    }
+
+    final albumResponses = await Future.wait(
+      albumBatches.map((batch) => _get('/albums', query: {'ids': batch.join(',')})),
+    );
+
+    // Step 3: collect all track IDs from the embedded track lists
+    final allTrackIds = <String>[];
+    for (final resp in albumResponses) {
+      if (resp.statusCode != 200) continue;
+      final json = jsonDecode(resp.body) as Map<String, dynamic>;
+      final albums =
+          (json['albums'] as List?)?.cast<Map<String, dynamic>?>() ?? [];
+      for (final album in albums) {
+        if (album == null) continue;
+        final trackPage = album['tracks'] as Map<String, dynamic>? ?? {};
+        final items =
+            (trackPage['items'] as List?)?.cast<Map<String, dynamic>?>() ?? [];
+        for (final track in items) {
+          if (track == null) continue;
+          final id = track['id'] as String? ?? '';
+          if (id.isNotEmpty) allTrackIds.add(id);
+        }
+      }
+    }
+
+    if (allTrackIds.isEmpty) return [];
+
+    // Step 4: batch-fetch full track objects (adds popularity + ISRC)
+    final uniqueIds = allTrackIds.toSet().toList();
+    final fullTracks = await getTracksByIds(uniqueIds);
+
+    // Step 5: sort by popularity first (so we keep the best version when deduping)
+    fullTracks.sort((a, b) => b.popularity.compareTo(a.popularity));
+
+    // Step 6: filter to this artist, deduplicate by ISRC then name+artist fallback
+    final deduped = <SpotifyTrack>[];
+    final seenIsrcs = <String>{};
+    final seenNameKeys = <String>{};
+
+    for (final track in fullTracks) {
+      if (!track.hasArtist(id: artistId)) continue;
+
+      final isrc = track.isrc;
+      if (isrc != null && isrc.isNotEmpty) {
+        if (!seenIsrcs.add(isrc)) continue;
+      } else {
+        final key = '${track.name.toLowerCase()}|${track.artistId ?? ''}';
+        if (!seenNameKeys.add(key)) continue;
+      }
+
+      deduped.add(track);
+    }
+
+    return deduped; // already sorted by popularity desc
+  }
+
+  Future<List<List<SpotifyTrack>>> getBothArtistsDiscographyTracks(
+    String artist1Id,
+    String artist2Id, {
+    String market = 'US',
+  }) async {
+    final results = await Future.wait([
+      getArtistDiscographyTracks(artist1Id, market: market),
+      getArtistDiscographyTracks(artist2Id, market: market),
+    ]);
+    return results;
+  }
+
   Future<SpotifyAlbumWithTracks?> getAlbumWithTracks(String albumId) async {
     if (albumId.isEmpty) return null;
     final resp = await _get('/albums/$albumId');
@@ -734,6 +847,14 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
 }
 
   Future<VersusModel> enrichWithSpotifyData(VersusModel versus) async {
+    // Images + artist names were denormalized at creation — skip Spotify call.
+    if ((versus.album1ImageUrl?.isNotEmpty ?? false) &&
+        (versus.album2ImageUrl?.isNotEmpty ?? false)) {
+      versus.album1Title ??= versus.album1Name;
+      versus.album2Title ??= versus.album2Name;
+      return versus;
+    }
+
     final token = await TokenStorageService.getAccessToken();
     if (token == null) return versus;
 
@@ -745,11 +866,11 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
     final album1 = results[0];
     final album2 = results[1];
 
-    versus.album1Title = album1?.title ?? versus.album1Name ?? versus.album1ID;
+    versus.album1Title = album1?.title ?? versus.album1Name;
     versus.album1ArtistName = album1?.artistName;
     versus.album1ImageUrl = album1?.imageUrl;
 
-    versus.album2Title = album2?.title ?? versus.album2Name ?? versus.album2ID;
+    versus.album2Title = album2?.title ?? versus.album2Name;
     versus.album2ArtistName = album2?.artistName;
     versus.album2ImageUrl = album2?.imageUrl;
 
@@ -762,6 +883,12 @@ Future<List<SpotifyTrack>> getTracksByIds(List<String> trackIds) async {
 
   /// Fetches artist images from Spotify and sets artist1ImageUrl / artist2ImageUrl.
   Future<ArtistVersusModel> enrichArtistVersus(ArtistVersusModel versus) async {
+    // Images were denormalized at creation — skip Spotify call.
+    if ((versus.artist1ImageUrl?.isNotEmpty ?? false) &&
+        (versus.artist2ImageUrl?.isNotEmpty ?? false)) {
+      return versus;
+    }
+
     final token = await TokenStorageService.getAccessToken();
     if (token == null) return versus;
 

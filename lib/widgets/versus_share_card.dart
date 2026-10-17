@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +20,8 @@ class VersusShareCard extends StatelessWidget {
   final List<String> roundTrackNames2;
   final List<String> roundTrackIds1;
   final List<String> roundTrackIds2;
+  /// true = album poll → square cover art; false (default) = artist → circle.
+  final bool isAlbumPoll;
 
   const VersusShareCard({
     super.key,
@@ -39,6 +40,7 @@ class VersusShareCard extends StatelessWidget {
     required this.roundTrackIds2,
     this.artist1ImageUrl,
     this.artist2ImageUrl,
+    this.isAlbumPoll = false,
   });
 
   Map<String, dynamic> _mergedRound(int index) {
@@ -112,7 +114,7 @@ class VersusShareCard extends StatelessWidget {
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 2.2,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                           ),
                         ),
                         Container(
@@ -121,7 +123,7 @@ class VersusShareCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(99),
                             border: Border.all(
-                              color: const Color(0xFFF07012).withOpacity(0.5),
+                              color: const Color(0xFFF07012).withValues(alpha: 0.5),
                               width: 0.8,
                             ),
                           ),
@@ -153,6 +155,7 @@ class VersusShareCard extends StatelessWidget {
                             align: CrossAxisAlignment.start,
                             isWinner: total > 0 &&
                                 artist1Votes > artist2Votes,
+                            isAlbum: isAlbumPoll,
                           ),
                         ),
 
@@ -195,6 +198,7 @@ class VersusShareCard extends StatelessWidget {
                             align: CrossAxisAlignment.end,
                             isWinner: total > 0 &&
                                 artist2Votes > artist1Votes,
+                            isAlbum: isAlbumPoll,
                           ),
                         ),
                       ],
@@ -219,9 +223,9 @@ class VersusShareCard extends StatelessWidget {
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.07),
+                          color: Colors.white.withValues(alpha: 0.07),
                           width: 0.5,
                         ),
                       ),
@@ -241,7 +245,7 @@ class VersusShareCard extends StatelessWidget {
                                 Container(
                                   width: 0.5,
                                   height: 16,
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha: 0.15),
                                 ),
                                 const SizedBox(width: 8),
                                 _ColHeader(
@@ -255,7 +259,7 @@ class VersusShareCard extends StatelessWidget {
                           Container(
                             height: 0.5,
                             margin: const EdgeInsets.only(top: 8),
-                            color: Colors.white.withOpacity(0.07),
+                            color: Colors.white.withValues(alpha: 0.07),
                           ),
                           if (pairedRoundCount <= 0)
                             Padding(
@@ -266,7 +270,7 @@ class VersusShareCard extends StatelessWidget {
                                   'no rounds in this versus',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white.withOpacity(0.25),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -317,7 +321,7 @@ class VersusShareCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white.withOpacity(0.5),
+                                color: Colors.white.withValues(alpha: 0.5),
                               ),
                             ),
                           ],
@@ -328,7 +332,7 @@ class VersusShareCard extends StatelessWidget {
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 2,
-                            color: Colors.white.withOpacity(0.18),
+                            color: Colors.white.withValues(alpha: 0.18),
                           ),
                         ),
                       ],
@@ -351,6 +355,8 @@ class _ArtistSide extends StatelessWidget {
   final Color color;
   final CrossAxisAlignment align;
   final bool isWinner;
+  // true = album poll → rounded-square cover; false = artist → circle.
+  final bool isAlbum;
 
   const _ArtistSide({
     required this.name,
@@ -359,10 +365,18 @@ class _ArtistSide extends StatelessWidget {
     required this.align,
     required this.isWinner,
     this.imageUrl,
+    this.isAlbum = false,
   });
+
+  static const double _size = 68;
+  static const double _albumRadius = 12;
 
   @override
   Widget build(BuildContext context) {
+    final br = isAlbum
+        ? BorderRadius.circular(_albumRadius)
+        : BorderRadius.circular(_size / 2);
+
     return Column(
       crossAxisAlignment: align,
       children: [
@@ -370,18 +384,19 @@ class _ArtistSide extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 68,
-              height: 68,
+              width: _size,
+              height: _size,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                borderRadius: br,
                 border: Border.all(
                   color: isWinner
                       ? color
-                      : color.withOpacity(0.4),
+                      : color.withValues(alpha: 0.4),
                   width: isWinner ? 2.5 : 1.2,
                 ),
               ),
-              child: ClipOval(
+              child: ClipRRect(
+                borderRadius: br,
                 child: imageUrl != null && imageUrl!.isNotEmpty
                     ? Image.network(
                         imageUrl!,
@@ -424,7 +439,7 @@ class _ArtistSide extends StatelessWidget {
               ? TextAlign.left
               : TextAlign.right,
           style: TextStyle(
-            color: Colors.white.withOpacity(isWinner ? 1.0 : 0.7),
+            color: Colors.white.withValues(alpha: isWinner ? 1.0 : 0.7),
             fontSize: 12,
             fontWeight:
                 isWinner ? FontWeight.w800 : FontWeight.w600,
@@ -445,7 +460,7 @@ class _ArtistSide extends StatelessWidget {
           votes == 1 ? 'round' : 'rounds',
           style: TextStyle(
             fontSize: 9,
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             letterSpacing: 1.2,
             fontWeight: FontWeight.w600,
           ),
@@ -455,9 +470,12 @@ class _ArtistSide extends StatelessWidget {
   }
 
   Widget _fallback(Color color) => Container(
-        color: color.withOpacity(0.15),
-        child: const Icon(Icons.person_rounded,
-            color: Colors.white38, size: 28),
+        color: color.withValues(alpha: 0.15),
+        child: Icon(
+          isAlbum ? Icons.album_rounded : Icons.person_rounded,
+          color: Colors.white38,
+          size: 28,
+        ),
       );
 }
 
@@ -528,7 +546,7 @@ class _VoteBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: color1.withOpacity(0.8),
+                color: color1.withValues(alpha: 0.8),
               ),
             ),
             Text(
@@ -537,7 +555,7 @@ class _VoteBar extends StatelessWidget {
                   : '$total round${total == 1 ? '' : 's'} voted',
               style: TextStyle(
                 fontSize: 9,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -546,7 +564,7 @@ class _VoteBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: color2.withOpacity(0.8),
+                color: color2.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -583,7 +601,7 @@ class _ColHeader extends StatelessWidget {
                 fontSize: 8,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.8,
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
               ),
             ),
             const SizedBox(width: 5),
@@ -607,7 +625,7 @@ class _ColHeader extends StatelessWidget {
                 fontSize: 8,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.8,
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
               ),
             ),
           ],
@@ -649,14 +667,14 @@ class _TrackResultRow extends StatelessWidget {
       fontSize: 6.5,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.5,
-      color: color1.withOpacity(0.65),
+      color: color1.withValues(alpha: 0.65),
       height: 1.0,
     );
     final commentLabelStyleRight = GoogleFonts.ibmPlexMono(
       fontSize: 6.5,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.5,
-      color: color2.withOpacity(0.65),
+      color: color2.withValues(alpha: 0.65),
       height: 1.0,
     );
     final commentBodyStyle = GoogleFonts.dmSans(
@@ -664,7 +682,7 @@ class _TrackResultRow extends StatelessWidget {
       fontStyle: FontStyle.italic,
       fontWeight: FontWeight.w500,
       height: 1.25,
-      color: Colors.white.withOpacity(0.78),
+      color: Colors.white.withValues(alpha: 0.78),
     );
 
     return Column(
@@ -700,7 +718,7 @@ class _TrackResultRow extends StatelessWidget {
                               : FontWeight.w400,
                           color: artist1Won
                               ? Colors.white
-                              : Colors.white.withOpacity(0.35),
+                              : Colors.white.withValues(alpha: 0.35),
                         ),
                       ),
                     ),
@@ -717,7 +735,7 @@ class _TrackResultRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -741,7 +759,7 @@ class _TrackResultRow extends StatelessWidget {
                               : FontWeight.w400,
                           color: artist2Won
                               ? Colors.white
-                              : Colors.white.withOpacity(0.35),
+                              : Colors.white.withValues(alpha: 0.35),
                         ),
                       ),
                     ),
@@ -811,7 +829,7 @@ class _TrackResultRow extends StatelessWidget {
             height: 0,
             indent: 12,
             endIndent: 12,
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
           ),
       ],
     );

@@ -1,11 +1,21 @@
 // lib/posts/post_view.dart
 
+import 'dart:async';
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:welcometothedisco/Ranking/entity_profile.dart';
+import 'package:welcometothedisco/friends/friendprofile.dart';
 import 'package:welcometothedisco/models/post_model.dart';
+import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/models/artist_versus_model.dart';
+import 'package:welcometothedisco/versus/artistplayground.dart';
+import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
 
 const _kGreen      = AppTheme.createGreen;
 const _kPink       = AppTheme.gradientEnd;
@@ -46,20 +56,36 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   String? _playingTrackId;
   bool    _isBusy = false; // prevents double-taps while API in flight
 
+  // Live-updating counts from Firestore.
+  late int _remixCount;
+  StreamSubscription<PostModel?>? _postSub;
+
   PostModel get post => widget.post;
 
   @override
   void initState() {
     super.initState();
+    _remixCount = post.remixCount;
+
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 450),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    if (post.id.isNotEmpty) {
+      _postSub = FirebaseService.getPostStream(post.id).listen((updated) {
+        if (!mounted || updated == null) return;
+        if (updated.remixCount != _remixCount) {
+          setState(() => _remixCount = updated.remixCount);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _postSub?.cancel();
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -161,6 +187,35 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       ));
   }
 
+  // ── Remix tap ──────────────────────────────────────────────────────────────
+  Future<void> _onRemixTap() async {
+    // Remixes disabled on this post
+    if (post.remixEnabled == RemixEnabled.disabled) {
+      _snack('Remixes are disabled for this post.');
+      return;
+    }
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      _snack('Sign in to remix this post.');
+      return;
+    }
+
+    // Cannot remix your own post
+    if (uid == post.authorID) {
+      _snack('You cannot remix your own post.');
+      return;
+    }
+
+    // Load current user profile for the remix screen
+    await FirebaseService.getCurrentUser();
+    if (!mounted) return;
+
+    Navigator.of(context).push(slideUpRoute(
+      PostRemixLockeroom(post: post),
+    ));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -196,7 +251,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             child: Text(
                               post.description,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.78),
+                                color: Colors.white.withValues(alpha: 0.78),
                                 fontFamily: AppTheme.fontBody,
                                 fontSize: 15,
                                 height: 1.65,
@@ -204,6 +259,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             ),
                           ),
                         ),
+
+                        if (post.mentionedUids.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: _TaggedFriendsRow(
+                                uids: post.mentionedUids),
+                          ),
 
                         SliverToBoxAdapter(
                             child: _HDivider(top: 22, bottom: 16)),
@@ -224,13 +285,13 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                             child: Row(
                               children: [
                                 Icon(Icons.queue_music_rounded,
-                                    color: _kCyan.withOpacity(0.75),
+                                    color: _kCyan.withValues(alpha: 0.75),
                                     size: 16),
                                 const SizedBox(width: 6),
                                 Text(
                                   'TRACKLIST',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.45),
+                                    color: Colors.white.withValues(alpha: 0.45),
                                     fontFamily: AppTheme.fontBody,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
@@ -243,12 +304,12 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                                       horizontal: 7, vertical: 1),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
-                                    color: _kCyan.withOpacity(0.12),
+                                    color: _kCyan.withValues(alpha: 0.12),
                                   ),
                                   child: Text(
                                     '${post.tracklist.length}',
                                     style: TextStyle(
-                                      color: _kCyan.withOpacity(0.8),
+                                      color: _kCyan.withValues(alpha: 0.8),
                                       fontFamily: AppTheme.fontBody,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w800,
@@ -286,12 +347,25 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                         SliverToBoxAdapter(
                             child: _HDivider(top: 12, bottom: 8)),
 
+                        // Remixes
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: _RemixesSection(postId: post.id),
+                          ),
+                        ),
+
+                        SliverToBoxAdapter(
+                            child: _HDivider(top: 4, bottom: 8)),
+
                         // Footer
                         SliverToBoxAdapter(
                           child: _FooterActions(
                             post: post,
                             fmt: _fmt,
+                            remixCount: _remixCount,
                             onQueueAll: _isBusy ? null : _queueAll,
+                            onRemix: _onRemixTap,
                           ),
                         ),
 
@@ -330,13 +404,13 @@ class _TopBar extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.07),
+                color: Colors.white.withValues(alpha: 0.07),
                 border: Border.all(
-                    color: Colors.white.withOpacity(0.12), width: 0.8),
+                    color: Colors.white.withValues(alpha: 0.12), width: 0.8),
               ),
               child: Icon(
                 Icons.arrow_back_ios_new_rounded,
-                color: Colors.white.withOpacity(0.80),
+                color: Colors.white.withValues(alpha: 0.80),
                 size: 15,
               ),
             ),
@@ -348,7 +422,7 @@ class _TopBar extends StatelessWidget {
           GestureDetector(
             onTap: () {/* TODO: share */},
             child: Icon(Icons.ios_share_rounded,
-                color: Colors.white.withOpacity(0.55), size: 20),
+                color: Colors.white.withValues(alpha: 0.55), size: 20),
           ),
 
           const SizedBox(width: 18),
@@ -357,7 +431,7 @@ class _TopBar extends StatelessWidget {
           GestureDetector(
             onTap: () {/* TODO: options */},
             child: Icon(Icons.more_horiz_rounded,
-                color: Colors.white.withOpacity(0.55), size: 22),
+                color: Colors.white.withValues(alpha: 0.55), size: 22),
           ),
         ],
       ),
@@ -385,9 +459,9 @@ class _AuthorRow extends StatelessWidget {
     Widget fallback() => Container(
           width: size,
           height: size,
-          color: _kBlue.withOpacity(0.35),
+          color: _kBlue.withValues(alpha: 0.35),
           child: Icon(Icons.person_rounded,
-              color: Colors.white.withOpacity(0.7), size: 22),
+              color: Colors.white.withValues(alpha: 0.7), size: 22),
         );
 
     if (p.isEmpty) return ClipOval(child: fallback());
@@ -415,46 +489,83 @@ class _AuthorRow extends StatelessWidget {
     );
   }
 
+  void _openAuthorProfile(BuildContext context) {
+    final uid = post.authorID.trim();
+    if (uid.isEmpty) return;
+
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && uid == currentUid) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const UserProfilePage()),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FriendProfilePage(
+          uid: uid,
+          initialUsername: post.authorName,
+          initialAvatarPath: post.authorAvatar,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                  color: _kGreen.withOpacity(0.5), width: 1.5),
+          GestureDetector(
+            onTap: () => _openAuthorProfile(context),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: _kGreen.withValues(alpha: 0.5), width: 1.5),
+                  ),
+                  child: _avatar(),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: const TextStyle(
+                        color: _kTextPrimary,
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _relativeTime(post.createdAt?.toDate()),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: _avatar(),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                post.authorName,
-                style: const TextStyle(
-                  color: _kTextPrimary,
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _relativeTime(post.createdAt?.toDate()),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
-                  fontFamily: AppTheme.fontBody,
-                  fontSize: 11,
-                ),
-              ),
-            ],
           ),
           const Spacer(),
-          _FollowPill(),
+          if (post.authorID.trim() !=
+              FirebaseAuth.instance.currentUser?.uid)
+            _FollowPill(
+              authorUid: post.authorID.trim(),
+              authorUsername: post.authorName,
+              authorAvatarPath: post.authorAvatar,
+            ),
         ],
       ),
     );
@@ -463,30 +574,76 @@ class _AuthorRow extends StatelessWidget {
 
 // ─── Follow pill ──────────────────────────────────────────────────────────────
 class _FollowPill extends StatefulWidget {
+  const _FollowPill({
+    required this.authorUid,
+    required this.authorUsername,
+    required this.authorAvatarPath,
+  });
+
+  final String authorUid;
+  final String authorUsername;
+  final String authorAvatarPath;
+
   @override
   State<_FollowPill> createState() => _FollowPillState();
 }
 
 class _FollowPillState extends State<_FollowPill> {
+  StreamSubscription<UserModel?>? _userSub;
   bool _following = false;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _userSub = FirebaseService.getCurrentUserStream().listen((user) {
+      if (!mounted) return;
+      final following =
+          user?.friends.any((f) => f.uid == widget.authorUid) ?? false;
+      if (following != _following) setState(() => _following = following);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    if (_following || _loading) return;
+    setState(() => _loading = true);
+    try {
+      await FirebaseService.addFriend(
+        friendUid: widget.authorUid,
+        friendUsername: widget.authorUsername,
+        friendAvatarPath: widget.authorAvatarPath,
+      );
+      if (mounted) setState(() => _following = true);
+    } catch (_) {
+      // Real state reconciles via the user stream above.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => setState(() => _following = !_following),
+      onTap: _handleTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: _following
-              ? Colors.white.withOpacity(0.07)
-              : _kGreen.withOpacity(0.13),
+              ? Colors.white.withValues(alpha: 0.07)
+              : _kGreen.withValues(alpha: 0.13),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _following
-                ? Colors.white.withOpacity(0.14)
-                : _kGreen.withOpacity(0.55),
+                ? Colors.white.withValues(alpha: 0.14)
+                : _kGreen.withValues(alpha: 0.55),
             width: 1,
           ),
         ),
@@ -504,16 +661,115 @@ class _FollowPillState extends State<_FollowPill> {
   }
 }
 
+// ─── Tagged friends row ─────────────────────────────────────────────────────────
+class _TaggedFriendsRow extends StatefulWidget {
+  const _TaggedFriendsRow({required this.uids});
+  final List<String> uids;
+
+  @override
+  State<_TaggedFriendsRow> createState() => _TaggedFriendsRowState();
+}
+
+class _TaggedFriendsRowState extends State<_TaggedFriendsRow> {
+  late final Future<List<UserModel>> _usersFuture = Future.wait(
+    widget.uids.map(FirebaseService.getUserById),
+  ).then((users) => users.whereType<UserModel>().toList());
+
+  void _openProfile(BuildContext context, UserModel user) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && user.id == currentUid) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const UserProfilePage()),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FriendProfilePage(
+          uid: user.id,
+          initialUsername: user.username,
+          initialAvatarPath: user.avatarPath,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<UserModel>>(
+      future: _usersFuture,
+      builder: (context, snapshot) {
+        final users = snapshot.data ?? const [];
+        if (users.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Icon(Icons.local_offer_rounded,
+                  color: Colors.white.withValues(alpha: 0.35), size: 14),
+              Text(
+                'with',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 13,
+                ),
+              ),
+              for (final user in users)
+                GestureDetector(
+                  onTap: () => _openProfile(context, user),
+                  child: Text(
+                    '@${user.username}',
+                    style: const TextStyle(
+                      color: _kCyan,
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 // ─── Artist block ─────────────────────────────────────────────────────────────
 class _ArtistBlock extends StatelessWidget {
   const _ArtistBlock({required this.post});
   final PostModel post;
 
+  void _openArtistProfile(BuildContext context) {
+    final artistId = post.artistID.trim();
+    if (artistId.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EntityProfileScreen(
+          entityId: artistId,
+          initialTitle: post.artistName,
+          initialImageUrl: post.artistImageUrl.trim().isNotEmpty
+              ? post.artistImageUrl
+              : null,
+          isArtist: true,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
+      child: GestureDetector(
+        onTap: () => _openArtistProfile(context),
+        behavior: HitTestBehavior.opaque,
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -524,7 +780,7 @@ class _ArtistBlock extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               gradient: AppTheme.glassPanelGradient(opacity: 0.35),
               border: Border.all(
-                  color: Colors.white.withOpacity(0.14), width: 0.8),
+                  color: Colors.white.withValues(alpha: 0.14), width: 0.8),
             ),
             child: Row(
               children: [
@@ -535,10 +791,10 @@ class _ArtistBlock extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.20), width: 1.5),
+                        color: Colors.white.withValues(alpha: 0.20), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: _kPink.withOpacity(0.20),
+                        color: _kPink.withValues(alpha: 0.20),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -577,7 +833,7 @@ class _ArtistBlock extends StatelessWidget {
                       Text(
                         '${post.tracklist.length} tracks',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.38),
+                          color: Colors.white.withValues(alpha: 0.38),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 12,
                         ),
@@ -587,19 +843,20 @@ class _ArtistBlock extends StatelessWidget {
                 ),
 
                 Icon(Icons.chevron_right_rounded,
-                    color: Colors.white.withOpacity(0.22), size: 20),
+                    color: Colors.white.withValues(alpha: 0.22), size: 20),
               ],
             ),
           ),
         ),
       ),
+      ),
     );
   }
 
   Widget _artistFallback(double size) => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(Icons.music_note_rounded,
-            color: _kPink.withOpacity(0.8), size: size * 0.5),
+            color: _kPink.withValues(alpha: 0.8), size: size * 0.5),
       );
 }
 
@@ -633,12 +890,12 @@ class _TrackTile extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               color: isPlaying
-                  ? _kCyan.withOpacity(0.10)
-                  : Colors.white.withOpacity(0.04),
+                  ? _kCyan.withValues(alpha: 0.10)
+                  : Colors.white.withValues(alpha: 0.04),
               border: Border.all(
                 color: isPlaying
-                    ? _kCyan.withOpacity(0.45)
-                    : Colors.white.withOpacity(0.08),
+                    ? _kCyan.withValues(alpha: 0.45)
+                    : Colors.white.withValues(alpha: 0.08),
                 width: isPlaying ? 1.0 : 0.7,
               ),
             ),
@@ -653,7 +910,7 @@ class _TrackTile extends StatelessWidget {
                     style: TextStyle(
                       color: isPlaying
                           ? _kCyan
-                          : Colors.white.withOpacity(0.25),
+                          : Colors.white.withValues(alpha: 0.25),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -689,7 +946,7 @@ class _TrackTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           color: Colors.black
-                              .withOpacity(isPlaying ? 0.45 : 0.18),
+                              .withValues(alpha: isPlaying ? 0.45 : 0.18),
                         ),
                         child: Icon(
                           isPlaying
@@ -697,7 +954,7 @@ class _TrackTile extends StatelessWidget {
                               : Icons.play_arrow_rounded,
                           color: isPlaying
                               ? _kCyan
-                              : Colors.white.withOpacity(0.70),
+                              : Colors.white.withValues(alpha: 0.70),
                           size: isPlaying ? 22 : 20,
                         ),
                       ),
@@ -719,7 +976,7 @@ class _TrackTile extends StatelessWidget {
                         style: TextStyle(
                           color: isPlaying
                               ? Colors.white
-                              : Colors.white.withOpacity(0.88),
+                              : Colors.white.withValues(alpha: 0.88),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 13.5,
                           fontWeight: isPlaying
@@ -733,7 +990,7 @@ class _TrackTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.38),
+                          color: Colors.white.withValues(alpha: 0.38),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 11.5,
                         ),
@@ -760,10 +1017,10 @@ class _TrackTile extends StatelessWidget {
         height: 46,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color: _kBlue.withOpacity(0.30),
+          color: _kBlue.withValues(alpha: 0.30),
         ),
         child: Icon(Icons.album_rounded,
-            color: _kPink.withOpacity(0.75), size: 22),
+            color: _kPink.withValues(alpha: 0.75), size: 22),
       );
 }
 
@@ -828,11 +1085,15 @@ class _FooterActions extends StatelessWidget {
   const _FooterActions({
     required this.post,
     required this.fmt,
+    required this.remixCount,
     required this.onQueueAll,
+    required this.onRemix,
   });
   final PostModel post;
   final String Function(int) fmt;
+  final int remixCount;
   final VoidCallback? onQueueAll;
+  final VoidCallback onRemix;
 
   @override
   Widget build(BuildContext context) {
@@ -843,10 +1104,12 @@ class _FooterActions extends StatelessWidget {
           // Remix
           _ActionBtn(
             icon: Icons.shuffle_rounded,
-            label: 'remix ${fmt(post.remixCount)}',
-            color: _kGreen,
-            filled: true,
-            onTap: () {},
+            label: 'remix ${fmt(remixCount)}',
+            color: post.remixEnabled == RemixEnabled.disabled
+                ? Colors.white.withValues(alpha: 0.30)
+                : _kGreen,
+            filled: post.remixEnabled != RemixEnabled.disabled,
+            onTap: onRemix,
           ),
 
           const SizedBox(width: 10),
@@ -855,7 +1118,7 @@ class _FooterActions extends StatelessWidget {
           _ActionBtn(
             icon: Icons.reply_rounded,
             label: fmt(post.shareCount),
-            color: Colors.white.withOpacity(0.45),
+            color: Colors.white.withValues(alpha: 0.45),
             filled: false,
             onTap: () {},
           ),
@@ -870,13 +1133,13 @@ class _FooterActions extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
                 color: onQueueAll != null
-                    ? _kCyan.withOpacity(0.14)
-                    : Colors.white.withOpacity(0.04),
+                    ? _kCyan.withValues(alpha: 0.14)
+                    : Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: onQueueAll != null
-                      ? _kCyan.withOpacity(0.55)
-                      : Colors.white.withOpacity(0.10),
+                      ? _kCyan.withValues(alpha: 0.55)
+                      : Colors.white.withValues(alpha: 0.10),
                   width: 1,
                 ),
               ),
@@ -887,7 +1150,7 @@ class _FooterActions extends StatelessWidget {
                     Icons.queue_music_rounded,
                     color: onQueueAll != null
                         ? _kCyan
-                        : Colors.white.withOpacity(0.25),
+                        : Colors.white.withValues(alpha: 0.25),
                     size: 15,
                   ),
                   const SizedBox(width: 5),
@@ -896,7 +1159,7 @@ class _FooterActions extends StatelessWidget {
                     style: TextStyle(
                       color: onQueueAll != null
                           ? _kCyan
-                          : Colors.white.withOpacity(0.25),
+                          : Colors.white.withValues(alpha: 0.25),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -934,12 +1197,12 @@ class _ActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: filled ? color.withOpacity(0.13) : Colors.transparent,
+          color: filled ? color.withValues(alpha: 0.13) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: filled
-                ? color.withOpacity(0.50)
-                : Colors.white.withOpacity(0.13),
+                ? color.withValues(alpha: 0.50)
+                : Colors.white.withValues(alpha: 0.13),
             width: 0.9,
           ),
         ),
@@ -974,5 +1237,359 @@ class _HDivider extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: EdgeInsets.fromLTRB(20, top, 20, bottom),
         child: Container(height: 0.5, color: _kDivider),
+      );
+}
+
+// ─── Remixes collapsible section ──────────────────────────────────────────────
+class _RemixesSection extends StatefulWidget {
+  const _RemixesSection({required this.postId});
+  final String postId;
+
+  @override
+  State<_RemixesSection> createState() => _RemixesSectionState();
+}
+
+class _RemixesSectionState extends State<_RemixesSection>
+    with SingleTickerProviderStateMixin {
+  bool _expanded = false;
+  late final AnimationController _ctrl;
+  late final Animation<double>   _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _ctrl.forward() : _ctrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.postId.isEmpty) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: FirebaseService.getPostRemixesStream(widget.postId),
+      builder: (context, snap) {
+        final remixes = snap.data ?? [];
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.10), width: 0.8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header strip ───────────────────────────────────────
+                  GestureDetector(
+                    onTap: remixes.isEmpty ? null : _toggle,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.shuffle_rounded,
+                              color: _kGreen.withValues(alpha: 0.70), size: 14),
+                          const SizedBox(width: 8),
+                          if (remixes.isEmpty) ...[
+                            Text(
+                              'No remixes yet',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.38),
+                                fontFamily: AppTheme.fontBody,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ] else ...[
+                            _OverlappingRemixCircles(
+                                remixes: remixes.take(7).toList()),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${remixes.length} remix${remixes.length == 1 ? '' : 'es'}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.82),
+                                  fontFamily: AppTheme.fontBody,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (remixes.isNotEmpty)
+                            AnimatedRotation(
+                              turns: _expanded ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(Icons.expand_more_rounded,
+                                  color: Colors.white.withValues(alpha: 0.50),
+                                  size: 20),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Expanded list ──────────────────────────────────────
+                  SizeTransition(
+                    sizeFactor: _anim,
+                    alignment: const Alignment(-1.0, -1.0),
+                    child: Column(
+                      children: [
+                        Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Colors.white.withValues(alpha: 0.08)),
+                        ...remixes.asMap().entries.map((e) => _RemixRow(
+                              data: e.value,
+                              isLast: e.key == remixes.length - 1,
+                            )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Overlapping artist image circles (remix strip) ───────────────────────────
+class _OverlappingRemixCircles extends StatelessWidget {
+  const _OverlappingRemixCircles({required this.remixes});
+  final List<Map<String, dynamic>> remixes;
+
+  static const double _size    = 28.0;
+  static const double _overlap = 9.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (remixes.isEmpty) return const SizedBox.shrink();
+    final count = remixes.length;
+    final totalWidth = _size + (_size - _overlap) * (count - 1);
+
+    return SizedBox(
+      height: _size,
+      width: totalWidth,
+      child: Stack(
+        children: List.generate(count, (i) {
+          final url =
+              (remixes[i]['artist2ImageUrl'] as String?)?.trim() ?? '';
+          return Positioned(
+            left: i * (_size - _overlap),
+            child: _RemixAvatarCircle(url: url),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _RemixAvatarCircle extends StatelessWidget {
+  const _RemixAvatarCircle({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _OverlappingRemixCircles._size,
+      height: _OverlappingRemixCircles._size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border:
+            Border.all(color: _kGreen.withValues(alpha: 0.45), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 5,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: ClipOval(
+        child: url.isNotEmpty
+            ? Image.network(url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallback())
+            : _fallback(),
+      ),
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: _kBlue.withValues(alpha: 0.35),
+        child: Icon(Icons.music_note_rounded,
+            color: _kGreen.withValues(alpha: 0.8), size: 13),
+      );
+}
+
+// ─── Single remix row (expanded list) ────────────────────────────────────────
+class _RemixRow extends StatelessWidget {
+  const _RemixRow({required this.data, required this.isLast});
+  final Map<String, dynamic> data;
+  final bool isLast;
+
+  void _openPlayground(BuildContext context) {
+    final versusId = (data['id'] as String?)?.trim() ?? '';
+    final model = ArtistVersusModel.fromFirestore(
+      Map<String, dynamic>.from(data)..remove('id'),
+      versusId,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ArtistVersusPlayground(
+          versus: model,
+          versusId: versusId,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final artist2Name =
+        (data['artist2Name'] as String?)?.trim() ?? 'Unknown Artist';
+    final artist2Image =
+        (data['artist2ImageUrl'] as String?)?.trim() ?? '';
+    final collabName =
+        (data['collaborator_username'] as String?)?.trim() ?? '';
+    final collabAvatar =
+        (data['collaborator_avatar'] as String?)?.trim() ?? '';
+
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _openPlayground(context),
+            splashColor: Colors.white.withValues(alpha: 0.06),
+            highlightColor: Colors.white.withValues(alpha: 0.03),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              // Artist circle
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.20), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _kGreen.withValues(alpha: 0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: ClipOval(
+                  child: artist2Image.isNotEmpty
+                      ? Image.network(artist2Image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _artistFallback())
+                      : _artistFallback(),
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      artist2Name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: AppTheme.fontBody,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (collabName.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (collabAvatar.isNotEmpty) ...[
+                            ClipOval(
+                              child: Image.network(
+                                collabAvatar,
+                                width: 14,
+                                height: 14,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              'by $collabName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.48),
+                                fontFamily: AppTheme.fontBody,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              Icon(Icons.chevron_right_rounded,
+                  size: 17, color: Colors.white.withValues(alpha: 0.25)),
+            ],
+          ),
+        ),
+          ),
+        ),
+        if (!isLast)
+          Divider(
+            height: 1,
+            thickness: 1,
+            indent: 14,
+            endIndent: 14,
+            color: Colors.white.withValues(alpha: 0.07),
+          ),
+      ],
+    );
+  }
+
+  Widget _artistFallback() => Container(
+        color: _kBlue.withValues(alpha: 0.30),
+        child: Icon(Icons.music_note_rounded,
+            color: _kGreen.withValues(alpha: 0.7), size: 22),
       );
 }

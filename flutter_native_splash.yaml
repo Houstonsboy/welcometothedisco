@@ -1,0 +1,22 @@
+# Native splash configuration.
+# Regenerate after any logo change:
+#   dart run flutter_native_splash:create
+#
+# The PNG is the four-quadrant logo generated at assets/images/splash_logo.png.
+# Re-export it by running: dart run tool/generate_splash_logo.dart
+# (or re-run the ImageMagick one-liner in the README / splash_screen.dart header).
+
+flutter_native_splash:
+  color: "#161616"
+  image: assets/images/splash_logo.png
+
+  android_12:
+    image: assets/images/splash_logo.png
+    color: "#161616"
+    image_dark: assets/images/splash_logo.png
+    color_dark: "#161616"
+
+  ios: true
+  android: true
+  web: false
+  fullscreen: false

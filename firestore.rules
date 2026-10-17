@@ -15,10 +15,14 @@ service cloud.firestore {
 
         // Follow: sender is the follower — must match followerID.
         // Invite: sender is author — must match authorID; written under recipient userId.
+        // Mention: sender is the post author — must match authorID; written under each tagged userId.
         allow create: if request.auth != null && (
           request.resource.data.type == 'follow'
             && request.resource.data.followerID == request.auth.uid
           || request.resource.data.type == 'invite'
+            && request.resource.data.authorID == request.auth.uid
+            && userId != request.auth.uid
+          || request.resource.data.type == 'mention'
             && request.resource.data.authorID == request.auth.uid
             && userId != request.auth.uid
         );
@@ -63,45 +67,137 @@ service cloud.firestore {
               ]);
       }
 
+      /// Returns true when pk is the canonical sorted pair key for id1 and id2.
+      /// Accepts only the sorted (lower-lex first) form; the reversed form is rejected.
+      function validSortedPairKey(id1, id2, pk) {
+        return id1 != '' && id2 != '' && pk != ''
+          && ((id1 < id2 && pk == (id1 + '_' + id2))
+           || (id2 < id1 && pk == (id2 + '_' + id1))
+           || (id1 == id2 && pk == (id1 + '_' + id2)));
+      }
+
+      /// pair_key on an open-join update must be the sorted canonical form.
+      function validArtistPairKey() {
+        let pk = request.resource.data.get('pair_key', '');
+        let a1 = request.resource.data.get('artist1ID', '');
+        let a2 = request.resource.data.get('artist2ID', '');
+        return validSortedPairKey(a1, a2, pk);
+      }
+
+      /// At create time, validates artist pair_key and is_self_matchup consistency.
+      /// - Open-join (no artist2 yet): passes — pair_key not required yet.
+      /// - Self-matchup (a1 == a2): requires is_self_matchup == true and pair_key absent.
+      /// - Normal (a1 != a2): requires is_self_matchup == false and valid sorted pair_key.
+      function validArtistPairKeyAtCreate() {
+        let pk = request.resource.data.get('pair_key', null);
+        let et = request.resource.data.get('entity_type', '');
+        let a1 = request.resource.data.get('artist1ID', '');
+        let a2 = request.resource.data.get('artist2ID', '');
+        let sm = request.resource.data.get('is_self_matchup', false);
+        return et != 'artist'
+          || a2 == ''
+          || (a1 == a2 && sm == true && pk == null)
+          || (a1 != a2 && sm == false && pk != null && validSortedPairKey(a1, a2, pk));
+      }
+
+      /// At create time, validates album pair_key and is_self_matchup consistency.
+      function validAlbumPairKeyAtCreate() {
+        let pk = request.resource.data.get('pair_key', null);
+        let et = request.resource.data.get('entity_type', '');
+        let a1 = request.resource.data.get('album1ID', '');
+        let a2 = request.resource.data.get('album2ID', '');
+        let sm = request.resource.data.get('is_self_matchup', false);
+        return et != 'album'
+          || a2 == ''
+          || (a1 == a2 && sm == true && pk == null)
+          || (a1 != a2 && sm == false && pk != null && validSortedPairKey(a1, a2, pk));
+      }
+
+      /// is_self_matchup can be set false → true (on join) but never true → false.
+      function selfMatchupImmutable() {
+        let before = resource.data.get('is_self_matchup', false);
+        let after  = request.resource.data.get('is_self_matchup', false);
+        return before != true || after == true;
+      }
+
       /// Public artist-versus join: claimant sets themselves as collaborator (was not author).
+      /// pair_key and entity_type may be written here (first time only) with validation.
+      /// For self-matchup joins, is_self_matchup is set to true and pair_key is omitted.
       function artistVersusOpenJoinUpdate() {
+        let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+        let pairKeyAlreadySet = resource.data.get('pair_key', null) != null;
+        let pairKeyImmutable = !pairKeyAlreadySet
+          || request.resource.data.get('pair_key', null) == resource.data.get('pair_key', null);
+        let isSM = request.resource.data.get('is_self_matchup', false);
+        let a1 = resource.data.get('artist1ID', '');
+        let a2 = request.resource.data.get('artist2ID', '');
+        // is_self_matchup flag must match the actual IDs.
+        let smConsistent = (a1 == a2) == isSM;
+        // pair_key validation depends on whether this is a self-matchup.
+        let pkConsistent = isSM
+          ? !affectedKeys.hasAny(['pair_key'])
+          : (!affectedKeys.hasAny(['pair_key', 'entity_type']) || validArtistPairKey());
         return request.auth != null
           && resource.data.get('type', '') == 'artist'
           && resource.data.get('status', '') == 'open'
           && request.auth.uid != versusAuthorUid()
           && request.resource.data.get('collaboratorID', '') == request.auth.uid
           && request.resource.data.get('status', '') == 'active'
+          && pairKeyImmutable
+          && smConsistent
+          && pkConsistent
+          && affectedKeys.hasOnly([
+              'collaboratorID', 'artist2ID', 'artist2Name',
+              'artist2TrackIDs', 'status', 'pair_key', 'entity_type', 'is_self_matchup'
+            ]);
+      }
+
+      /// Lazy Spotify image/name cache fill-in: any viewer (not just the author) may
+      /// populate these fields, since they're just cached display data keyed off the
+      /// doc's own Spotify IDs and are read in the shared Inbox feed (see
+      /// FirebaseService.backfillAlbumVersusImages / backfillArtistVersusImages).
+      function versusImageCacheBackfill() {
+        return request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly([
-                'collaboratorID', 'artist2ID', 'artist2Name',
-                'artist2TrackIDs', 'status'
+                'album1ImageUrl', 'album1ArtistName',
+                'album2ImageUrl', 'album2ArtistName',
+                'artist1ImageUrl', 'artist2ImageUrl'
               ]);
       }
 
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && validArtistPairKeyAtCreate()
+        && validAlbumPairKeyAtCreate();
       allow update: if request.auth != null
+        && selfMatchupImmutable()
         && (
           // One-off type backfill (e.g. album versus migration)
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type'])
           || isVersusAuthor()
           || collaborationCollaboratorUpdate()
           || artistVersusOpenJoinUpdate()
+          || versusImageCacheBackfill()
         );
       allow delete: if request.auth != null && isVersusAuthor();
     }
 
-    // Rankings: one doc per Spotify artist or album (`rankings/{spotifyEntityId}`).
-    // Initial stub is created client-side when an entity first appears in a versus;
-    // later updates should use atomic increments / dotted paths, not full overwrites.
+    // Rankings: read-only from clients; all writes are by Cloud Functions.
     match /rankings/{entityId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.get('entity_id', '') == entityId
-        && (request.resource.data.get('entity_type', '') == 'artist'
-            || request.resource.data.get('entity_type', '') == 'album');
-      allow update: if request.auth != null;
-      allow delete: if false;
+      allow create, update, delete: if false;
+    }
+
+    // Pairs: read-only from clients; all writes are by Cloud Functions.
+    match /pairs/{pairKey} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if false;
+
+      match /voters/{voterId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if false;
+      }
     }
 
     // Polls: one poll doc per voter per versus, keyed as {versus_id}_{voter_id}.
@@ -122,11 +218,25 @@ service cloud.firestore {
         return pollId == (versusId() + '_' + voterId());
       }
 
+      /// pair_key must be the sorted canonical form of entity1_id and entity2_id.
+      /// Self-matchup (e1 == e2): pair_key must be absent/null.
+      /// Non-self-matchup: pair_key must equal the lower-lex-first sorted key.
+      function validPollPairKey() {
+        let e1 = request.resource.data.get('entity1_id', '');
+        let e2 = request.resource.data.get('entity2_id', '');
+        let pk = request.resource.data.get('pair_key', null);
+        return (e1 == e2 && pk == null)
+          || (e1 != e2 && pk != null
+              && ((e1 < e2 && pk == (e1 + '_' + e2))
+               || (e2 < e1 && pk == (e2 + '_' + e1))));
+      }
+
       function isOwnerCreate() {
         return isAuthed()
           && voterId() == request.auth.uid
           && versusId() != ''
-          && ownerDocIdMatches();
+          && ownerDocIdMatches()
+          && validPollPairKey();
       }
 
       function isOwnerUpdate() {
@@ -143,8 +253,48 @@ service cloud.firestore {
 
       allow read: if isAuthed();
       allow create: if isOwnerCreate();
-      allow update: if isOwnerUpdate();
-      allow delete: if isAuthed() && resource.data.get('voter_id', '') == request.auth.uid;
+      allow update: if isOwnerUpdate() && validPollPairKey();
+      allow delete: if false;
+    }
+
+    // Posts: global feed + per-author / per-artist streams.
+    match /posts/{postId} {
+      function isPostAuthor() {
+        return request.auth != null
+          && resource.data.get('authorID', '') == request.auth.uid;
+      }
+
+      allow read: if request.auth != null;
+
+      // Creator must stamp their own uid in authorID.
+      allow create: if request.auth != null
+        && request.resource.data.get('authorID', '') == request.auth.uid;
+
+      allow update: if request.auth != null && (
+        // Post owner can patch any field.
+        isPostAuthor()
+        // Anyone can bump the remix counter (the remixer is not the post author).
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Remixcount'])
+        // Anyone can bump the share counter.
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Sharecount'])
+      );
+
+      allow delete: if request.auth != null && isPostAuthor();
+    }
+
+    // Ranking run audit log: written only by Cloud Functions, never by clients.
+    match /ranking_runs/{docId} {
+      allow read, write: if false;
+    }
+
+    // Playback-gate A/B test events (see lib/services/playback_gate.dart).
+    // Write-only event log: a client logs its own attempts, never reads them
+    // back (analysis happens via the Firebase console / a script) and can
+    // never edit or delete one after the fact.
+    match /playback_gate_events/{eventId} {
+      allow create: if request.auth != null
+        && request.resource.data.get('uid', '') == request.auth.uid;
+      allow read, update, delete: if false;
     }
   }
 }

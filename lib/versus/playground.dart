@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,10 +11,10 @@ import 'package:gal/gal.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:welcometothedisco/models/vote_doc_template_model.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/utils/pair_utils.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/widgets/versus_share_card.dart';
@@ -99,27 +97,27 @@ class _VersusPlaygroundState extends State<VersusPlayground>
   late final AnimationController _pulseController;
   late final AnimationController _slideController;
   late final Animation<double>   _pulseAnim;
-  late final Animation<double>   _slideAnim;
-  late final PageController      _pageController;
 
   // ── UI state ──────────────────────────────────────────────────────────────
   int  _selectedAlbum    = 0;
   int  _activeTrackIndex = 0;
   int? _playingTrackIndex;
-  int  _leadAlbumIndex   = 0;
 
   // ── Playback ──────────────────────────────────────────────────────────────
-  bool _isPlayLoading = false;
   bool _isBombLoading = false;
+  bool _hasVersusPlaybackStarted = false;
+  int? _coverLoadingRoundIndex;
   StreamSubscription<NowPlaying?>? _nowPlayingSub;
   String? _advanceOnTrackId;
-  String? _currentRoundTrack1Id;
   String? _currentRoundTrack2Id;
   bool    _roundTrack2Started = false;
 
   // ── Vote state ────────────────────────────────────────────────────────────
   final Map<int, int>                  _votesByIndex = {};
   final Map<int, AlbumTrackVoteDetail> _trackDetails = {};
+
+  // ── Scroll controllers — one per side, kept in sync when active track changes
+  final ScrollController _scrollController1 = ScrollController();
 
   // ── Comment controllers (state-level so they survive rebuilds & are syncable)
   final Map<int, TextEditingController> _commentControllers = {};
@@ -326,10 +324,12 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       '${tempDir.path}/wttd_album_versus.png',
     ).writeAsBytes(bytes);
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: '$_shareAlbum1Title vs $_shareAlbum2Title '
-          '— voted on welcometothedisco',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: '$_shareAlbum1Title vs $_shareAlbum2Title '
+            '— voted on welcometothedisco',
+      ),
     );
   }
 
@@ -350,7 +350,6 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     super.initState();
     debugPrint('[VersusPlayground] opened | versus_id: ${_resolvedVersusId.isEmpty ? "(missing)" : _resolvedVersusId}');
 
-    _pageController  = PageController();
     _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))
       ..repeat(reverse: true);
     _slideController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
@@ -358,29 +357,57 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    _slideAnim = CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic);
     _slideController.forward();
 
-    _albumsFuture = _api.getBothAlbumsWithTracks(
-      widget.versus.album1ID,
-      widget.versus.album2ID,
-    );
+    // If the versus was created with full tracklists, pre-build albums from
+    // Firestore data so the UI renders immediately without an API loading state.
+    final tl1 = widget.versus.album1Tracklist;
+    final tl2 = widget.versus.album2Tracklist;
+    final hasTracklists = (tl1 != null && tl1.isNotEmpty) &&
+                          (tl2 != null && tl2.isNotEmpty);
 
-    _albumsFuture.then((list) {
-      if (!mounted || list == null || list.length < 2) return;
-      setState(() => _albums = list);
-      _extractPalette(
-        list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
-        list[1]?.imageUrl ?? widget.versus.album2ImageUrl,
+    if (hasTracklists) {
+      final prebuilt = _albumsFromTracklists(tl1, tl2, widget.versus);
+      _albums = prebuilt;
+      _albumsFuture = Future.value(prebuilt);
+      _extractPalette(widget.versus.album1ImageUrl, widget.versus.album2ImageUrl);
+      // Background: enrich with Spotify data (duration, track numbers, etc.).
+      _api.getBothAlbumsWithTracks(
+        widget.versus.album1ID,
+        widget.versus.album2ID,
+      ).then((list) {
+        if (!mounted || list.length < 2) return;
+        if (list[0] != null && list[1] != null) {
+          setState(() => _albums = list);
+          _extractPalette(
+            list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
+            list[1]?.imageUrl ?? widget.versus.album2ImageUrl,
+          );
+        }
+      }).catchError((_) {/* non-critical — Firestore data already shown */});
+    } else {
+      // Older records without tracklists: fetch from Spotify as before.
+      _albumsFuture = _api.getBothAlbumsWithTracks(
+        widget.versus.album1ID,
+        widget.versus.album2ID,
       );
-    });
+
+      _albumsFuture.then((list) {
+        if (!mounted || list.length < 2) return;
+        setState(() => _albums = list);
+        _extractPalette(
+          list[0]?.imageUrl ?? widget.versus.album1ImageUrl,
+          list[1]?.imageUrl ?? widget.versus.album2ImageUrl,
+        );
+      });
+    }
 
     unawaited(_hydrateVoterContext());
   }
 
   // ── Voter context + session restore ──────────────────────────────────────
   Future<void> _hydrateVoterContext() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
     if (uid.isEmpty) return;
 
     var cached = await UserProfileCacheService.readUser(expectedUid: uid);
@@ -415,52 +442,54 @@ class _VersusPlaygroundState extends State<VersusPlayground>
       }
     }
 
-    final data = await FirebaseService.getExistingAlbumPoll(
+    final data = await FirebaseService.getExistingPoll(
       versusId: _resolvedVersusId,
       voterId:  _voterId,
     );
     if (data == null || !mounted) return;
 
-    final rawDetails = data['track_details'] as Map<String, dynamic>?;
+    final rawDetails = data['track_details'] as List<dynamic>?;
     if (rawDetails == null || rawDetails.isEmpty) return;
 
     final restoredVotes   = <int, int>{};
     final restoredDetails = <int, AlbumTrackVoteDetail>{};
 
-    for (final entry in rawDetails.entries) {
-      final roundIndex = int.tryParse(entry.key);
-      if (roundIndex == null) continue;
-
-      final round   = entry.value as Map<String, dynamic>?;
+    for (final item in rawDetails) {
+      final round = item as Map<String, dynamic>?;
       if (round == null) continue;
+
+      final roundIndex = (round['round_number'] as num?)?.toInt();
+      if (roundIndex == null) continue;
 
       final isBonus = round['isBonus'] as bool? ?? false;
       if (isBonus) continue;
 
-      // Note: we stored these under artist1trackID/artist2trackID keys
-      // to match the shared poll schema.
-      final album1trackID   = round['artist1trackID']   as String? ?? '';
-      final album2trackID   = round['artist2trackID']   as String? ?? '';
-      final winnerId        = round['Winner']            as String? ?? '';
-      final album1trackName = round['artist1trackName'] as String? ?? '';
-      final album2trackName = round['artist2trackName'] as String? ?? '';
-      final comment         = round['voter_comment']    as String? ?? '';
+      final art1Id = (round['entity1_track_id'] as String?) ?? '';
+      final art2Id = (round['entity2_track_id'] as String?) ?? '';
+      final winnerStr = round['winner'] as String?;
 
-      if (winnerId.isEmpty || album1trackID.isEmpty || album2trackID.isEmpty) continue;
+      if (winnerStr == null || art1Id.isEmpty || art2Id.isEmpty) continue;
 
-      final int winnerAlbumIndex;
-      if (winnerId == album1trackID)      { winnerAlbumIndex = 0; }
-      else if (winnerId == album2trackID) { winnerAlbumIndex = 1; }
-      else { continue; }
+      final int winnerIndex;
+      final String winnerId;
+      if (winnerStr == 'entity1') {
+        winnerIndex = 0;
+        winnerId = art1Id;
+      } else if (winnerStr == 'entity2') {
+        winnerIndex = 1;
+        winnerId = art2Id;
+      } else {
+        continue;
+      }
 
-      restoredVotes[roundIndex] = winnerAlbumIndex;
+      restoredVotes[roundIndex] = winnerIndex;
       restoredDetails[roundIndex] = AlbumTrackVoteDetail(
-        album1trackID:   album1trackID,
-        album2trackID:   album2trackID,
+        album1trackID:   art1Id,
+        album2trackID:   art2Id,
         winnerTrackID:   winnerId,
-        album1trackName: album1trackName,
-        album2trackName: album2trackName,
-        voterComment:    comment,
+        album1trackName: (round['entity1_track_name'] as String?) ?? '',
+        album2trackName: (round['entity2_track_name'] as String?) ?? '',
+        voterComment:    (round['voter_comment'] as String?) ?? '',
         isBonus:         false,
       );
     }
@@ -505,46 +534,75 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         ? 0.0
         : ((votedCount / totalRounds) * 100).clamp(0, 100).toDouble();
 
-    // Build track_details — include bonus rounds for longer album.
-    final details = <int, Map<String, dynamic>>{
-      for (final e in _trackDetails.entries) e.key: e.value.toMap(),
-    };
+    final album1 = albums[0];
+    final album2 = albums[1];
+    final album1Id = widget.versus.album1ID;
+    final album2Id = widget.versus.album2ID;
 
+    // Build unified track_details list.
+    final trackDetailsList = <Map<String, dynamic>>[];
+    for (final e in _trackDetails.entries) {
+      final oldMap = e.value.toMap();
+      final art1Id = (oldMap['artist1trackID'] as String?) ?? '';
+      final art2Id = (oldMap['artist2trackID'] as String?) ?? '';
+      final winnerId = (oldMap['Winner'] as String?) ?? '';
+      final String? winner = winnerId.isEmpty
+          ? null
+          : (winnerId == art1Id
+              ? 'entity1'
+              : (winnerId == art2Id ? 'entity2' : null));
+      trackDetailsList.add({
+        'round_number':       e.key,
+        'entity1_track_id':   art1Id,
+        'entity1_track_name': (oldMap['artist1trackName'] as String?) ?? '',
+        'entity2_track_id':   art2Id,
+        'entity2_track_name': (oldMap['artist2trackName'] as String?) ?? '',
+        'isBonus':            (oldMap['isBonus'] as bool?) ?? false,
+        'winner':             winner,
+        'voter_comment':      (oldMap['voter_comment'] as String?) ?? '',
+      });
+    }
+
+    // Append bonus rounds for the longer album.
     final longerIndex = _longerSideAlbumIndex;
     if (longerIndex != null && _isVotingCompleteForPairs) {
       final longerTracks = albums[longerIndex]?.tracks ?? <SpotifyAlbumTrack>[];
       for (int i = _pairedRoundCount; i < longerTracks.length; i++) {
         final t = longerTracks[i];
-        details[i] = {
-          'artist1trackID':   longerIndex == 0 ? t.id   : null,
-          'artist2trackID':   longerIndex == 1 ? t.id   : null,
-          'Winner':           t.id,
-          'voter_comment':    '',
-          'artist1trackName': longerIndex == 0 ? t.name : null,
-          'artist2trackName': longerIndex == 1 ? t.name : null,
-          'isBonus':          true,
-        };
+        final isEnt1 = longerIndex == 0;
+        trackDetailsList.add({
+          'round_number':       i,
+          'entity1_track_id':   isEnt1 ? t.id   : '',
+          'entity1_track_name': isEnt1 ? t.name : '',
+          'entity2_track_id':   isEnt1 ? ''     : t.id,
+          'entity2_track_name': isEnt1 ? ''     : t.name,
+          'isBonus':            true,
+          'winner':             isEnt1 ? 'entity1' : 'entity2',
+          'voter_comment':      '',
+        });
       }
     }
 
-    final album1 = albums[0];
-    final album2 = albums[1];
+    trackDetailsList.sort(
+      (a, b) => (a['round_number'] as int).compareTo(b['round_number'] as int),
+    );
 
-    await FirebaseService.upsertAlbumPoll(
-      versusId:  _resolvedVersusId,
-      versusType: widget.versus.type.trim(),
-      voterId:   _voterId,
-      voterName: _voterName,
+    final pairKey = makePairKey(album1Id, album2Id);
+
+    await FirebaseService.upsertPoll(
+      versusId:    _resolvedVersusId,
+      pairKey:     pairKey,
+      entityType:  'album',
+      voterId:     _voterId,
+      voterName:   _voterName,
       voterAvatar: _voterAvatar,
-      album1ID:   widget.versus.album1ID,
-      album1Name: album1?.title ?? widget.versus.album1Name ?? '',
-      album1Vote: _album1VoteCount,
-      album2ID:   widget.versus.album2ID,
-      album2Name: album2?.title ?? widget.versus.album2Name ?? '',
-      album2Vote: _album2VoteCount,
-      trackDetails: details,
-      completionPercentage: completion,
-      unvotedCount: unvoted,
+      entity1Id:   album1Id,
+      entity1Name: album1?.title ?? widget.versus.album1Name,
+      entity2Id:   album2Id,
+      entity2Name: album2?.title ?? widget.versus.album2Name,
+      trackDetails:          trackDetailsList,
+      completionPercentage:  completion,
+      unvotedCount:          unvoted,
     );
   }
 
@@ -587,12 +645,43 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _schedulePollSync();
   }
 
-  void _onCommentChanged(int trackIndex, String text) {
-    final detail = _trackDetails[trackIndex];
-    if (detail != null) {
-      setState(() => detail.voterComment = text);
-      _schedulePollSync();
+  // ── Tracklist → SpotifyAlbumWithTracks ───────────────────────────────────
+  static List<SpotifyAlbumWithTracks?> _albumsFromTracklists(
+    List<Map<String, dynamic>> tl1,
+    List<Map<String, dynamic>> tl2,
+    VersusModel v,
+  ) {
+    SpotifyAlbumWithTracks build(
+      List<Map<String, dynamic>> tl,
+      String id,
+      String name,
+      String? artistName,
+      String? imageUrl,
+    ) {
+      return SpotifyAlbumWithTracks(
+        id: id,
+        title: name,
+        artistName: artistName ?? '',
+        imageUrl: imageUrl,
+        totalTracks: tl.length,
+        releaseDate: '',
+        tracks: tl.asMap().entries.map((e) {
+          final t = e.value;
+          return SpotifyAlbumTrack(
+            id: (t['spotifyID'] as String?) ?? '',
+            trackNumber: e.key + 1,
+            name: (t['trackname'] as String?) ?? '',
+            artistName: (t['trackartist'] as String?) ?? '',
+            durationMs: 0,
+          );
+        }).toList(),
+      );
     }
+
+    return [
+      build(tl1, v.album1ID, v.album1Name, v.album1ArtistName, v.album1ImageUrl),
+      build(tl2, v.album2ID, v.album2Name, v.album2ArtistName, v.album2ImageUrl),
+    ];
   }
 
   // ── Palette ───────────────────────────────────────────────────────────────
@@ -618,56 +707,119 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     if (_selectedAlbum == index) return;
     setState(() => _selectedAlbum = index);
     _slideController.forward(from: 0);
-    _pageController.animateToPage(index,
-        duration: const Duration(milliseconds: 380), curve: Curves.easeOutCubic);
   }
 
-  void _onPageChanged(int index) {
-    if (_selectedAlbum == index) return;
-    setState(() => _selectedAlbum = index);
-    _slideController.forward(from: 0);
-  }
-
-  void _onTrackTapped(int trackIndex, int albumIndex) {
+  void _stopPlaybackTracking() {
     _nowPlayingSub?.cancel();
-    _nowPlayingSub        = null;
-    _advanceOnTrackId     = null;
-    _currentRoundTrack1Id = null;
+    _nowPlayingSub = null;
+    _advanceOnTrackId = null;
     _currentRoundTrack2Id = null;
-    _roundTrack2Started   = false;
+    _roundTrack2Started = false;
+  }
+
+  void _showPlaybackSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  String _spotifyUriFor(SpotifyAlbumTrack track) {
+    final uri = track.uri.trim();
+    if (uri.isNotEmpty) return uri;
+    final id = track.id.trim();
+    if (id.isNotEmpty) return 'spotify:track:$id';
+    return '';
+  }
+
+  void _syncScrollToActiveTrack() {
+    const double rowH = 136.0; // 130px cell + 6px gap
+    final target = _activeTrackIndex * rowH;
+    if (_scrollController1.hasClients) {
+      _scrollController1.animateTo(
+        target.clamp(0.0, _scrollController1.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _onTitleTap(int trackIndex, int _) {
     setState(() {
-      _activeTrackIndex  = trackIndex;
-      _leadAlbumIndex    = albumIndex;
-      _playingTrackIndex = null;
+      _activeTrackIndex = trackIndex;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollToActiveTrack());
   }
 
   // ── Playback ──────────────────────────────────────────────────────────────
-  Future<void> _handlePlay() async {
+  Future<bool> _playRoundAtIndex(int index) async {
+    final albums = _albums;
+    if (albums == null || albums.length < 2) return false;
+    final t1 = albums[0]?.tracks.elementAtOrNull(index);
+    final t2 = albums[1]?.tracks.elementAtOrNull(index);
+    if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) {
+      return false;
+    }
+    final uri1 = _spotifyUriFor(t1);
+    final uri2 = _spotifyUriFor(t2);
+    if (uri1.isEmpty || uri2.isEmpty) return false;
+
+    setState(() => _coverLoadingRoundIndex = index);
+    try {
+      final played = await _api.playRoundTracks(uri1, uri2);
+      if (!played) {
+        _showPlaybackSnack(
+          'Open Spotify on a phone, speaker, or desktop, then try again.',
+        );
+        return false;
+      }
+      _hasVersusPlaybackStarted = true;
+      _currentRoundTrack2Id = t2.id;
+      _roundTrack2Started = false;
+      _advanceOnTrackId = t2.id;
+      _startNowPlayingIndexTracking();
+      if (mounted) setState(() => _playingTrackIndex = index);
+      return true;
+    } catch (e) {
+      debugPrint('[VersusPlayground] _playRoundAtIndex error: $e');
+      _showPlaybackSnack('Playback failed. Check Spotify is active.');
+      return false;
+    } finally {
+      if (mounted) setState(() => _coverLoadingRoundIndex = null);
+    }
+  }
+
+  Future<void> _onCoverTap(int trackIndex, int _) async {
     final albums = _albums;
     if (albums == null || albums.length < 2) return;
-    final roundIndex  = _activeTrackIndex;
-    final leadAlbum   = _leadAlbumIndex;
-    final followAlbum = leadAlbum == 0 ? 1 : 0;
-    final tLead   = albums[leadAlbum]?.tracks.elementAtOrNull(roundIndex);
-    final tFollow = albums[followAlbum]?.tracks.elementAtOrNull(roundIndex);
-    if (tLead == null || tFollow == null || tLead.id.isEmpty || tFollow.id.isEmpty) return;
 
-    setState(() => _isPlayLoading = true);
-    try {
-      final played = await _api.playRoundTracks(tLead.uri, tFollow.uri);
-      if (!played) return;
-      _currentRoundTrack1Id = tLead.id;
-      _currentRoundTrack2Id = tFollow.id;
-      _roundTrack2Started   = false;
-      _advanceOnTrackId     = tFollow.id;
-      _startNowPlayingIndexTracking();
-      if (mounted) setState(() => _playingTrackIndex = roundIndex);
-    } catch (e) {
-      debugPrint('[VersusPlayground] _handlePlay error: $e');
-    } finally {
-      if (mounted) setState(() => _isPlayLoading = false);
+    final playIndex = _hasVersusPlaybackStarted ? trackIndex : 0;
+
+    if (_playingTrackIndex == playIndex) {
+      setState(() => _coverLoadingRoundIndex = playIndex);
+      try {
+        final paused = await _api.pause();
+        if (!mounted) return;
+        if (paused) {
+          _stopPlaybackTracking();
+          setState(() => _playingTrackIndex = null);
+        } else {
+          _showPlaybackSnack(
+            'Could not pause — open Spotify on a device and try again.',
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _coverLoadingRoundIndex = null);
+      }
+      return;
     }
+
+    await _playRoundAtIndex(playIndex);
   }
 
   void _startNowPlayingIndexTracking() {
@@ -682,11 +834,11 @@ class _VersusPlaygroundState extends State<VersusPlayground>
         final total = math.min(_albums?[0]?.tracks.length ?? 0, _albums?[1]?.tracks.length ?? 0);
         if (_activeTrackIndex < total - 1) {
           setState(() { _activeTrackIndex++; _playingTrackIndex = null; });
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollToActiveTrack());
         } else {
           setState(() => _playingTrackIndex = null);
         }
-        _advanceOnTrackId = null; _currentRoundTrack1Id = null;
-        _currentRoundTrack2Id = null; _roundTrack2Started = false;
+        _stopPlaybackTracking();
       }
     });
   }
@@ -697,7 +849,10 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final t1 = a[0]?.tracks.elementAtOrNull(index);
     final t2 = a[1]?.tracks.elementAtOrNull(index);
     if (t1 == null || t2 == null || t1.id.isEmpty || t2.id.isEmpty) return false;
-    return _api.queueRoundTracks(t1.uri, t2.uri);
+    final uri1 = _spotifyUriFor(t1);
+    final uri2 = _spotifyUriFor(t2);
+    if (uri1.isEmpty || uri2.isEmpty) return false;
+    return _api.queueRoundTracks(uri1, uri2);
   }
 
   Future<void> _handleBomb() async {
@@ -705,10 +860,20 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     final a = _albums;
     if (a == null || a.length < 2) return;
     final total = math.min(a[0]?.tracks.length ?? 0, a[1]?.tracks.length ?? 0);
-    if (total <= 0 || _activeTrackIndex >= total - 1) return;
+    if (total <= 0) return;
     setState(() => _isBombLoading = true);
     try {
-      for (int i = _activeTrackIndex + 1; i < total; i++) {
+      int queueFrom;
+      if (!_hasVersusPlaybackStarted || _playingTrackIndex == null) {
+        final started = await _playRoundAtIndex(0);
+        if (!started) return;
+        queueFrom = 1;
+      } else {
+        if (_activeTrackIndex >= total - 1) return;
+        queueFrom = _activeTrackIndex + 1;
+      }
+
+      for (int i = queueFrom; i < total; i++) {
         if (!await _queueRoundAtIndex(i)) break;
       }
     } catch (e) {
@@ -733,8 +898,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
 
   Widget _avatarFallback(double size) => Container(
     width: size, height: size,
-    color: Colors.white.withOpacity(0.2),
-    child: Icon(Icons.person_rounded, color: Colors.white.withOpacity(0.8), size: size * 0.55),
+    color: Colors.white.withValues(alpha: 0.2),
+    child: Icon(Icons.person_rounded, color: Colors.white.withValues(alpha: 0.8), size: size * 0.55),
   );
 
   @override
@@ -743,7 +908,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     _nowPlayingSub?.cancel();
     _pulseController.dispose();
     _slideController.dispose();
-    _pageController.dispose();
+    _scrollController1.dispose();
     for (final c in _commentControllers.values) { c.dispose(); }
     super.dispose();
   }
@@ -772,8 +937,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                   builder: (context, snapshot) {
               final album1   = snapshot.data?[0];
               final album2   = snapshot.data?[1];
-              final a1Title  = album1?.title    ?? widget.versus.album1Name ?? 'Album 1';
-              final a2Title  = album2?.title    ?? widget.versus.album2Name ?? 'Album 2';
+              final a1Title  = album1?.title    ?? widget.versus.album1Name;
+              final a2Title  = album2?.title    ?? widget.versus.album2Name;
               final a1Image  = album1?.imageUrl ?? widget.versus.album1ImageUrl;
               final a2Image  = album2?.imageUrl ?? widget.versus.album2ImageUrl;
               final a1Artist = album1?.artistName ?? widget.versus.album1ArtistName ?? '';
@@ -791,61 +956,45 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                     isLoading: isLoading,
                   )),
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SwipeDot(isActive: _selectedAlbum == 0, color: _color1),
-                          const SizedBox(width: 6),
-                          _SwipeDot(isActive: _selectedAlbum == 1, color: _color2),
-                        ],
-                      ),
-                    ),
-                  ),
                   SliverFillRemaining(
                     child: isLoading
                         ? Center(child: CircularProgressIndicator(color: _color1))
                         : Column(children: [
-                            // ── Playback controls ────────────────────────────
+                            // ── Playback status ──────────────────────────────
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                               child: Row(children: [
-                                GestureDetector(
-                                  onTap: _isPlayLoading ? null : _handlePlay,
-                                  child: Container(
-                                    width: 40, height: 40,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _kSpotifyGreen.withOpacity(_isPlayLoading ? 0.12 : 0.25),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(_isPlayLoading ? 0.3 : 0.6), width: 1.2),
-                                    ),
-                                    child: _isPlayLoading
-                                        ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(color: _kSpotifyGreen, strokeWidth: 2))
-                                        : const Icon(Icons.play_arrow_rounded, color: _kSpotifyGreen, size: 24),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 14),
+                                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(0.2),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(0.5), width: 0.8),
+                                      color: _kSpotifyGreen.withValues(alpha: 0.18),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: 0.45), width: 0.85),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: _kSpotifyGreen)),
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: _playingTrackIndex != null
+                                                ? _kSpotifyGreen
+                                                : Colors.white.withValues(alpha: 0.35),
+                                          ),
+                                        ),
                                         const SizedBox(width: 8),
                                         Text('ROUND ${_activeTrackIndex + 1}',
                                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2)),
                                         if (_playingTrackIndex != null) ...[
-                                          const SizedBox(width: 10),
-                                          Text('PLAY ${_playingTrackIndex! + 1}',
-                                              style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.1)),
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.graphic_eq_rounded,
+                                            size: 14,
+                                            color: _kSpotifyGreen.withValues(alpha: 0.95),
+                                          ),
                                         ],
                                       ],
                                     ),
@@ -858,62 +1007,38 @@ class _VersusPlaygroundState extends State<VersusPlayground>
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(99),
-                                      color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.12 : 0.25),
-                                      border: Border.all(color: _kSpotifyGreen.withOpacity(_isBombLoading ? 0.3 : 0.6), width: 1.2),
+                                      color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.12 : 0.25),
+                                      border: Border.all(color: _kSpotifyGreen.withValues(alpha: _isBombLoading ? 0.3 : 0.6), width: 1.2),
                                     ),
                                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                                       if (_isBombLoading)
                                         const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.8, color: _kSpotifyGreen))
                                       else
-                                        const Text('BOMB', style: TextStyle(color: _kSpotifyGreen, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                                        const Text('QUEUE ALL', style: TextStyle(color: _kSpotifyGreen, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.arrow_forward_rounded, color: _kSpotifyGreen, size: 16),
+                                      const Icon(Icons.queue_music_rounded, color: _kSpotifyGreen, size: 16),
                                     ]),
                                   ),
                                 ),
                               ]),
                             ),
-
-                            // ── Track PageView ───────────────────────────────
-                            Expanded(
-                              child: PageView(
-                                controller: _pageController,
-                                onPageChanged: _onPageChanged,
-                                children: [
-                                  _TrackPage(
-                                    album: album1,
-                                    albumIndex: 0,
-                                    fallbackTitle: a1Title,
-                                    fallbackArtist: a1Artist,
-                                    fallbackImageUrl: a1Image,
-                                    slideAnim: _slideAnim,
-                                    accentColor: _color1,
-                                    activeTrackIndex: _activeTrackIndex,
-                                    votableRoundCount: _pairedRoundCount,
-                                    votesByIndex: _votesByIndex,
-                                    onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
-                                    onTrackTap: _onTrackTapped,
-                                    getCommentCtrl: _commentCtrlAt,
-                                    onCommentChanged: _onCommentChanged,
-                                  ),
-                                  _TrackPage(
-                                    album: album2,
-                                    albumIndex: 1,
-                                    fallbackTitle: a2Title,
-                                    fallbackArtist: a2Artist,
-                                    fallbackImageUrl: a2Image,
-                                    slideAnim: _slideAnim,
-                                    accentColor: _color2,
-                                    activeTrackIndex: _activeTrackIndex,
-                                    votableRoundCount: _pairedRoundCount,
-                                    votesByIndex: _votesByIndex,
-                                    onVote: (albumIndex) => _onVote(_activeTrackIndex, albumIndex),
-                                    onTrackTap: _onTrackTapped,
-                                    getCommentCtrl: _commentCtrlAt,
-                                    onCommentChanged: _onCommentChanged,
-                                  ),
-                                ],
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                              child: Text(
+                                'Tap cover to play · tap title to select round & vote',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.42),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
+                            ),
+
+                            // ── Dual-column cover feed ───────────────────────
+                            Expanded(
+                              child: _buildDualAlbumFeed(album1, album2, a1Image, a2Image),
                             ),
                           ]),
                   ),
@@ -993,6 +1118,291 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     );
   }
 
+  // ── Dual-column album cover feed ──────────────────────────────────────────
+  Widget _buildDualAlbumFeed(
+    SpotifyAlbumWithTracks? album1,
+    SpotifyAlbumWithTracks? album2,
+    String? a1Image,
+    String? a2Image,
+  ) {
+    final tracks1 = album1?.tracks ?? <SpotifyAlbumTrack>[];
+    final tracks2 = album2?.tracks ?? <SpotifyAlbumTrack>[];
+    final roundCount = math.max(tracks1.length, tracks2.length);
+    if (roundCount == 0) {
+      return Center(
+        child: Text('No tracks found.',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14)),
+      );
+    }
+    final cover1 = album1?.imageUrl ?? a1Image;
+    final cover2 = album2?.imageUrl ?? a2Image;
+    return ListView.builder(
+      controller: _scrollController1,
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 48),
+      physics: const BouncingScrollPhysics(),
+      itemCount: roundCount,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: _buildAlbumRoundRow(
+          roundIndex: i,
+          track1: i < tracks1.length ? tracks1[i] : null,
+          track2: i < tracks2.length ? tracks2[i] : null,
+          cover1: cover1,
+          cover2: cover2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlbumRoundRow({
+    required int roundIndex,
+    required SpotifyAlbumTrack? track1,
+    required SpotifyAlbumTrack? track2,
+    required String? cover1,
+    required String? cover2,
+  }) {
+    const double cellH = 130.0;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _buildAlbumCoverCell(
+            roundIndex:  roundIndex,
+            albumIndex:  0,
+            track:       track1,
+            coverUrl:    cover1,
+            accentColor: _color1,
+            height:      cellH,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _buildAlbumCoverCell(
+            roundIndex:  roundIndex,
+            albumIndex:  1,
+            track:       track2,
+            coverUrl:    cover2,
+            accentColor: _color2,
+            height:      cellH,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAlbumCoverCell({
+    required int roundIndex,
+    required int albumIndex,
+    required SpotifyAlbumTrack? track,
+    required String? coverUrl,
+    required Color accentColor,
+    required double height,
+  }) {
+    if (track == null) return SizedBox(height: height);
+
+    final votedAlbum     = _votesByIndex[roundIndex];
+    final isVotedForMe   = votedAlbum == albumIndex;
+    final isActive       = roundIndex == _activeTrackIndex;
+    final isLocked       = roundIndex > _activeTrackIndex;
+    final isBonusIndex   = roundIndex >= _pairedRoundCount;
+    final isVoteDisabled = isBonusIndex || (votedAlbum != null && votedAlbum != albumIndex);
+    final showVoteButton = isActive || isVotedForMe;
+    final isPlaying      = _playingTrackIndex == roundIndex;
+    final isCoverLoading = _coverLoadingRoundIndex == roundIndex;
+
+    return GestureDetector(
+      onTap: () {
+        if (roundIndex == _activeTrackIndex) {
+          _onCoverTap(roundIndex, albumIndex);
+        } else {
+          _onTitleTap(roundIndex, albumIndex);
+        }
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Album cover fill
+            if (coverUrl != null && coverUrl.isNotEmpty)
+              Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: accentColor.withValues(alpha: 0.25)),
+              )
+            else
+              Container(color: accentColor.withValues(alpha: 0.25)),
+
+            // Bottom gradient
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.3, 1.0],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.80),
+                  ],
+                ),
+              ),
+            ),
+
+            // Lock dim
+            if (isLocked) Container(color: Colors.black.withValues(alpha: 0.35)),
+
+            // Active border
+            if (isActive)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: accentColor, width: 2.0),
+                ),
+              ),
+
+            // Round badge
+            Positioned(
+              left: albumIndex == 0 ? 6 : null,
+              right: albumIndex == 1 ? 6 : null,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${roundIndex + 1}'.padLeft(2, '0'),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+
+            // Now-playing indicator
+            if (isPlaying)
+              Positioned(
+                right: albumIndex == 0 ? 6 : null,
+                left: albumIndex == 1 ? 6 : null,
+                top: 6,
+                child: const Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 14,
+                  color: _kSpotifyGreen,
+                ),
+              ),
+
+            // Lock icon
+            if (isLocked)
+              Center(
+                child: Icon(
+                  Icons.lock_rounded,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.38),
+                ),
+              ),
+
+            // Cover loading spinner
+            if (isCoverLoading)
+              const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: Colors.white),
+                ),
+              ),
+
+            // Track name + vote button
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    track.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isLocked
+                          ? Colors.white.withValues(alpha: 0.45)
+                          : Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                      shadows: const [
+                        Shadow(color: Colors.black87, blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                  if (showVoteButton) ...[
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                      onTap: (isActive && !isBonusIndex && !isVoteDisabled)
+                          ? () => _onVote(roundIndex, albumIndex)
+                          : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: isVotedForMe
+                              ? _kSpotifyGreen.withValues(alpha: 0.85)
+                              : accentColor.withValues(alpha: 0.30),
+                          border: Border.all(
+                            color: isVotedForMe
+                                ? _kSpotifyGreen
+                                : accentColor.withValues(alpha: 0.65),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isVotedForMe
+                                  ? Icons.check_rounded
+                                  : Icons.how_to_vote_rounded,
+                              size: 10,
+                              color: isVoteDisabled
+                                  ? Colors.white.withValues(alpha: 0.3)
+                                  : Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              isVotedForMe ? 'Voted' : 'Vote',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: isVoteDisabled
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        ),
+      ),
+    );
+  }
+
   // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, String authorLabel, String? avatarPath) {
     return Padding(
@@ -1004,8 +1414,8 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.15),
-              border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.15),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
           ),
@@ -1028,9 +1438,9 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha: 0.25),
                 width: 0.8,
               ),
             ),
@@ -1082,7 +1492,7 @@ class _VersusPlaygroundState extends State<VersusPlayground>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_color1, _color2]),
-              boxShadow: [BoxShadow(color: _color2.withOpacity(0.5), blurRadius: 18, spreadRadius: 2)],
+              boxShadow: [BoxShadow(color: _color2.withValues(alpha: 0.5), blurRadius: 18, spreadRadius: 2)],
             ),
             child: const Center(child: Text('VS', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5))),
           ),
@@ -1118,7 +1528,7 @@ class _ShareSheet extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1127,7 +1537,7 @@ class _ShareSheet extends StatelessWidget {
             Text(
               'Share result',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -1166,9 +1576,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1176,14 +1586,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.photo_library_outlined,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Save to gallery',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1201,9 +1611,9 @@ class _ShareSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                 ),
@@ -1211,14 +1621,14 @@ class _ShareSheet extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.link_rounded,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       'Copy link',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1258,8 +1668,8 @@ class _ShareButton extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withOpacity(0.15),
-              border: Border.all(color: color.withOpacity(0.4), width: 0.8),
+              color: color.withValues(alpha: 0.15),
+              border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
             ),
             child: Icon(icon, color: color, size: 22),
           ),
@@ -1267,31 +1677,12 @@ class _ShareButton extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SwipeDot extends StatelessWidget {
-  final bool  isActive;
-  final Color color;
-  const _SwipeDot({required this.isActive, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      width: isActive ? 20 : 6, height: 6,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -1317,332 +1708,58 @@ class _AlbumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? accentColor.withOpacity(0.7) : Colors.white.withOpacity(0.06),
-          width: isSelected ? 1.5 : 0.8,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: imageUrl != null && imageUrl!.isNotEmpty
+              ? Image.network(imageUrl!, fit: BoxFit.cover)
+              : Container(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  child: Icon(Icons.album_rounded, size: 40,
+                      color: Colors.white.withValues(alpha: 0.3)),
+                ),
         ),
-        color: isSelected ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.07),
-      ),
-      child: Column(children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: imageUrl != null && imageUrl!.isNotEmpty
-                ? Image.network(imageUrl!, fit: BoxFit.cover)
-                : Container(color: Colors.white.withOpacity(0.06),
-                    child: Icon(Icons.album_rounded, size: 40, color: Colors.white.withOpacity(0.3))),
-          ),
-        ),
+        const SizedBox(height: 8),
         Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: isSelected ? Colors.white : Colors.white.withOpacity(0.7),
-                    fontSize: 13, fontWeight: FontWeight.w700, height: 1.3)),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
+                  fontSize: 13, fontWeight: FontWeight.w700, height: 1.3,
+                )),
             if (artist.isNotEmpty) ...[
               const SizedBox(height: 3),
               Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: isSelected ? accentColor.withOpacity(0.9) : Colors.white.withOpacity(0.35),
-                    fontSize: 11, fontWeight: FontWeight.w500)),
+                    color: isSelected
+                        ? accentColor.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.35),
+                    fontSize: 11, fontWeight: FontWeight.w500,
+                  )),
             ],
-            // Live vote badge — mirrors artist card behaviour
             if (voteCount > 0) ...[
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: accentColor.withOpacity(0.22),
-                  border: Border.all(color: accentColor.withOpacity(0.55), width: 0.9),
+                  color: accentColor.withValues(alpha: 0.22),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.55), width: 0.9),
                 ),
                 child: Text('$voteCount',
-                    style: TextStyle(color: accentColor, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                    style: TextStyle(
+                      color: accentColor, fontSize: 10,
+                      fontWeight: FontWeight.w800, letterSpacing: 0.8,
+                    )),
               ),
             ],
           ]),
         ),
-      ]),
+      ],
     );
   }
 }
 
-// ── Track Page ────────────────────────────────────────────────────────────────
-class _TrackPage extends StatelessWidget {
-  final SpotifyAlbumWithTracks? album;
-  final int     albumIndex;
-  final String  fallbackTitle;
-  final String  fallbackArtist;
-  final String? fallbackImageUrl;
-  final Animation<double> slideAnim;
-  final Color   accentColor;
-  final int     activeTrackIndex;
-  final int     votableRoundCount;
-  final Map<int, int> votesByIndex;
-  final void Function(int albumIndex)              onVote;
-  final void Function(int trackIndex, int albumIndex) onTrackTap;
-  final TextEditingController Function(int)        getCommentCtrl;
-  final void Function(int roundIndex, String text) onCommentChanged;
-
-  const _TrackPage({
-    required this.album,
-    required this.albumIndex,
-    required this.fallbackTitle,
-    required this.fallbackArtist,
-    required this.fallbackImageUrl,
-    required this.slideAnim,
-    required this.accentColor,
-    required this.activeTrackIndex,
-    required this.votableRoundCount,
-    required this.votesByIndex,
-    required this.onVote,
-    required this.onTrackTap,
-    required this.getCommentCtrl,
-    required this.onCommentChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tracks = album?.tracks ?? <SpotifyAlbumTrack>[];
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
-      physics: const BouncingScrollPhysics(),
-      itemCount: tracks.isEmpty ? 2 : tracks.length + 1,
-      itemBuilder: (context, index) {
-        // Header
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12, top: 4),
-            child: Row(children: [
-              Container(width: 3, height: 16,
-                  decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(99))),
-              const SizedBox(width: 10),
-              Text('TRACKS', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2.5)),
-              const SizedBox(width: 8),
-              Text('${tracks.length}', style: TextStyle(color: accentColor.withOpacity(0.9), fontSize: 11, fontWeight: FontWeight.w700)),
-            ]),
-          );
-        }
-
-        if (tracks.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Text(album == null ? 'Spotify data unavailable.' : 'No tracks found.',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
-          );
-        }
-
-        final trackIndex   = index - 1;
-        if (trackIndex >= tracks.length) return const SizedBox.shrink();
-        final track        = tracks[trackIndex];
-        final isActive     = trackIndex == activeTrackIndex;
-        final isPast       = trackIndex <  activeTrackIndex;
-        final isLocked     = trackIndex >  activeTrackIndex;
-        final isBonusIndex = trackIndex >= votableRoundCount;
-
-        final votedAlbum      = votesByIndex[trackIndex];
-        final isVotedForMe    = votedAlbum == albumIndex;
-        final isVoteDisabled  = isBonusIndex || (votedAlbum != null && votedAlbum != albumIndex);
-
-        return AnimatedBuilder(
-          animation: slideAnim,
-          builder: (context, child) => Transform.translate(
-            offset: Offset(0, 24 * (1 - slideAnim.value) * math.max(0, 1 - trackIndex * 0.05)),
-            child: Opacity(opacity: slideAnim.value.clamp(0.0, 1.0), child: child),
-          ),
-          child: _TrackRow(
-            key:               ValueKey('album-$albumIndex-track-$trackIndex'),
-            track:             track,
-            index:             trackIndex,
-            accentColor:       accentColor,
-            isLast:            trackIndex == tracks.length - 1,
-            isActive:          isActive,
-            isPast:            isPast,
-            isLocked:          isLocked,
-            showVoteButton:    isActive || isVotedForMe,
-            isVoted:           isVotedForMe,
-            isVoteDisabled:    isVoteDisabled,
-            commentController: getCommentCtrl(trackIndex),
-            onVote:            isActive && !isBonusIndex ? () => onVote(albumIndex) : null,
-            onCommentChanged:  (text) => onCommentChanged(trackIndex, text),
-            onTap:             () => onTrackTap(trackIndex, albumIndex),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Track Row ─────────────────────────────────────────────────────────────────
-class _TrackRow extends StatelessWidget {
-  final SpotifyAlbumTrack          track;
-  final int                        index;
-  final Color                      accentColor;
-  final bool                       isLast, isActive, isPast, isLocked;
-  final bool                       showVoteButton, isVoted, isVoteDisabled;
-  final TextEditingController      commentController;
-  final VoidCallback?              onVote;
-  final void Function(String)      onCommentChanged;
-  final VoidCallback?              onTap;
-
-  const _TrackRow({
-    super.key,
-    required this.track,
-    required this.index,
-    required this.accentColor,
-    required this.commentController,
-    required this.onCommentChanged,
-    this.isLast         = false,
-    this.isActive       = false,
-    this.isPast         = false,
-    this.isLocked       = false,
-    this.showVoteButton = false,
-    this.isVoted        = false,
-    this.isVoteDisabled = false,
-    this.onVote,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textOpacity = isActive ? 1.0 : isPast ? 0.6 : 0.52;
-    final numberColor = isActive
-        ? accentColor
-        : isPast ? accentColor.withOpacity(0.5) : Colors.white.withOpacity(0.42);
-
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 300),
-      opacity: isLocked ? 0.62 : 1.0,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(children: [
-          Container(
-            decoration: isActive ? BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: accentColor.withOpacity(0.42),
-              border: Border.all(color: accentColor.withOpacity(0.65), width: 1.2),
-            ) : null,
-            padding: isActive ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2) : EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 11, 0, 9),
-              child: Column(children: [
-                Row(children: [
-                  // Track number / state icon
-                  SizedBox(width: 32,
-                    child: isPast
-                        ? Icon(Icons.check_rounded, size: 15, color: accentColor.withOpacity(0.5))
-                        : isLocked
-                            ? Icon(Icons.lock_rounded, size: 14, color: Colors.white.withOpacity(0.45))
-                            : Text('${track.trackNumber}'.padLeft(2, '0'),
-                                style: TextStyle(color: numberColor, fontSize: 12, fontWeight: FontWeight.w700,
-                                    fontFeatures: const [FontFeature.tabularFigures()])),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Track info
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(track.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white.withOpacity(textOpacity), fontSize: 14,
-                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500, letterSpacing: -0.1)),
-                    if (track.artistName.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(track.artistName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withOpacity(textOpacity * 0.6), fontSize: 12, fontWeight: FontWeight.w400)),
-                    ],
-                  ])),
-                  const SizedBox(width: 12),
-
-                  // Vote button
-                  if (showVoteButton) ...[
-                    GestureDetector(
-                      onTap: isVoteDisabled ? null : onVote,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99),
-                          color: isVoted
-                              ? _kSpotifyGreen.withOpacity(0.5)
-                              : isVoteDisabled
-                                  ? Colors.white.withOpacity(0.06)
-                                  : _kSpotifyGreen.withOpacity(0.25),
-                          border: Border.all(
-                            color: isVoted ? _kSpotifyGreen
-                                : isVoteDisabled ? Colors.white.withOpacity(0.1)
-                                : _kSpotifyGreen.withOpacity(0.6),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(isVoted ? Icons.check_rounded : Icons.how_to_vote_rounded,
-                              size: 14,
-                              color: isVoteDisabled ? Colors.white.withOpacity(0.2)
-                                  : isVoted ? Colors.white : _kSpotifyGreen),
-                          const SizedBox(width: 4),
-                          Text(isVoted ? 'Voted' : 'Vote',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5,
-                                  color: isVoteDisabled ? Colors.white.withOpacity(0.2)
-                                      : isVoted ? Colors.white : _kSpotifyGreen)),
-                        ]),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-
-                  // Duration on non-active rows; NOTE badge on voted rows
-                  if (isVoted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99), color: accentColor.withOpacity(0.75)),
-                      child: const Text('NOTE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
-                    )
-                  else if (!isActive)
-                    Text(track.durationFormatted,
-                        style: TextStyle(color: Colors.white.withOpacity(textOpacity * 0.5), fontSize: 12,
-                            fontWeight: FontWeight.w500, fontFeatures: const [FontFeature.tabularFigures()])),
-                ]),
-
-                // Comment field — visible when voted
-                if (isVoted) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(9),
-                      color: Colors.white.withOpacity(0.12),
-                      border: Border.all(color: Colors.white.withOpacity(0.20), width: 0.8),
-                    ),
-                    child: TextField(
-                      controller: commentController,
-                      onChanged: onCommentChanged,
-                      minLines: 1, maxLines: 3,
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Disclaimer...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.42), fontSize: 12),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      ),
-                    ),
-                  ),
-                ],
-              ]),
-            ),
-          ),
-          if (!isLast)
-            Divider(height: 0, indent: 44, color: Colors.white.withOpacity(0.06)),
-        ]),
-      ),
-    );
-  }
-}

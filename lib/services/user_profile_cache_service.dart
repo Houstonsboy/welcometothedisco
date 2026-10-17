@@ -8,7 +8,6 @@ import 'package:welcometothedisco/models/users_model.dart';
 /// without repeatedly hitting Firestore for initial paint.
 class UserProfileCacheService {
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 

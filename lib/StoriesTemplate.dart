@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
-import 'package:welcometothedisco/userprofile.dart';
+import 'package:welcometothedisco/friends/friendprofile.dart';
 
 const _kBlue  = AppTheme.gradientStart;
 const _kPink  = AppTheme.gradientEnd;
@@ -14,13 +14,28 @@ const _kGreen = AppTheme.createGreen;
 /// Streams the current user's document so the list stays live —
 /// any friend added in the Find Friends tab appears here instantly
 /// without a manual refresh.
-class StoriesTemplate extends StatelessWidget {
+class StoriesTemplate extends StatefulWidget {
   const StoriesTemplate({super.key});
+
+  @override
+  State<StoriesTemplate> createState() => _StoriesTemplateState();
+}
+
+class _StoriesTemplateState extends State<StoriesTemplate> {
+  // Stream is created once — parent rebuilds (e.g. search typing) won't
+  // reset the StreamBuilder subscription and cause a loading flicker.
+  late final Stream<UserModel?> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = FirebaseService.getCurrentUserStream();
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<UserModel?>(
-      stream: FirebaseService.getCurrentUserStream(),
+      stream: _stream,
       builder: (context, snapshot) {
         final friends = snapshot.data?.friends ?? const <FriendEntry>[];
         final loading = snapshot.connectionState == ConnectionState.waiting;
@@ -39,13 +54,13 @@ class StoriesTemplate extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      _kBlue.withOpacity(0.40),
-                      _kPink.withOpacity(0.40),
+                      _kBlue.withValues(alpha: 0.40),
+                      _kPink.withValues(alpha: 0.40),
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 20,
                       spreadRadius: 0,
                       offset: const Offset(0, 6),
@@ -79,7 +94,7 @@ class StoriesTemplate extends StatelessWidget {
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: Colors.white.withOpacity(0.45),
+          color: Colors.white.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -93,13 +108,13 @@ class StoriesTemplate extends StatelessWidget {
           Icon(
             Icons.people_outline_rounded,
             size: 28,
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.25),
           ),
           const SizedBox(height: 6),
           Text(
             'Find friends to see them here',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -157,7 +172,7 @@ class _FriendBubble extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
+                          color: Colors.black.withValues(alpha: 0.25),
                           blurRadius: 12,
                           spreadRadius: 0,
                           offset: const Offset(0, 4),
@@ -196,10 +211,10 @@ class _FriendBubble extends StatelessWidget {
   }
 
   Widget _fallbackAvatar() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           size: 32,
         ),
       );

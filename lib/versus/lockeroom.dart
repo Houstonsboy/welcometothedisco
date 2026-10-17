@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/versus_model.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/playground.dart';
@@ -214,10 +215,33 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
         album2Name: album2.name,
         album1ImageUrl: album1.imageUrl ?? '',
         album2ImageUrl: album2.imageUrl ?? '',
+        album1ArtistName: album1.artistName,
+        album2ArtistName: album2.artistName,
+        album1Tracklist: album1.tracks.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': album1.artistName,
+          'trackcover':  album1.imageUrl ?? '',
+        }).toList(),
+        album2Tracklist: album2.tracks.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': album2.artistName,
+          'trackcover':  album2.imageUrl ?? '',
+        }).toList(),
       );
       if (!mounted) return;
 
-      final uid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+      final uid  = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+      final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
+      unawaited(NotificationService.notifyFriendsNewVersus(
+        creatorUid:  uid,
+        creatorName: name,
+        versusId:    versusId,
+        versusType:  'album',
+        entityName1: album1.name,
+        entityName2: album2.name,
+      ));
 
       final versus = VersusModel(
         id: versusId,
@@ -370,9 +394,9 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                       height: 36,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.22),
+                          color: Colors.white.withValues(alpha: 0.22),
                           width: 0.8,
                         ),
                       ),
@@ -393,9 +417,9 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                         horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(99),
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white.withValues(alpha: 0.12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 0.8,
                       ),
                     ),
@@ -414,7 +438,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                         Text(
                           'LOCKER ROOM',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 2.5,
@@ -446,7 +470,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                     ? 'Now pick the challenger.'
                     : 'Review the battle. Save when ready.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
               fontWeight: FontWeight.w400,
             ),
@@ -491,10 +515,10 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                         colors: [_kBlue, _kPink],
                       ),
                       border: Border.all(
-                          color: Colors.white.withOpacity(0.3), width: 1),
+                          color: Colors.white.withValues(alpha: 0.3), width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: _kPink.withOpacity(0.4),
+                          color: _kPink.withValues(alpha: 0.4),
                           blurRadius: 14,
                           spreadRadius: 1,
                         ),
@@ -541,15 +565,15 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               border: Border.all(
-                  color: accent.withOpacity(0.45), width: 1),
+                  color: accent.withValues(alpha: 0.45), width: 1),
             ),
             child: Row(
               children: [
                 const SizedBox(width: 14),
                 Icon(Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.6), size: 20),
+                    color: Colors.white.withValues(alpha: 0.6), size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -566,7 +590,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                           ? 'Search challenger album...'
                           : 'Search albums or artists...',
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -586,7 +610,7 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                     child: Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: Icon(Icons.close_rounded,
-                          color: Colors.white.withOpacity(0.4), size: 18),
+                          color: Colors.white.withValues(alpha: 0.4), size: 18),
                     ),
                   ),
               ],
@@ -650,24 +674,24 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
                   end: Alignment.centerRight,
                   colors: _isSaving
                       ? [
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.1)
+                          Colors.white.withValues(alpha: 0.1),
+                          Colors.white.withValues(alpha: 0.1)
                         ]
                       : [
-                          _kBlue.withOpacity(0.85),
-                          _kPink.withOpacity(0.85),
+                          _kBlue.withValues(alpha: 0.85),
+                          _kPink.withValues(alpha: 0.85),
                         ],
                 ),
                 border: Border.all(
                   color: Colors.white
-                      .withOpacity(_isSaving ? 0.1 : 0.25),
+                      .withValues(alpha: _isSaving ? 0.1 : 0.25),
                   width: 0.8,
                 ),
                 boxShadow: _isSaving
                     ? []
                     : [
                         BoxShadow(
-                          color: _kPink.withOpacity(0.35),
+                          color: _kPink.withValues(alpha: 0.35),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -743,25 +767,25 @@ class _ArtistChip extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isEmpty
-                        ? Colors.white.withOpacity(0.1)
-                        : accentColor.withOpacity(0.2),
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : accentColor.withValues(alpha: 0.2),
                     border: Border.all(
                       color: isEmpty
-                          ? Colors.white.withOpacity(0.18)
-                          : accentColor.withOpacity(0.7),
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : accentColor.withValues(alpha: 0.7),
                       width: isEmpty ? 1 : 2,
                     ),
                   ),
                   child: isEmpty
                       ? Icon(Icons.person_rounded,
-                          color: Colors.white.withOpacity(0.25), size: 26)
+                          color: Colors.white.withValues(alpha: 0.25), size: 26)
                       : (album!.artistImageUrl != null
                           ? Image.network(album!.artistImageUrl!,
                               fit: BoxFit.cover)
                           : Container(
-                              color: accentColor.withOpacity(0.25),
+                              color: accentColor.withValues(alpha: 0.25),
                               child: Icon(Icons.person_rounded,
-                                  color: accentColor.withOpacity(0.7),
+                                  color: accentColor.withValues(alpha: 0.7),
                                   size: 26),
                             )),
                 ),
@@ -782,7 +806,7 @@ class _ArtistChip extends StatelessWidget {
                       color: _kPink,
                       boxShadow: [
                         BoxShadow(
-                            color: _kPink.withOpacity(0.4), blurRadius: 6),
+                            color: _kPink.withValues(alpha: 0.4), blurRadius: 6),
                       ],
                     ),
                     child: const Icon(Icons.close_rounded,
@@ -800,7 +824,7 @@ class _ArtistChip extends StatelessWidget {
                   label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.8,
@@ -812,7 +836,7 @@ class _ArtistChip extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: accentColor.withOpacity(0.95),
+                    color: accentColor.withValues(alpha: 0.95),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -846,9 +870,9 @@ class _AlbumResultGridTile extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               border: Border.all(
-                  color: Colors.white.withOpacity(0.15), width: 0.8),
+                  color: Colors.white.withValues(alpha: 0.15), width: 0.8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,9 +886,9 @@ class _AlbumResultGridTile extends StatelessWidget {
                         child: album.imageUrl != null
                             ? Image.network(album.imageUrl!, fit: BoxFit.cover)
                             : Container(
-                                color: accentColor.withOpacity(0.2),
+                                color: accentColor.withValues(alpha: 0.2),
                                 child: Icon(Icons.album_rounded,
-                                    color: accentColor.withOpacity(0.6),
+                                    color: accentColor.withValues(alpha: 0.6),
                                     size: 28),
                               ),
                       ),
@@ -892,7 +916,7 @@ class _AlbumResultGridTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.62),
+                      color: Colors.white.withValues(alpha: 0.62),
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -917,8 +941,6 @@ final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
-    final visible = album.tracks.take(6).toList();
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -926,9 +948,9 @@ final Color accentColor;
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             border: Border.all(
-                color: accentColor.withOpacity(0.4), width: 1),
+                color: accentColor.withValues(alpha: 0.4), width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -941,9 +963,9 @@ final Color accentColor;
                   child: album.imageUrl != null
                       ? Image.network(album.imageUrl!, fit: BoxFit.cover)
                       : Container(
-                          color: accentColor.withOpacity(0.18),
+                          color: accentColor.withValues(alpha: 0.18),
                           child: Icon(Icons.album_rounded,
-                              color: accentColor.withOpacity(0.5),
+                              color: accentColor.withValues(alpha: 0.5),
                               size: 40),
                         ),
                 ),
@@ -977,7 +999,7 @@ final Color accentColor;
                     Text(
                       'TRACKS',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.45),
+                        color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 2,
@@ -987,7 +1009,7 @@ final Color accentColor;
                     Text(
                       '${album.tracks.length}',
                       style: TextStyle(
-                        color: accentColor.withOpacity(0.9),
+                        color: accentColor.withValues(alpha: 0.9),
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                       ),
@@ -996,28 +1018,14 @@ final Color accentColor;
                 ),
               ),
               ...List.generate(
-                visible.length,
+                album.tracks.length,
                 (i) => _PreviewTrackRow(
-                  track: visible[i],
+                  track: album.tracks[i],
                   accentColor: accentColor,
-                  isLast: i == visible.length - 1 &&
-                      album.tracks.length <= 6,
+                  isLast: i == album.tracks.length - 1,
                 ),
               ),
-              if (album.tracks.length > 6)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                  child: Text(
-                    '+${album.tracks.length - 6} more tracks',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(height: 12),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -1047,8 +1055,8 @@ class _TrackPreviewPlaceholder extends StatelessWidget {
           height: 260,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: Colors.white.withOpacity(0.08),
-            border: Border.all(color: accentColor.withOpacity(0.35), width: 1),
+            color: Colors.white.withValues(alpha: 0.08),
+            border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1),
           ),
           child: Center(
             child: Padding(
@@ -1057,12 +1065,12 @@ class _TrackPreviewPlaceholder extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.library_music_rounded,
-                      color: accentColor.withOpacity(0.75), size: 26),
+                      color: accentColor.withValues(alpha: 0.75), size: 26),
                   const SizedBox(height: 10),
                   Text(
                     label,
                     style: TextStyle(
-                      color: accentColor.withOpacity(0.9),
+                      color: accentColor.withValues(alpha: 0.9),
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.8,
@@ -1073,7 +1081,7 @@ class _TrackPreviewPlaceholder extends StatelessWidget {
                     message,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.55),
+                      color: Colors.white.withValues(alpha: 0.55),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1112,7 +1120,7 @@ class _PreviewTrackRow extends StatelessWidget {
                 child: Text(
                   '${track.trackNumber}',
                   style: TextStyle(
-                    color: accentColor.withOpacity(0.7),
+                    color: accentColor.withValues(alpha: 0.7),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1134,7 +1142,7 @@ class _PreviewTrackRow extends StatelessWidget {
               Text(
                 track.durationFormatted,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 11,
                 ),
               ),
@@ -1145,7 +1153,7 @@ class _PreviewTrackRow extends StatelessWidget {
           Divider(
               height: 0,
               indent: 42,
-              color: Colors.white.withOpacity(0.08)),
+              color: Colors.white.withValues(alpha: 0.08)),
       ],
     );
   }

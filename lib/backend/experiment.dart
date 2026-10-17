@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 const String clientId = '9aafc2bea5134e1893987ed0d4c372bb';
@@ -7,12 +8,12 @@ const String clientSecret = 'b1a1a591023a499cadfb6b9f1067b326';
 void main() async {
   try {
     var token = await getToken();
-    print('Authorization Token: $token');
+    debugPrint('Authorization Token: $token');
     var currentlyPlaying = await getCurrentlyPlaying(token);
-    print('Currently Playing Song: ${currentlyPlaying['songName']}');
-    print('Artist: ${currentlyPlaying['artistName']}');
+    debugPrint('Currently Playing Song: ${currentlyPlaying['songName']}');
+    debugPrint('Artist: ${currentlyPlaying['artistName']}');
   } catch (error) {
-    print('Error: $error');
+    debugPrint('Error: $error');
   }
 }
 
@@ -32,8 +33,8 @@ Future<String> getToken() async {
     var data = json.decode(response.body);
     return data['access_token'];
   } catch (error) {
-    print('Error getting Spotify access token: $error');
-    throw error;
+    debugPrint('Error getting Spotify access token: $error');
+    rethrow;
   }
 }
 
@@ -60,8 +61,8 @@ Future<List<Map<String, dynamic>>> getQueue(String userId, String token) async {
     }
     return queuedSongs;
   } catch (error) {
-    print('Error getting queue: $error');
-    throw error;
+    debugPrint('Error getting queue: $error');
+    rethrow;
   }
 }
 Future<Map<String, dynamic>> getCurrentlyPlaying(String token) async {
@@ -78,7 +79,7 @@ Future<Map<String, dynamic>> getCurrentlyPlaying(String token) async {
     var artistName = data['item']['artists'][0]['name'];
     return {'songName': songName, 'artistName': artistName};
   } catch (error) {
-    print('Error getting currently playing track: $error');
-    throw error;
+    debugPrint('Error getting currently playing track: $error');
+    rethrow;
   }
 }

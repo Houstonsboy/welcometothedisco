@@ -134,7 +134,7 @@ class _FriendRequestState extends State<FriendRequest>
               Text(
                 'search by username',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.3,
@@ -152,16 +152,16 @@ class _FriendRequestState extends State<FriendRequest>
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withValues(alpha: 0.18),
                     width: 0.8,
                   ),
                 ),
                 child: Text(
                   '${_results.length} found',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -184,9 +184,9 @@ class _FriendRequestState extends State<FriendRequest>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 0.8,
               ),
             ),
@@ -203,7 +203,7 @@ class _FriendRequestState extends State<FriendRequest>
               decoration: InputDecoration(
                 hintText: 'Search username...',
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 15,
                 ),
                 prefixIcon: _isSearching
@@ -214,13 +214,13 @@ class _FriendRequestState extends State<FriendRequest>
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.8,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                           ),
                         ),
                       )
                     : Icon(
                         Icons.search_rounded,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         size: 20,
                       ),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -232,7 +232,7 @@ class _FriendRequestState extends State<FriendRequest>
                         },
                         child: Icon(
                           Icons.close_rounded,
-                          color: Colors.white.withOpacity(0.4),
+                          color: Colors.white.withValues(alpha: 0.4),
                           size: 18,
                         ),
                       )
@@ -256,7 +256,7 @@ class _FriendRequestState extends State<FriendRequest>
         separatorBuilder: (_, __) => Divider(
           height: 0,
           indent: 58,
-          color: Colors.white.withOpacity(0.07),
+          color: Colors.white.withValues(alpha: 0.07),
         ),
         itemBuilder: (_, __) =>
             _ShimmerUserRow(shimmerController: _shimmerController),
@@ -273,15 +273,15 @@ class _FriendRequestState extends State<FriendRequest>
               height: 76,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.07),
+                color: Colors.white.withValues(alpha: 0.07),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   width: 1,
                 ),
               ),
               child: Icon(
                 Icons.person_search_rounded,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 size: 36,
               ),
             ),
@@ -289,7 +289,7 @@ class _FriendRequestState extends State<FriendRequest>
             Text(
               'Find your people',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
@@ -299,7 +299,7 @@ class _FriendRequestState extends State<FriendRequest>
             Text(
               'Start typing to search by username',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
               ),
@@ -316,14 +316,14 @@ class _FriendRequestState extends State<FriendRequest>
           children: [
             Icon(
               Icons.search_off_rounded,
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               size: 44,
             ),
             const SizedBox(height: 12),
             Text(
               'No users found',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -332,7 +332,7 @@ class _FriendRequestState extends State<FriendRequest>
             Text(
               'Try a different username',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha: 0.25),
                 fontSize: 12,
               ),
             ),
@@ -348,7 +348,7 @@ class _FriendRequestState extends State<FriendRequest>
       separatorBuilder: (_, __) => Divider(
         height: 0,
         indent: 58,
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
       ),
       itemBuilder: (context, i) => _UserResultRow(
         user: _results[i],
@@ -404,7 +404,7 @@ class _UserResultRowState extends State<_UserResultRow> {
             'Could not follow: ${e.toString()}',
             style: const TextStyle(fontSize: 13),
           ),
-          backgroundColor: AppTheme.gradientEnd.withOpacity(0.85),
+          backgroundColor: AppTheme.gradientEnd.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -461,7 +461,7 @@ class _UserResultRowState extends State<_UserResultRow> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.42),
+                          color: Colors.white.withValues(alpha: 0.42),
                           fontSize: 12,
                         ),
                       ),
@@ -488,17 +488,17 @@ class _UserResultRowState extends State<_UserResultRow> {
                         : null,
                     color: _isFollowing || _loading
                         ? null
-                        : Colors.white.withOpacity(0.10),
+                        : Colors.white.withValues(alpha: 0.10),
                     border: Border.all(
                       color: _isFollowing
                           ? Colors.transparent
-                          : Colors.white.withOpacity(0.22),
+                          : Colors.white.withValues(alpha: 0.22),
                       width: 0.8,
                     ),
                     boxShadow: _isFollowing
                         ? [
                             BoxShadow(
-                              color: _kPink.withOpacity(0.3),
+                              color: _kPink.withValues(alpha: 0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -511,14 +511,14 @@ class _UserResultRowState extends State<_UserResultRow> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.6,
-                            color: Colors.white.withOpacity(0.65),
+                            color: Colors.white.withValues(alpha: 0.65),
                           ),
                         )
                       : Text(
                           _isFollowing ? 'Following' : 'Follow',
                           style: TextStyle(
                             color: Colors.white
-                                .withOpacity(_isFollowing ? 1.0 : 0.82),
+                                .withValues(alpha: _isFollowing ? 1.0 : 0.82),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -548,13 +548,13 @@ class _UserAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1.5,
         ),
         gradient: LinearGradient(
           colors: [
-            _kPurple.withOpacity(0.3),
-            _kPink.withOpacity(0.2),
+            _kPurple.withValues(alpha: 0.3),
+            _kPink.withValues(alpha: 0.2),
           ],
         ),
       ),
@@ -571,10 +571,10 @@ class _UserAvatar extends StatelessWidget {
   }
 
   Widget _fallback() => Container(
-        color: _kPurple.withOpacity(0.25),
+        color: _kPurple.withValues(alpha: 0.25),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           size: size * 0.5,
         ),
       );
@@ -595,9 +595,9 @@ class _ShimmerUserRow extends StatelessWidget {
               begin: Alignment(-1 + s * 2, 0),
               end: Alignment(s * 2, 0),
               colors: [
-                Colors.white.withOpacity(opacity * 0.5),
-                Colors.white.withOpacity(opacity),
-                Colors.white.withOpacity(opacity * 0.5),
+                Colors.white.withValues(alpha: opacity * 0.5),
+                Colors.white.withValues(alpha: opacity),
+                Colors.white.withValues(alpha: opacity * 0.5),
               ],
             );
         return Padding(

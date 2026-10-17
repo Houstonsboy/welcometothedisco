@@ -1,0 +1,2137 @@
+{
+  "generated_at": "2026-10-12T13:46:04.103699+00:00",
+  "stats": {
+    "polls_read": 75,
+    "polls_tagged": 53,
+    "artist_polls": 45,
+    "album_polls": 8,
+    "pairs_total": 35,
+    "voters_total": 44,
+    "voters_counted": 33
+  },
+  "pairs": {
+    "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z": {
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z",
+      "entity_type": "artist",
+      "entity_ids": [
+        "3TVXtAsR1Inumwj472S9r4",
+        "7bXgB6jMjp9ATFy66eO08Z"
+      ],
+      "entity_a": {
+        "entity_id": "3TVXtAsR1Inumwj472S9r4",
+        "entity_name": "Drake",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
+      },
+      "entity_b": {
+        "entity_id": "7bXgB6jMjp9ATFy66eO08Z",
+        "entity_name": "Chris Brown",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb913ab85302df0ddfb77131e9"
+      },
+      "votes_a": 0.6000000000000001,
+      "votes_b": 1.4,
+      "voter_count": 2,
+      "rounds_a": 3,
+      "rounds_b": 7,
+      "versus_count": 1,
+      "versus": {
+        "oHUDuQ4mKmLe0GcUZ3r5": {
+          "rounds_a": 3,
+          "rounds_b": 7,
+          "poll_count": 2,
+          "last_voted_at": "2026-10-06T20:19:28.337000+00:00"
+        }
+      },
+      "created_at": "2026-08-12T10:14:09.618000+00:00",
+      "last_voted_at": "2026-10-06T20:19:28.337000+00:00"
+    },
+    "2YZyLoL8N0Wb9xBt1NhZWg_5K4W6rqBFWDnAN6FQUkS6x": {
+      "pair_key": "2YZyLoL8N0Wb9xBt1NhZWg_5K4W6rqBFWDnAN6FQUkS6x",
+      "entity_type": "artist",
+      "entity_ids": [
+        "2YZyLoL8N0Wb9xBt1NhZWg",
+        "5K4W6rqBFWDnAN6FQUkS6x"
+      ],
+      "entity_a": {
+        "entity_id": "2YZyLoL8N0Wb9xBt1NhZWg",
+        "entity_name": "Kendrick Lamar",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "5K4W6rqBFWDnAN6FQUkS6x",
+        "entity_name": "Kanye West",
+        "entity_image": ""
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "Yb0axgvm75LXIFsQtsKQ": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-14T19:00:37.756000+00:00"
+        }
+      },
+      "created_at": "2026-04-14T19:00:37.756000+00:00",
+      "last_voted_at": "2026-04-14T19:00:37.756000+00:00"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_1Xyo4u8uXC1ZmMpatF05PJ": {
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_1Xyo4u8uXC1ZmMpatF05PJ",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0du5cEVh5yTK9QJze8zA0C",
+        "1Xyo4u8uXC1ZmMpatF05PJ"
+      ],
+      "entity_a": {
+        "entity_id": "0du5cEVh5yTK9QJze8zA0C",
+        "entity_name": "Bruno Mars",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebc7688aad1bf03986934d7e26"
+      },
+      "entity_b": {
+        "entity_id": "1Xyo4u8uXC1ZmMpatF05PJ",
+        "entity_name": "The Weeknd",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb9e528993a2820267b97f6aae"
+      },
+      "votes_a": 1.0,
+      "votes_b": 0.0,
+      "voter_count": 1,
+      "rounds_a": 2,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "d66LpLdyEuZfWldvRVnu": {
+          "rounds_a": 2,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-04T22:27:37.697000+00:00"
+        }
+      },
+      "created_at": "2026-04-04T22:27:37.697000+00:00",
+      "last_voted_at": "2026-04-04T22:27:37.697000+00:00"
+    },
+    "3MATDdrpHmQCmuOcozZjDa_6pwuKxMUkNg673KETsXPUV": {
+      "pair_key": "3MATDdrpHmQCmuOcozZjDa_6pwuKxMUkNg673KETsXPUV",
+      "entity_type": "album",
+      "entity_ids": [
+        "3MATDdrpHmQCmuOcozZjDa",
+        "6pwuKxMUkNg673KETsXPUV"
+      ],
+      "entity_a": {
+        "entity_id": "3MATDdrpHmQCmuOcozZjDa",
+        "entity_name": "TESTING",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273bfcb8d00cee4f8257a6b7fe1"
+      },
+      "entity_b": {
+        "entity_id": "6pwuKxMUkNg673KETsXPUV",
+        "entity_name": "KIDS SEE GHOSTS",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273013c00ee367dd85396f79c82"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "sYxULHM84rOpSAtAvGON": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m": {
+      "pair_key": "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m",
+      "entity_type": "artist",
+      "entity_ids": [
+        "4dpARuHxo51G3z768sgnrY",
+        "6vWDO969PvNqNYHIOW5v0m"
+      ],
+      "entity_a": {
+        "entity_id": "4dpARuHxo51G3z768sgnrY",
+        "entity_name": "Adele",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb68f6e5892075d7f22615bd17"
+      },
+      "entity_b": {
+        "entity_id": "6vWDO969PvNqNYHIOW5v0m",
+        "entity_name": "Beyonc\u00e9",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb7eaa373538359164b843f7c0"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "rhwy13N5YsRm53Cf3ofH": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 2,
+          "last_voted_at": "2026-05-20T12:10:51.051000+00:00"
+        }
+      },
+      "created_at": "2026-04-23T15:48:47.387000+00:00",
+      "last_voted_at": "2026-05-20T12:10:51.051000+00:00"
+    },
+    "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u": {
+      "pair_key": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u",
+      "entity_type": "album",
+      "entity_ids": [
+        "4SZko61aMnmgvNhfhgTuD3",
+        "748dZDqSZy6aPXKcI9H80u"
+      ],
+      "entity_a": {
+        "entity_id": "4SZko61aMnmgvNhfhgTuD3",
+        "entity_name": "Graduation",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "748dZDqSZy6aPXKcI9H80u",
+        "entity_name": "good kid, m.A.A.d city (Deluxe)",
+        "entity_image": ""
+      },
+      "votes_a": 0.5714285714285714,
+      "votes_b": 0.42857142857142855,
+      "voter_count": 1,
+      "rounds_a": 32,
+      "rounds_b": 24,
+      "versus_count": 1,
+      "versus": {
+        "o53Ip1om93frVxyWKwZJ": {
+          "rounds_a": 32,
+          "rounds_b": 24,
+          "poll_count": 4,
+          "last_voted_at": "2026-01-27T12:29:04.430882+00:00"
+        }
+      },
+      "created_at": "2026-01-27T12:28:49.525660+00:00",
+      "last_voted_at": "2026-01-27T12:29:04.430882+00:00"
+    },
+    "3gBZUcNeVumkeeJ19CY2sX_3qiHUAX7zY4Qnjx8TNUzVx": {
+      "pair_key": "3gBZUcNeVumkeeJ19CY2sX_3qiHUAX7zY4Qnjx8TNUzVx",
+      "entity_type": "artist",
+      "entity_ids": [
+        "3gBZUcNeVumkeeJ19CY2sX",
+        "3qiHUAX7zY4Qnjx8TNUzVx"
+      ],
+      "entity_a": {
+        "entity_id": "3gBZUcNeVumkeeJ19CY2sX",
+        "entity_name": "Ken Carson",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb95ccca370d8bd50e84c222bc"
+      },
+      "entity_b": {
+        "entity_id": "3qiHUAX7zY4Qnjx8TNUzVx",
+        "entity_name": "Yeat",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb3cb51ac0d2a735316c536315"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "uSIUE6dys9nMATEdRWmi": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-07-25T20:50:10.919000+00:00"
+        }
+      },
+      "created_at": "2026-07-25T20:50:10.919000+00:00",
+      "last_voted_at": "2026-07-25T20:50:10.919000+00:00"
+    },
+    "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD": {
+      "pair_key": "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD",
+      "entity_type": "artist",
+      "entity_ids": [
+        "4O15NlyKLIASxsJ0PrXPfz",
+        "699OTQXzgjhIYAHMy9RyPD"
+      ],
+      "entity_a": {
+        "entity_id": "4O15NlyKLIASxsJ0PrXPfz",
+        "entity_name": "Lil Uzi Vert",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb62c272d76220f2e9dad56704"
+      },
+      "entity_b": {
+        "entity_id": "699OTQXzgjhIYAHMy9RyPD",
+        "entity_name": "Playboi Carti",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebba50ca67ffc3097f6ea1710a"
+      },
+      "votes_a": 1.25,
+      "votes_b": 0.75,
+      "voter_count": 2,
+      "rounds_a": 4,
+      "rounds_b": 2,
+      "versus_count": 1,
+      "versus": {
+        "zMHw4BPYwNv3FKx82kak": {
+          "rounds_a": 4,
+          "rounds_b": 2,
+          "poll_count": 2,
+          "last_voted_at": "2026-04-23T15:47:09.675000+00:00"
+        }
+      },
+      "created_at": "2026-04-14T18:49:37.461000+00:00",
+      "last_voted_at": "2026-04-23T15:47:09.675000+00:00"
+    },
+    "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4": {
+      "pair_key": "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4",
+      "entity_type": "artist",
+      "entity_ids": [
+        "1Xyo4u8uXC1ZmMpatF05PJ",
+        "3TVXtAsR1Inumwj472S9r4"
+      ],
+      "entity_a": {
+        "entity_id": "1Xyo4u8uXC1ZmMpatF05PJ",
+        "entity_name": "The Weeknd",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb9e528993a2820267b97f6aae"
+      },
+      "entity_b": {
+        "entity_id": "3TVXtAsR1Inumwj472S9r4",
+        "entity_name": "Drake",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
+      },
+      "votes_a": 1.0,
+      "votes_b": 0.0,
+      "voter_count": 1,
+      "rounds_a": 1,
+      "rounds_b": 0,
+      "versus_count": 2,
+      "versus": {
+        "0SwGtIcUsPEjpNnN1q3d": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-13T10:39:56.350000+00:00"
+        },
+        "bATZpE5AwxYcB694mDgh": {
+          "rounds_a": 1,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-04T22:12:25.470000+00:00"
+        }
+      },
+      "created_at": "2026-04-04T22:12:25.470000+00:00",
+      "last_voted_at": "2026-04-13T10:39:56.350000+00:00"
+    },
+    "748dZDqSZy6aPXKcI9H80u_7ycBtnsMtyVbbwTfJwRjSP": {
+      "pair_key": "748dZDqSZy6aPXKcI9H80u_7ycBtnsMtyVbbwTfJwRjSP",
+      "entity_type": "album",
+      "entity_ids": [
+        "748dZDqSZy6aPXKcI9H80u",
+        "7ycBtnsMtyVbbwTfJwRjSP"
+      ],
+      "entity_a": {
+        "entity_id": "748dZDqSZy6aPXKcI9H80u",
+        "entity_name": "good kid, m.A.A.d city (Deluxe)",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "7ycBtnsMtyVbbwTfJwRjSP",
+        "entity_name": "To Pimp A Butterfly",
+        "entity_image": ""
+      },
+      "votes_a": 0.625,
+      "votes_b": 0.375,
+      "voter_count": 1,
+      "rounds_a": 10,
+      "rounds_b": 6,
+      "versus_count": 1,
+      "versus": {
+        "0hOwdurr84LifILwAo0D": {
+          "rounds_a": 10,
+          "rounds_b": 6,
+          "poll_count": 1,
+          "last_voted_at": "2026-01-27T12:32:12.713373+00:00"
+        }
+      },
+      "created_at": "2026-01-27T12:32:12.713373+00:00",
+      "last_voted_at": "2026-01-27T12:32:12.713373+00:00"
+    },
+    "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D": {
+      "pair_key": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+      "entity_type": "artist",
+      "entity_ids": [
+        "246dkjvS1zLTtiykXe5h60",
+        "7iZtZyCzp3LItcw1wtPI3D"
+      ],
+      "entity_a": {
+        "entity_id": "246dkjvS1zLTtiykXe5h60",
+        "entity_name": "Post Malone",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebe17c0aa1714a03d62b5ce4e0"
+      },
+      "entity_b": {
+        "entity_id": "7iZtZyCzp3LItcw1wtPI3D",
+        "entity_name": "Rae Sremmurd",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebca1568791bf7ac0cf34dbc66"
+      },
+      "votes_a": 1.9676767676767675,
+      "votes_b": 1.0323232323232323,
+      "voter_count": 3,
+      "rounds_a": 22,
+      "rounds_b": 13,
+      "versus_count": 2,
+      "versus": {
+        "qzVcE2SbvqiCo1bhpJiD": {
+          "rounds_a": 12,
+          "rounds_b": 2,
+          "poll_count": 4,
+          "last_voted_at": "2026-10-02T22:40:23.003000+00:00"
+        },
+        "ucec4ZSqCsib1VageXdV": {
+          "rounds_a": 10,
+          "rounds_b": 11,
+          "poll_count": 3,
+          "last_voted_at": "2026-07-31T14:40:49.496000+00:00"
+        }
+      },
+      "created_at": "2026-07-31T13:55:20.351000+00:00",
+      "last_voted_at": "2026-10-02T22:40:23.003000+00:00"
+    },
+    "2YZyLoL8N0Wb9xBt1NhZWg_3TVXtAsR1Inumwj472S9r4": {
+      "pair_key": "2YZyLoL8N0Wb9xBt1NhZWg_3TVXtAsR1Inumwj472S9r4",
+      "entity_type": "artist",
+      "entity_ids": [
+        "2YZyLoL8N0Wb9xBt1NhZWg",
+        "3TVXtAsR1Inumwj472S9r4"
+      ],
+      "entity_a": {
+        "entity_id": "2YZyLoL8N0Wb9xBt1NhZWg",
+        "entity_name": "Kendrick Lamar",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "3TVXtAsR1Inumwj472S9r4",
+        "entity_name": "Drake",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
+      },
+      "votes_a": 0.5,
+      "votes_b": 0.5,
+      "voter_count": 1,
+      "rounds_a": 2,
+      "rounds_b": 2,
+      "versus_count": 1,
+      "versus": {
+        "YKv2H40jB0A6Xyj0OK0m": {
+          "rounds_a": 2,
+          "rounds_b": 2,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-03T17:56:28.655000+00:00"
+        }
+      },
+      "created_at": "2026-04-03T17:56:28.655000+00:00",
+      "last_voted_at": "2026-04-03T17:56:28.655000+00:00"
+    },
+    "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx": {
+      "pair_key": "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx",
+      "entity_type": "artist",
+      "entity_ids": [
+        "3AA28KZvwAUcZuOKwyblJQ",
+        "3YQKmKGau1PzlVlkL1iodx"
+      ],
+      "entity_a": {
+        "entity_id": "3AA28KZvwAUcZuOKwyblJQ",
+        "entity_name": "Gorillaz",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebdd5b57b40cf2aaeccd07835e"
+      },
+      "entity_b": {
+        "entity_id": "3YQKmKGau1PzlVlkL1iodx",
+        "entity_name": "Twenty One Pilots",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb61a7ea26d33ded218cd1e59d"
+      },
+      "votes_a": 0.0,
+      "votes_b": 2.0,
+      "voter_count": 2,
+      "rounds_a": 0,
+      "rounds_b": 5,
+      "versus_count": 1,
+      "versus": {
+        "M7IHIMgwb3GgYyNTziLS": {
+          "rounds_a": 0,
+          "rounds_b": 5,
+          "poll_count": 2,
+          "last_voted_at": "2026-06-16T14:24:43.194000+00:00"
+        }
+      },
+      "created_at": "2026-04-12T17:36:58.043000+00:00",
+      "last_voted_at": "2026-06-16T14:24:43.194000+00:00"
+    },
+    "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m": {
+      "pair_key": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m",
+      "entity_type": "artist",
+      "entity_ids": [
+        "5pKCCKE2ajJHZ9KAiaK11H",
+        "6vWDO969PvNqNYHIOW5v0m"
+      ],
+      "entity_a": {
+        "entity_id": "5pKCCKE2ajJHZ9KAiaK11H",
+        "entity_name": "Rihanna",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebcb565a8e684e3be458d329ac"
+      },
+      "entity_b": {
+        "entity_id": "6vWDO969PvNqNYHIOW5v0m",
+        "entity_name": "Beyonc\u00e9",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb7eaa373538359164b843f7c0"
+      },
+      "votes_a": 1.0714285714285714,
+      "votes_b": 0.9285714285714286,
+      "voter_count": 2,
+      "rounds_a": 5,
+      "rounds_b": 4,
+      "versus_count": 2,
+      "versus": {
+        "XKHzCUi32umzTZDlE71c": {
+          "rounds_a": 2,
+          "rounds_b": 2,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-10T07:32:42.066000+00:00"
+        },
+        "ZYRP2y7sQUm4Uv9srhWC": {
+          "rounds_a": 3,
+          "rounds_b": 2,
+          "poll_count": 2,
+          "last_voted_at": "2026-05-20T12:12:07.363000+00:00"
+        }
+      },
+      "created_at": "2026-04-10T07:32:42.066000+00:00",
+      "last_voted_at": "2026-05-20T12:12:07.363000+00:00"
+    },
+    "48i37aZTC1prDr4EcpQeEa_76290XdXVF9rPzGdNRWdCh": {
+      "pair_key": "48i37aZTC1prDr4EcpQeEa_76290XdXVF9rPzGdNRWdCh",
+      "entity_type": "album",
+      "entity_ids": [
+        "48i37aZTC1prDr4EcpQeEa",
+        "76290XdXVF9rPzGdNRWdCh"
+      ],
+      "entity_a": {
+        "entity_id": "48i37aZTC1prDr4EcpQeEa",
+        "entity_name": "ANTI",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2737b688587a6754481c53f6bb7"
+      },
+      "entity_b": {
+        "entity_id": "76290XdXVF9rPzGdNRWdCh",
+        "entity_name": "Ctrl",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b27306d56b057cce5797538a16d5"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "93KlTQSP9vj4uDakGwsh": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z": {
+      "pair_key": "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z",
+      "entity_type": "artist",
+      "entity_ids": [
+        "23zg3TcAtWQy7J6upgbUnj",
+        "7bXgB6jMjp9ATFy66eO08Z"
+      ],
+      "entity_a": {
+        "entity_id": "23zg3TcAtWQy7J6upgbUnj",
+        "entity_name": "USHER",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "7bXgB6jMjp9ATFy66eO08Z",
+        "entity_name": "Chris Brown",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb913ab85302df0ddfb77131e9"
+      },
+      "votes_a": 1.0,
+      "votes_b": 1.0,
+      "voter_count": 2,
+      "rounds_a": 5,
+      "rounds_b": 7,
+      "versus_count": 1,
+      "versus": {
+        "wlPmnseFewZ5EHP7P6Em": {
+          "rounds_a": 5,
+          "rounds_b": 7,
+          "poll_count": 2,
+          "last_voted_at": "2026-04-02T19:20:43.362000+00:00"
+        }
+      },
+      "created_at": "2026-04-01T21:21:58.846000+00:00",
+      "last_voted_at": "2026-04-02T19:20:43.362000+00:00"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_1uNFoZAHBGtllmzznpCI3s": {
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_1uNFoZAHBGtllmzznpCI3s",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0du5cEVh5yTK9QJze8zA0C",
+        "1uNFoZAHBGtllmzznpCI3s"
+      ],
+      "entity_a": {
+        "entity_id": "0du5cEVh5yTK9QJze8zA0C",
+        "entity_name": "Bruno Mars",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebc7688aad1bf03986934d7e26"
+      },
+      "entity_b": {
+        "entity_id": "1uNFoZAHBGtllmzznpCI3s",
+        "entity_name": "Justin Bieber",
+        "entity_image": ""
+      },
+      "votes_a": 0.3333333333333333,
+      "votes_b": 0.6666666666666666,
+      "voter_count": 1,
+      "rounds_a": 1,
+      "rounds_b": 2,
+      "versus_count": 1,
+      "versus": {
+        "3R62Q0W7PxcX8EVqCfrG": {
+          "rounds_a": 1,
+          "rounds_b": 2,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-01T21:07:05.873000+00:00"
+        }
+      },
+      "created_at": "2026-04-01T21:07:05.873000+00:00",
+      "last_voted_at": "2026-04-01T21:07:05.873000+00:00"
+    },
+    "2zhossaaVN2pXg5p8o101X_7KY9NaOVRmptl8vlpVomi6": {
+      "pair_key": "2zhossaaVN2pXg5p8o101X_7KY9NaOVRmptl8vlpVomi6",
+      "entity_type": "artist",
+      "entity_ids": [
+        "2zhossaaVN2pXg5p8o101X",
+        "7KY9NaOVRmptl8vlpVomi6"
+      ],
+      "entity_a": {
+        "entity_id": "2zhossaaVN2pXg5p8o101X",
+        "entity_name": "Bien",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb449c5c548193a55ba6bca2a9"
+      },
+      "entity_b": {
+        "entity_id": "7KY9NaOVRmptl8vlpVomi6",
+        "entity_name": "Nyashinski",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb39944bb4f0bc2225c1e1728d"
+      },
+      "votes_a": 0.0,
+      "votes_b": 1.0,
+      "voter_count": 1,
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "versus_count": 1,
+      "versus": {
+        "pkHEGsjGZUdkY6SV1s5k": {
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-14T14:49:08.930000+00:00"
+        }
+      },
+      "created_at": "2026-04-14T14:49:08.930000+00:00",
+      "last_voted_at": "2026-04-14T14:49:08.930000+00:00"
+    },
+    "3arNdjotCvtiiLFfjKngMc_41GuZcammIkupMPKH2OJ6I": {
+      "pair_key": "3arNdjotCvtiiLFfjKngMc_41GuZcammIkupMPKH2OJ6I",
+      "entity_type": "album",
+      "entity_ids": [
+        "3arNdjotCvtiiLFfjKngMc",
+        "41GuZcammIkupMPKH2OJ6I"
+      ],
+      "entity_a": {
+        "entity_id": "3arNdjotCvtiiLFfjKngMc",
+        "entity_name": "AT.LONG.LAST.A$AP",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b27349efdc44d0733042f8b99d57"
+      },
+      "entity_b": {
+        "entity_id": "41GuZcammIkupMPKH2OJ6I",
+        "entity_name": "ASTROWORLD",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273daec894c14c0ca42d76eeb32"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "INxpiYz1H4KZ8NsNDeG5": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "13ubrt8QOOCPljQ2FL1Kca_2h93pZq0e7k5yf4dywlkpM": {
+      "pair_key": "13ubrt8QOOCPljQ2FL1Kca_2h93pZq0e7k5yf4dywlkpM",
+      "entity_type": "artist",
+      "entity_ids": [
+        "13ubrt8QOOCPljQ2FL1Kca",
+        "2h93pZq0e7k5yf4dywlkpM"
+      ],
+      "entity_a": {
+        "entity_id": "13ubrt8QOOCPljQ2FL1Kca",
+        "entity_name": "A$AP Rocky",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebad160b333f9a240f84aff7d7"
+      },
+      "entity_b": {
+        "entity_id": "2h93pZq0e7k5yf4dywlkpM",
+        "entity_name": "Frank Ocean",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebee3123e593174208f9754fab"
+      },
+      "votes_a": 0.75,
+      "votes_b": 0.25,
+      "voter_count": 1,
+      "rounds_a": 3,
+      "rounds_b": 1,
+      "versus_count": 1,
+      "versus": {
+        "q9mIkPGXzw50YcBZ6a1D": {
+          "rounds_a": 3,
+          "rounds_b": 1,
+          "poll_count": 1,
+          "last_voted_at": "2026-10-12T10:10:31.672000+00:00"
+        }
+      },
+      "created_at": "2026-10-12T10:10:31.672000+00:00",
+      "last_voted_at": "2026-10-12T10:10:31.672000+00:00"
+    },
+    "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd": {
+      "pair_key": "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd",
+      "entity_type": "album",
+      "entity_ids": [
+        "4qZBW3f2Q8y0k1A84d4iAO",
+        "7zCODUHkfuRxsUjtuzNqbd"
+      ],
+      "entity_a": {
+        "entity_id": "4qZBW3f2Q8y0k1A84d4iAO",
+        "entity_name": "My Dear Melancholy,",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2731f6a2a40bb692936879db730"
+      },
+      "entity_b": {
+        "entity_id": "7zCODUHkfuRxsUjtuzNqbd",
+        "entity_name": "House Of Balloons (Original)",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273274b406a7e18acebcf743079"
+      },
+      "votes_a": 0.2857142857142857,
+      "votes_b": 0.7142857142857143,
+      "voter_count": 1,
+      "rounds_a": 4,
+      "rounds_b": 10,
+      "versus_count": 1,
+      "versus": {
+        "i0OBlCaF5TPamPoBCP1Y": {
+          "rounds_a": 4,
+          "rounds_b": 10,
+          "poll_count": 2,
+          "last_voted_at": "2026-02-03T08:37:30.253730+00:00"
+        }
+      },
+      "created_at": "2026-01-27T09:49:17.159587+00:00",
+      "last_voted_at": "2026-02-03T08:37:30.253730+00:00"
+    },
+    "6oMuImdp5ZcFhWP0ESe6mG_7iZtZyCzp3LItcw1wtPI3D": {
+      "pair_key": "6oMuImdp5ZcFhWP0ESe6mG_7iZtZyCzp3LItcw1wtPI3D",
+      "entity_type": "artist",
+      "entity_ids": [
+        "6oMuImdp5ZcFhWP0ESe6mG",
+        "7iZtZyCzp3LItcw1wtPI3D"
+      ],
+      "entity_a": {
+        "entity_id": "6oMuImdp5ZcFhWP0ESe6mG",
+        "entity_name": "Migos",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebf4593f7b778219838d858c34"
+      },
+      "entity_b": {
+        "entity_id": "7iZtZyCzp3LItcw1wtPI3D",
+        "entity_name": "Rae Sremmurd",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebca1568791bf7ac0cf34dbc66"
+      },
+      "votes_a": 0.0,
+      "votes_b": 1.0,
+      "voter_count": 1,
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "versus_count": 1,
+      "versus": {
+        "DMvG21g9OjibtqULpPqs": {
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-02T09:11:34.037000+00:00"
+        }
+      },
+      "created_at": "2026-04-02T09:11:34.037000+00:00",
+      "last_voted_at": "2026-04-02T09:11:34.037000+00:00"
+    },
+    "0iEtIxbK0KxaSlF7G42ZOp_5Y5TRrQiqgUO4S36tzjIRZ": {
+      "pair_key": "0iEtIxbK0KxaSlF7G42ZOp_5Y5TRrQiqgUO4S36tzjIRZ",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0iEtIxbK0KxaSlF7G42ZOp",
+        "5Y5TRrQiqgUO4S36tzjIRZ"
+      ],
+      "entity_a": {
+        "entity_id": "0iEtIxbK0KxaSlF7G42ZOp",
+        "entity_name": "Metro Boomin",
+        "entity_image": ""
+      },
+      "entity_b": {
+        "entity_id": "5Y5TRrQiqgUO4S36tzjIRZ",
+        "entity_name": "Timbaland",
+        "entity_image": ""
+      },
+      "votes_a": 0.3333333333333333,
+      "votes_b": 0.6666666666666666,
+      "voter_count": 1,
+      "rounds_a": 2,
+      "rounds_b": 4,
+      "versus_count": 1,
+      "versus": {
+        "QN9k4HqcUuv6HsiOpjCh": {
+          "rounds_a": 2,
+          "rounds_b": 4,
+          "poll_count": 1,
+          "last_voted_at": "2026-09-27T14:45:51.933000+00:00"
+        }
+      },
+      "created_at": "2026-09-27T14:45:51.933000+00:00",
+      "last_voted_at": "2026-09-27T14:45:51.933000+00:00"
+    },
+    "2nLOHgzXzwFEpl62zAgCEC_4yP0hdKOZPNshxUOjY0cZj": {
+      "pair_key": "2nLOHgzXzwFEpl62zAgCEC_4yP0hdKOZPNshxUOjY0cZj",
+      "entity_type": "album",
+      "entity_ids": [
+        "2nLOHgzXzwFEpl62zAgCEC",
+        "4yP0hdKOZPNshxUOjY0cZj"
+      ],
+      "entity_a": {
+        "entity_id": "2nLOHgzXzwFEpl62zAgCEC",
+        "entity_name": "Dawn FM",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2734ab2520c2c77a1d66b9ee21d"
+      },
+      "entity_b": {
+        "entity_id": "4yP0hdKOZPNshxUOjY0cZj",
+        "entity_name": "After Hours",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"
+      },
+      "votes_a": 0.2857142857142857,
+      "votes_b": 0.7142857142857143,
+      "voter_count": 1,
+      "rounds_a": 4,
+      "rounds_b": 10,
+      "versus_count": 2,
+      "versus": {
+        "SjaZpCHlJcMQxqe80gKM": {
+          "rounds_a": 4,
+          "rounds_b": 10,
+          "poll_count": 1,
+          "last_voted_at": "2026-01-29T07:13:52.857044+00:00"
+        },
+        "kUmuBy8WoVMjWiO6pMhj": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-01-29T07:13:52.857044+00:00",
+      "last_voted_at": "2026-01-29T07:13:52.857044+00:00"
+    },
+    "4yP0hdKOZPNshxUOjY0cZj_5Gm2XKBgnlzd6qTi7LE1z2": {
+      "pair_key": "4yP0hdKOZPNshxUOjY0cZj_5Gm2XKBgnlzd6qTi7LE1z2",
+      "entity_type": "album",
+      "entity_ids": [
+        "4yP0hdKOZPNshxUOjY0cZj",
+        "5Gm2XKBgnlzd6qTi7LE1z2"
+      ],
+      "entity_a": {
+        "entity_id": "4yP0hdKOZPNshxUOjY0cZj",
+        "entity_name": "After Hours",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"
+      },
+      "entity_b": {
+        "entity_id": "5Gm2XKBgnlzd6qTi7LE1z2",
+        "entity_name": "Alone At Prom",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2730c5f23cbf0b1ab7e37d0dc67"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "EwiFVKfWWr0BoA4pj80I": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "3OxfaVgvTxUTy7276t7SPU_5EbpxRwbbpCJUepbqVTZ1U": {
+      "pair_key": "3OxfaVgvTxUTy7276t7SPU_5EbpxRwbbpCJUepbqVTZ1U",
+      "entity_type": "album",
+      "entity_ids": [
+        "3OxfaVgvTxUTy7276t7SPU",
+        "5EbpxRwbbpCJUepbqVTZ1U"
+      ],
+      "entity_a": {
+        "entity_id": "3OxfaVgvTxUTy7276t7SPU",
+        "entity_name": "Hurry Up Tomorrow",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273de79f330bc297af3fae736da"
+      },
+      "entity_b": {
+        "entity_id": "5EbpxRwbbpCJUepbqVTZ1U",
+        "entity_name": "Trilogy",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b273b298538481c52f7e217ed000"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "qHvQiGKDEYiGJQ3qog2R": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "0Y5tJX1MQlPlqiwlOH1tJY_1RyvyyTE3xzB2ZywiAwp0i": {
+      "pair_key": "0Y5tJX1MQlPlqiwlOH1tJY_1RyvyyTE3xzB2ZywiAwp0i",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0Y5tJX1MQlPlqiwlOH1tJY",
+        "1RyvyyTE3xzB2ZywiAwp0i"
+      ],
+      "entity_a": {
+        "entity_id": "0Y5tJX1MQlPlqiwlOH1tJY",
+        "entity_name": "Travis Scott",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb19c2790744c792d05570bb71"
+      },
+      "entity_b": {
+        "entity_id": "1RyvyyTE3xzB2ZywiAwp0i",
+        "entity_name": "Future",
+        "entity_image": ""
+      },
+      "votes_a": 0.0,
+      "votes_b": 1.0,
+      "voter_count": 1,
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "versus_count": 1,
+      "versus": {
+        "bFBAoGMeCG8f1T6en6fI": {
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "poll_count": 1,
+          "last_voted_at": "2026-04-09T16:38:06.870000+00:00"
+        }
+      },
+      "created_at": "2026-04-09T16:38:06.870000+00:00",
+      "last_voted_at": "2026-04-09T16:38:06.870000+00:00"
+    },
+    "2nLOHgzXzwFEpl62zAgCEC_3cf4iSSKd8ffTncbtKljXw": {
+      "pair_key": "2nLOHgzXzwFEpl62zAgCEC_3cf4iSSKd8ffTncbtKljXw",
+      "entity_type": "album",
+      "entity_ids": [
+        "2nLOHgzXzwFEpl62zAgCEC",
+        "3cf4iSSKd8ffTncbtKljXw"
+      ],
+      "entity_a": {
+        "entity_id": "2nLOHgzXzwFEpl62zAgCEC",
+        "entity_name": "Dawn FM",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2734ab2520c2c77a1d66b9ee21d"
+      },
+      "entity_b": {
+        "entity_id": "3cf4iSSKd8ffTncbtKljXw",
+        "entity_name": "Honestly, Nevermind",
+        "entity_image": "https://i.scdn.co/image/ab67616d0000b2738dc0d801766a5aa6a33cbe37"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 2,
+      "versus": {
+        "9orFO04khv7BcmNfpMVK": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        },
+        "sbIyCMzk4BaBWhomEYc0": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 0,
+          "last_voted_at": null
+        }
+      },
+      "created_at": "2026-10-12T13:46:04.103699+00:00",
+      "last_voted_at": null
+    },
+    "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5": {
+      "pair_key": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5",
+      "entity_type": "artist",
+      "entity_ids": [
+        "246dkjvS1zLTtiykXe5h60",
+        "5cj0lLjcoR7YOSnhnX0Po5"
+      ],
+      "entity_a": {
+        "entity_id": "246dkjvS1zLTtiykXe5h60",
+        "entity_name": "Post Malone",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebe17c0aa1714a03d62b5ce4e0"
+      },
+      "entity_b": {
+        "entity_id": "5cj0lLjcoR7YOSnhnX0Po5",
+        "entity_name": "Doja Cat",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb8a0644455ebfa7d3976f5101"
+      },
+      "votes_a": 1.2,
+      "votes_b": 0.8,
+      "voter_count": 2,
+      "rounds_a": 2,
+      "rounds_b": 4,
+      "versus_count": 1,
+      "versus": {
+        "dBTx4Xc43dylfAx2ZhXv": {
+          "rounds_a": 2,
+          "rounds_b": 4,
+          "poll_count": 3,
+          "last_voted_at": "2026-10-02T22:02:40.074000+00:00"
+        }
+      },
+      "created_at": "2026-07-31T14:58:12.669000+00:00",
+      "last_voted_at": "2026-10-02T22:02:40.074000+00:00"
+    },
+    "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5": {
+      "pair_key": "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5",
+      "entity_type": "artist",
+      "entity_ids": [
+        "1Xyo4u8uXC1ZmMpatF05PJ",
+        "5cj0lLjcoR7YOSnhnX0Po5"
+      ],
+      "entity_a": {
+        "entity_id": "1Xyo4u8uXC1ZmMpatF05PJ",
+        "entity_name": "The Weeknd",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb9e528993a2820267b97f6aae"
+      },
+      "entity_b": {
+        "entity_id": "5cj0lLjcoR7YOSnhnX0Po5",
+        "entity_name": "Doja Cat",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb8a0644455ebfa7d3976f5101"
+      },
+      "votes_a": 1.0,
+      "votes_b": 0.0,
+      "voter_count": 1,
+      "rounds_a": 3,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "X7fStmgrsDWmsF2pcgtt": {
+          "rounds_a": 3,
+          "rounds_b": 0,
+          "poll_count": 2,
+          "last_voted_at": "2026-06-16T14:23:06.407000+00:00"
+        }
+      },
+      "created_at": "2026-04-13T13:42:22.374000+00:00",
+      "last_voted_at": "2026-06-16T14:23:06.407000+00:00"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z": {
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0du5cEVh5yTK9QJze8zA0C",
+        "7bXgB6jMjp9ATFy66eO08Z"
+      ],
+      "entity_a": {
+        "entity_id": "0du5cEVh5yTK9QJze8zA0C",
+        "entity_name": "Bruno Mars",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebc7688aad1bf03986934d7e26"
+      },
+      "entity_b": {
+        "entity_id": "7bXgB6jMjp9ATFy66eO08Z",
+        "entity_name": "Chris Brown",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb913ab85302df0ddfb77131e9"
+      },
+      "votes_a": 0.5,
+      "votes_b": 0.5,
+      "voter_count": 1,
+      "rounds_a": 1,
+      "rounds_b": 1,
+      "versus_count": 1,
+      "versus": {
+        "8yCQkYXc0e8Cc0935HeY": {
+          "rounds_a": 1,
+          "rounds_b": 1,
+          "poll_count": 2,
+          "last_voted_at": "2026-05-26T09:15:27.848000+00:00"
+        }
+      },
+      "created_at": "2026-04-04T22:59:36.903000+00:00",
+      "last_voted_at": "2026-05-26T09:15:27.848000+00:00"
+    },
+    "5fMUXHkw8R8eOP2RNVYEZX_738wLrAtLtCtFOLvQBXOXp": {
+      "pair_key": "5fMUXHkw8R8eOP2RNVYEZX_738wLrAtLtCtFOLvQBXOXp",
+      "entity_type": "artist",
+      "entity_ids": [
+        "5fMUXHkw8R8eOP2RNVYEZX",
+        "738wLrAtLtCtFOLvQBXOXp"
+      ],
+      "entity_a": {
+        "entity_id": "5fMUXHkw8R8eOP2RNVYEZX",
+        "entity_name": "Diplo",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebdf01727aa674ddefa777797a"
+      },
+      "entity_b": {
+        "entity_id": "738wLrAtLtCtFOLvQBXOXp",
+        "entity_name": "Major Lazer",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebd18eac6f1e653551fd05a793"
+      },
+      "votes_a": 0.25,
+      "votes_b": 0.75,
+      "voter_count": 1,
+      "rounds_a": 1,
+      "rounds_b": 3,
+      "versus_count": 1,
+      "versus": {
+        "LTiAlrl3JJQARWg3DUKC": {
+          "rounds_a": 1,
+          "rounds_b": 3,
+          "poll_count": 1,
+          "last_voted_at": "2026-06-03T20:11:32.216000+00:00"
+        }
+      },
+      "created_at": "2026-06-03T20:11:32.216000+00:00",
+      "last_voted_at": "2026-06-03T20:11:32.216000+00:00"
+    },
+    "13ubrt8QOOCPljQ2FL1Kca_4O15NlyKLIASxsJ0PrXPfz": {
+      "pair_key": "13ubrt8QOOCPljQ2FL1Kca_4O15NlyKLIASxsJ0PrXPfz",
+      "entity_type": "artist",
+      "entity_ids": [
+        "13ubrt8QOOCPljQ2FL1Kca",
+        "4O15NlyKLIASxsJ0PrXPfz"
+      ],
+      "entity_a": {
+        "entity_id": "13ubrt8QOOCPljQ2FL1Kca",
+        "entity_name": "A$AP Rocky",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebad160b333f9a240f84aff7d7"
+      },
+      "entity_b": {
+        "entity_id": "4O15NlyKLIASxsJ0PrXPfz",
+        "entity_name": "Lil Uzi Vert",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb62c272d76220f2e9dad56704"
+      },
+      "votes_a": 1.0,
+      "votes_b": 0.0,
+      "voter_count": 1,
+      "rounds_a": 1,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "TY9DFGNh24IUsBhDV6dc": {
+          "rounds_a": 1,
+          "rounds_b": 0,
+          "poll_count": 1,
+          "last_voted_at": "2026-10-02T12:15:09.590000+00:00"
+        }
+      },
+      "created_at": "2026-10-02T12:15:09.590000+00:00",
+      "last_voted_at": "2026-10-02T12:15:09.590000+00:00"
+    },
+    "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG": {
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG",
+      "entity_type": "artist",
+      "entity_ids": [
+        "3TVXtAsR1Inumwj472S9r4",
+        "6oMuImdp5ZcFhWP0ESe6mG"
+      ],
+      "entity_a": {
+        "entity_id": "3TVXtAsR1Inumwj472S9r4",
+        "entity_name": "Drake",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
+      },
+      "entity_b": {
+        "entity_id": "6oMuImdp5ZcFhWP0ESe6mG",
+        "entity_name": "Migos",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5ebf4593f7b778219838d858c34"
+      },
+      "votes_a": 0.0,
+      "votes_b": 0.0,
+      "voter_count": 0,
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "versus_count": 1,
+      "versus": {
+        "luUuCNJY1VSfP533LxFc": {
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "poll_count": 3,
+          "last_voted_at": "2026-07-29T09:25:41.977000+00:00"
+        }
+      },
+      "created_at": "2026-06-30T21:26:32.945000+00:00",
+      "last_voted_at": "2026-07-29T09:25:41.977000+00:00"
+    },
+    "0Y5tJX1MQlPlqiwlOH1tJY_4O15NlyKLIASxsJ0PrXPfz": {
+      "pair_key": "0Y5tJX1MQlPlqiwlOH1tJY_4O15NlyKLIASxsJ0PrXPfz",
+      "entity_type": "artist",
+      "entity_ids": [
+        "0Y5tJX1MQlPlqiwlOH1tJY",
+        "4O15NlyKLIASxsJ0PrXPfz"
+      ],
+      "entity_a": {
+        "entity_id": "0Y5tJX1MQlPlqiwlOH1tJY",
+        "entity_name": "Travis Scott",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb19c2790744c792d05570bb71"
+      },
+      "entity_b": {
+        "entity_id": "4O15NlyKLIASxsJ0PrXPfz",
+        "entity_name": "Lil Uzi Vert",
+        "entity_image": "https://i.scdn.co/image/ab6761610000e5eb62c272d76220f2e9dad56704"
+      },
+      "votes_a": 0.4,
+      "votes_b": 0.6,
+      "voter_count": 1,
+      "rounds_a": 2,
+      "rounds_b": 3,
+      "versus_count": 1,
+      "versus": {
+        "Y7DXV5UJybYBwlKMQLjt": {
+          "rounds_a": 2,
+          "rounds_b": 3,
+          "poll_count": 1,
+          "last_voted_at": "2026-10-02T11:47:26.214000+00:00"
+        }
+      },
+      "created_at": "2026-10-02T11:47:26.214000+00:00",
+      "last_voted_at": "2026-10-02T11:47:26.214000+00:00"
+    }
+  },
+  "voters": {
+    "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 0,
+      "share_a": 1.0,
+      "share_b": 0.0,
+      "counted": true,
+      "updated_at": "2026-04-13T10:39:56.350000+00:00",
+      "polls": {
+        "0SwGtIcUsPEjpNnN1q3d_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "0SwGtIcUsPEjpNnN1q3d",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-04-13T10:39:56.350000+00:00"
+        },
+        "bATZpE5AwxYcB694mDgh_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "bATZpE5AwxYcB694mDgh",
+          "rounds_a": 1,
+          "rounds_b": 0,
+          "voted_at": "2026-04-04T22:12:25.470000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4"
+    },
+    "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd||5I4TCyfmEySXWQMbGGxey7FUVm53": {
+      "rounds_a": 4,
+      "rounds_b": 10,
+      "share_a": 0.2857142857142857,
+      "share_b": 0.7142857142857143,
+      "counted": true,
+      "updated_at": "2026-02-03T08:37:30.253730+00:00",
+      "polls": {
+        "31KlqtaY6fYPFC1Ix2o3": {
+          "versus_id": "i0OBlCaF5TPamPoBCP1Y",
+          "rounds_a": 4,
+          "rounds_b": 3,
+          "voted_at": "2026-01-27T09:49:17.159587+00:00"
+        },
+        "X6BLtZkythDXboKVGUPa": {
+          "versus_id": "i0OBlCaF5TPamPoBCP1Y",
+          "rounds_a": 0,
+          "rounds_b": 7,
+          "voted_at": "2026-02-03T08:37:30.253730+00:00"
+        }
+      },
+      "voter_id": "5I4TCyfmEySXWQMbGGxey7FUVm53",
+      "pair_key": "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_1uNFoZAHBGtllmzznpCI3s||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 2,
+      "share_a": 0.3333333333333333,
+      "share_b": 0.6666666666666666,
+      "counted": true,
+      "updated_at": "2026-04-01T21:07:05.873000+00:00",
+      "polls": {
+        "3R62Q0W7PxcX8EVqCfrG_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "3R62Q0W7PxcX8EVqCfrG",
+          "rounds_a": 1,
+          "rounds_b": 2,
+          "voted_at": "2026-04-01T21:07:05.873000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_1uNFoZAHBGtllmzznpCI3s"
+    },
+    "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u||5I4TCyfmEySXWQMbGGxey7FUVm53": {
+      "rounds_a": 32,
+      "rounds_b": 24,
+      "share_a": 0.5714285714285714,
+      "share_b": 0.42857142857142855,
+      "counted": true,
+      "updated_at": "2026-01-27T12:29:04.430882+00:00",
+      "polls": {
+        "7MtS6wWaRshW5WVfMLRb": {
+          "versus_id": "o53Ip1om93frVxyWKwZJ",
+          "rounds_a": 8,
+          "rounds_b": 6,
+          "voted_at": "2026-01-27T12:28:56.078989+00:00"
+        },
+        "U3jED7oMk1iaUj4Hu72P": {
+          "versus_id": "o53Ip1om93frVxyWKwZJ",
+          "rounds_a": 8,
+          "rounds_b": 6,
+          "voted_at": "2026-01-27T12:28:54.894424+00:00"
+        },
+        "VubOO1OIokBwH3fsn14r": {
+          "versus_id": "o53Ip1om93frVxyWKwZJ",
+          "rounds_a": 8,
+          "rounds_b": 6,
+          "voted_at": "2026-01-27T12:29:04.430882+00:00"
+        },
+        "hctRBAPuRvuBUa5fnF0W": {
+          "versus_id": "o53Ip1om93frVxyWKwZJ",
+          "rounds_a": 8,
+          "rounds_b": 6,
+          "voted_at": "2026-01-27T12:28:49.525660+00:00"
+        }
+      },
+      "voter_id": "5I4TCyfmEySXWQMbGGxey7FUVm53",
+      "pair_key": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-05-26T09:15:27.848000+00:00",
+      "polls": {
+        "8yCQkYXc0e8Cc0935HeY_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "8yCQkYXc0e8Cc0935HeY",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-05-26T09:15:27.848000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 1,
+      "share_a": 0.5,
+      "share_b": 0.5,
+      "counted": true,
+      "updated_at": "2026-04-04T22:59:36.903000+00:00",
+      "polls": {
+        "8yCQkYXc0e8Cc0935HeY_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "8yCQkYXc0e8Cc0935HeY",
+          "rounds_a": 1,
+          "rounds_b": 1,
+          "voted_at": "2026-04-04T22:59:36.903000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "2nLOHgzXzwFEpl62zAgCEC_4yP0hdKOZPNshxUOjY0cZj||14z3DAjEMDdz2322woj25ydmnjo1": {
+      "rounds_a": 4,
+      "rounds_b": 10,
+      "share_a": 0.2857142857142857,
+      "share_b": 0.7142857142857143,
+      "counted": true,
+      "updated_at": "2026-01-29T07:13:52.857044+00:00",
+      "polls": {
+        "CHwlU0j7T3sgH3CH6efL": {
+          "versus_id": "SjaZpCHlJcMQxqe80gKM",
+          "rounds_a": 4,
+          "rounds_b": 10,
+          "voted_at": "2026-01-29T07:13:52.857044+00:00"
+        }
+      },
+      "voter_id": "14z3DAjEMDdz2322woj25ydmnjo1",
+      "pair_key": "2nLOHgzXzwFEpl62zAgCEC_4yP0hdKOZPNshxUOjY0cZj"
+    },
+    "6oMuImdp5ZcFhWP0ESe6mG_7iZtZyCzp3LItcw1wtPI3D||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "share_a": 0.0,
+      "share_b": 1.0,
+      "counted": true,
+      "updated_at": "2026-04-02T09:11:34.037000+00:00",
+      "polls": {
+        "DMvG21g9OjibtqULpPqs_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "DMvG21g9OjibtqULpPqs",
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "voted_at": "2026-04-02T09:11:34.037000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "6oMuImdp5ZcFhWP0ESe6mG_7iZtZyCzp3LItcw1wtPI3D"
+    },
+    "748dZDqSZy6aPXKcI9H80u_7ycBtnsMtyVbbwTfJwRjSP||5I4TCyfmEySXWQMbGGxey7FUVm53": {
+      "rounds_a": 10,
+      "rounds_b": 6,
+      "share_a": 0.625,
+      "share_b": 0.375,
+      "counted": true,
+      "updated_at": "2026-01-27T12:32:12.713373+00:00",
+      "polls": {
+        "KZk6z5eMJjY9X9PeccKW": {
+          "versus_id": "0hOwdurr84LifILwAo0D",
+          "rounds_a": 10,
+          "rounds_b": 6,
+          "voted_at": "2026-01-27T12:32:12.713373+00:00"
+        }
+      },
+      "voter_id": "5I4TCyfmEySXWQMbGGxey7FUVm53",
+      "pair_key": "748dZDqSZy6aPXKcI9H80u_7ycBtnsMtyVbbwTfJwRjSP"
+    },
+    "5fMUXHkw8R8eOP2RNVYEZX_738wLrAtLtCtFOLvQBXOXp||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 1,
+      "rounds_b": 3,
+      "share_a": 0.25,
+      "share_b": 0.75,
+      "counted": true,
+      "updated_at": "2026-06-03T20:11:32.216000+00:00",
+      "polls": {
+        "LTiAlrl3JJQARWg3DUKC_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "LTiAlrl3JJQARWg3DUKC",
+          "rounds_a": 1,
+          "rounds_b": 3,
+          "voted_at": "2026-06-03T20:11:32.216000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "5fMUXHkw8R8eOP2RNVYEZX_738wLrAtLtCtFOLvQBXOXp"
+    },
+    "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 2,
+      "share_a": 0.0,
+      "share_b": 1.0,
+      "counted": true,
+      "updated_at": "2026-06-16T14:24:43.194000+00:00",
+      "polls": {
+        "M7IHIMgwb3GgYyNTziLS_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "M7IHIMgwb3GgYyNTziLS",
+          "rounds_a": 0,
+          "rounds_b": 2,
+          "voted_at": "2026-06-16T14:24:43.194000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx"
+    },
+    "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 3,
+      "share_a": 0.0,
+      "share_b": 1.0,
+      "counted": true,
+      "updated_at": "2026-04-12T17:36:58.043000+00:00",
+      "polls": {
+        "M7IHIMgwb3GgYyNTziLS_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "M7IHIMgwb3GgYyNTziLS",
+          "rounds_a": 0,
+          "rounds_b": 3,
+          "voted_at": "2026-04-12T17:36:58.043000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx"
+    },
+    "0iEtIxbK0KxaSlF7G42ZOp_5Y5TRrQiqgUO4S36tzjIRZ||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 2,
+      "rounds_b": 4,
+      "share_a": 0.3333333333333333,
+      "share_b": 0.6666666666666666,
+      "counted": true,
+      "updated_at": "2026-09-27T14:45:51.933000+00:00",
+      "polls": {
+        "QN9k4HqcUuv6HsiOpjCh_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "QN9k4HqcUuv6HsiOpjCh",
+          "rounds_a": 2,
+          "rounds_b": 4,
+          "voted_at": "2026-09-27T14:45:51.933000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0iEtIxbK0KxaSlF7G42ZOp_5Y5TRrQiqgUO4S36tzjIRZ"
+    },
+    "13ubrt8QOOCPljQ2FL1Kca_4O15NlyKLIASxsJ0PrXPfz||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 0,
+      "share_a": 1.0,
+      "share_b": 0.0,
+      "counted": true,
+      "updated_at": "2026-10-02T12:15:09.590000+00:00",
+      "polls": {
+        "TY9DFGNh24IUsBhDV6dc_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "TY9DFGNh24IUsBhDV6dc",
+          "rounds_a": 1,
+          "rounds_b": 0,
+          "voted_at": "2026-10-02T12:15:09.590000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "13ubrt8QOOCPljQ2FL1Kca_4O15NlyKLIASxsJ0PrXPfz"
+    },
+    "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-06-16T14:23:06.407000+00:00",
+      "polls": {
+        "X7fStmgrsDWmsF2pcgtt_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "X7fStmgrsDWmsF2pcgtt",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-06-16T14:23:06.407000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5"
+    },
+    "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 3,
+      "rounds_b": 0,
+      "share_a": 1.0,
+      "share_b": 0.0,
+      "counted": true,
+      "updated_at": "2026-04-13T13:42:22.374000+00:00",
+      "polls": {
+        "X7fStmgrsDWmsF2pcgtt_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "X7fStmgrsDWmsF2pcgtt",
+          "rounds_a": 3,
+          "rounds_b": 0,
+          "voted_at": "2026-04-13T13:42:22.374000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5"
+    },
+    "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 4,
+      "rounds_b": 3,
+      "share_a": 0.5714285714285714,
+      "share_b": 0.42857142857142855,
+      "counted": true,
+      "updated_at": "2026-04-11T18:24:42.862000+00:00",
+      "polls": {
+        "XKHzCUi32umzTZDlE71c_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "XKHzCUi32umzTZDlE71c",
+          "rounds_a": 2,
+          "rounds_b": 2,
+          "voted_at": "2026-04-10T07:32:42.066000+00:00"
+        },
+        "ZYRP2y7sQUm4Uv9srhWC_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "ZYRP2y7sQUm4Uv9srhWC",
+          "rounds_a": 2,
+          "rounds_b": 1,
+          "voted_at": "2026-04-11T18:24:42.862000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m"
+    },
+    "0Y5tJX1MQlPlqiwlOH1tJY_4O15NlyKLIASxsJ0PrXPfz||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 2,
+      "rounds_b": 3,
+      "share_a": 0.4,
+      "share_b": 0.6,
+      "counted": true,
+      "updated_at": "2026-10-02T11:47:26.214000+00:00",
+      "polls": {
+        "Y7DXV5UJybYBwlKMQLjt_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "Y7DXV5UJybYBwlKMQLjt",
+          "rounds_a": 2,
+          "rounds_b": 3,
+          "voted_at": "2026-10-02T11:47:26.214000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0Y5tJX1MQlPlqiwlOH1tJY_4O15NlyKLIASxsJ0PrXPfz"
+    },
+    "2YZyLoL8N0Wb9xBt1NhZWg_3TVXtAsR1Inumwj472S9r4||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 2,
+      "rounds_b": 2,
+      "share_a": 0.5,
+      "share_b": 0.5,
+      "counted": true,
+      "updated_at": "2026-04-03T17:56:28.655000+00:00",
+      "polls": {
+        "YKv2H40jB0A6Xyj0OK0m_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "YKv2H40jB0A6Xyj0OK0m",
+          "rounds_a": 2,
+          "rounds_b": 2,
+          "voted_at": "2026-04-03T17:56:28.655000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "2YZyLoL8N0Wb9xBt1NhZWg_3TVXtAsR1Inumwj472S9r4"
+    },
+    "2YZyLoL8N0Wb9xBt1NhZWg_5K4W6rqBFWDnAN6FQUkS6x||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-04-14T19:00:37.756000+00:00",
+      "polls": {
+        "Yb0axgvm75LXIFsQtsKQ_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "Yb0axgvm75LXIFsQtsKQ",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-04-14T19:00:37.756000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "2YZyLoL8N0Wb9xBt1NhZWg_5K4W6rqBFWDnAN6FQUkS6x"
+    },
+    "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 1,
+      "rounds_b": 1,
+      "share_a": 0.5,
+      "share_b": 0.5,
+      "counted": true,
+      "updated_at": "2026-05-20T12:12:07.363000+00:00",
+      "polls": {
+        "ZYRP2y7sQUm4Uv9srhWC_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "ZYRP2y7sQUm4Uv9srhWC",
+          "rounds_a": 1,
+          "rounds_b": 1,
+          "voted_at": "2026-05-20T12:12:07.363000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m"
+    },
+    "0Y5tJX1MQlPlqiwlOH1tJY_1RyvyyTE3xzB2ZywiAwp0i||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "share_a": 0.0,
+      "share_b": 1.0,
+      "counted": true,
+      "updated_at": "2026-04-09T16:38:06.870000+00:00",
+      "polls": {
+        "bFBAoGMeCG8f1T6en6fI_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "bFBAoGMeCG8f1T6en6fI",
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "voted_at": "2026-04-09T16:38:06.870000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0Y5tJX1MQlPlqiwlOH1tJY_1RyvyyTE3xzB2ZywiAwp0i"
+    },
+    "0du5cEVh5yTK9QJze8zA0C_1Xyo4u8uXC1ZmMpatF05PJ||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 2,
+      "rounds_b": 0,
+      "share_a": 1.0,
+      "share_b": 0.0,
+      "counted": true,
+      "updated_at": "2026-04-04T22:27:37.697000+00:00",
+      "polls": {
+        "d66LpLdyEuZfWldvRVnu_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "d66LpLdyEuZfWldvRVnu",
+          "rounds_a": 2,
+          "rounds_b": 0,
+          "voted_at": "2026-04-04T22:27:37.697000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "0du5cEVh5yTK9QJze8zA0C_1Xyo4u8uXC1ZmMpatF05PJ"
+    },
+    "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5||BMV5PcNmOwNdhObD9xjcl1HqHn32": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-10-02T22:02:40.074000+00:00",
+      "polls": {
+        "dBTx4Xc43dylfAx2ZhXv_BMV5PcNmOwNdhObD9xjcl1HqHn32": {
+          "versus_id": "dBTx4Xc43dylfAx2ZhXv",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-10-02T22:02:40.074000+00:00"
+        }
+      },
+      "voter_id": "BMV5PcNmOwNdhObD9xjcl1HqHn32",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5"
+    },
+    "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 1,
+      "rounds_b": 4,
+      "share_a": 0.2,
+      "share_b": 0.8,
+      "counted": true,
+      "updated_at": "2026-07-31T14:58:12.669000+00:00",
+      "polls": {
+        "dBTx4Xc43dylfAx2ZhXv_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "dBTx4Xc43dylfAx2ZhXv",
+          "rounds_a": 1,
+          "rounds_b": 4,
+          "voted_at": "2026-07-31T14:58:12.669000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5"
+    },
+    "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 0,
+      "share_a": 1.0,
+      "share_b": 0.0,
+      "counted": true,
+      "updated_at": "2026-09-09T13:52:10.972000+00:00",
+      "polls": {
+        "dBTx4Xc43dylfAx2ZhXv_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "dBTx4Xc43dylfAx2ZhXv",
+          "rounds_a": 1,
+          "rounds_b": 0,
+          "voted_at": "2026-09-09T13:52:10.972000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5"
+    },
+    "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-06-30T21:26:32.945000+00:00",
+      "polls": {
+        "luUuCNJY1VSfP533LxFc_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "luUuCNJY1VSfP533LxFc",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-06-30T21:26:32.945000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG"
+    },
+    "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG||UrPbVkmk9NUGlHCrvBApU5hcVuv2": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-07-04T11:39:32.092000+00:00",
+      "polls": {
+        "luUuCNJY1VSfP533LxFc_UrPbVkmk9NUGlHCrvBApU5hcVuv2": {
+          "versus_id": "luUuCNJY1VSfP533LxFc",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-07-04T11:39:32.092000+00:00"
+        }
+      },
+      "voter_id": "UrPbVkmk9NUGlHCrvBApU5hcVuv2",
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG"
+    },
+    "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-07-29T09:25:41.977000+00:00",
+      "polls": {
+        "luUuCNJY1VSfP533LxFc_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "luUuCNJY1VSfP533LxFc",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-07-29T09:25:41.977000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG"
+    },
+    "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 2,
+      "rounds_b": 3,
+      "share_a": 0.4,
+      "share_b": 0.6,
+      "counted": true,
+      "updated_at": "2026-08-12T10:14:09.618000+00:00",
+      "polls": {
+        "oHUDuQ4mKmLe0GcUZ3r5_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "oHUDuQ4mKmLe0GcUZ3r5",
+          "rounds_a": 2,
+          "rounds_b": 3,
+          "voted_at": "2026-08-12T10:14:09.618000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 1,
+      "rounds_b": 4,
+      "share_a": 0.2,
+      "share_b": 0.8,
+      "counted": true,
+      "updated_at": "2026-10-06T20:19:28.337000+00:00",
+      "polls": {
+        "oHUDuQ4mKmLe0GcUZ3r5_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "oHUDuQ4mKmLe0GcUZ3r5",
+          "rounds_a": 1,
+          "rounds_b": 4,
+          "voted_at": "2026-10-06T20:19:28.337000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "2zhossaaVN2pXg5p8o101X_7KY9NaOVRmptl8vlpVomi6||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 1,
+      "share_a": 0.0,
+      "share_b": 1.0,
+      "counted": true,
+      "updated_at": "2026-04-14T14:49:08.930000+00:00",
+      "polls": {
+        "pkHEGsjGZUdkY6SV1s5k_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "pkHEGsjGZUdkY6SV1s5k",
+          "rounds_a": 0,
+          "rounds_b": 1,
+          "voted_at": "2026-04-14T14:49:08.930000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "2zhossaaVN2pXg5p8o101X_7KY9NaOVRmptl8vlpVomi6"
+    },
+    "13ubrt8QOOCPljQ2FL1Kca_2h93pZq0e7k5yf4dywlkpM||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 3,
+      "rounds_b": 1,
+      "share_a": 0.75,
+      "share_b": 0.25,
+      "counted": true,
+      "updated_at": "2026-10-12T10:10:31.672000+00:00",
+      "polls": {
+        "q9mIkPGXzw50YcBZ6a1D_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "q9mIkPGXzw50YcBZ6a1D",
+          "rounds_a": 3,
+          "rounds_b": 1,
+          "voted_at": "2026-10-12T10:10:31.672000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "13ubrt8QOOCPljQ2FL1Kca_2h93pZq0e7k5yf4dywlkpM"
+    },
+    "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D||BMV5PcNmOwNdhObD9xjcl1HqHn32": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-10-02T22:40:23.003000+00:00",
+      "polls": {
+        "qzVcE2SbvqiCo1bhpJiD_BMV5PcNmOwNdhObD9xjcl1HqHn32": {
+          "versus_id": "qzVcE2SbvqiCo1bhpJiD",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-10-02T22:40:23.003000+00:00"
+        }
+      },
+      "voter_id": "BMV5PcNmOwNdhObD9xjcl1HqHn32",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D"
+    },
+    "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 8,
+      "rounds_b": 1,
+      "share_a": 0.8888888888888888,
+      "share_b": 0.1111111111111111,
+      "counted": true,
+      "updated_at": "2026-08-06T22:33:59.981000+00:00",
+      "polls": {
+        "qzVcE2SbvqiCo1bhpJiD_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "qzVcE2SbvqiCo1bhpJiD",
+          "rounds_a": 1,
+          "rounds_b": 1,
+          "voted_at": "2026-08-06T22:33:59.981000+00:00"
+        },
+        "ucec4ZSqCsib1VageXdV_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "ucec4ZSqCsib1VageXdV",
+          "rounds_a": 7,
+          "rounds_b": 0,
+          "voted_at": "2026-07-31T14:40:49.496000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D"
+    },
+    "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D||UrPbVkmk9NUGlHCrvBApU5hcVuv2": {
+      "rounds_a": 6,
+      "rounds_b": 5,
+      "share_a": 0.5454545454545454,
+      "share_b": 0.45454545454545453,
+      "counted": true,
+      "updated_at": "2026-07-31T13:55:34.546000+00:00",
+      "polls": {
+        "qzVcE2SbvqiCo1bhpJiD_UrPbVkmk9NUGlHCrvBApU5hcVuv2": {
+          "versus_id": "qzVcE2SbvqiCo1bhpJiD",
+          "rounds_a": 3,
+          "rounds_b": 1,
+          "voted_at": "2026-07-31T13:55:34.546000+00:00"
+        },
+        "ucec4ZSqCsib1VageXdV_UrPbVkmk9NUGlHCrvBApU5hcVuv2": {
+          "versus_id": "ucec4ZSqCsib1VageXdV",
+          "rounds_a": 3,
+          "rounds_b": 4,
+          "voted_at": "2026-07-31T13:55:20.351000+00:00"
+        }
+      },
+      "voter_id": "UrPbVkmk9NUGlHCrvBApU5hcVuv2",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D"
+    },
+    "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 8,
+      "rounds_b": 7,
+      "share_a": 0.5333333333333333,
+      "share_b": 0.4666666666666667,
+      "counted": true,
+      "updated_at": "2026-09-09T14:12:14.489000+00:00",
+      "polls": {
+        "qzVcE2SbvqiCo1bhpJiD_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "qzVcE2SbvqiCo1bhpJiD",
+          "rounds_a": 8,
+          "rounds_b": 0,
+          "voted_at": "2026-09-09T14:12:14.489000+00:00"
+        },
+        "ucec4ZSqCsib1VageXdV_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "ucec4ZSqCsib1VageXdV",
+          "rounds_a": 0,
+          "rounds_b": 7,
+          "voted_at": "2026-07-31T14:08:00.805000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D"
+    },
+    "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-05-20T12:10:51.051000+00:00",
+      "polls": {
+        "rhwy13N5YsRm53Cf3ofH_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "rhwy13N5YsRm53Cf3ofH",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-05-20T12:10:51.051000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m"
+    },
+    "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-04-23T15:48:47.387000+00:00",
+      "polls": {
+        "rhwy13N5YsRm53Cf3ofH_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "rhwy13N5YsRm53Cf3ofH",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-04-23T15:48:47.387000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m"
+    },
+    "3gBZUcNeVumkeeJ19CY2sX_3qiHUAX7zY4Qnjx8TNUzVx||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 0,
+      "rounds_b": 0,
+      "share_a": 0.0,
+      "share_b": 0.0,
+      "counted": false,
+      "updated_at": "2026-07-25T20:50:10.919000+00:00",
+      "polls": {
+        "uSIUE6dys9nMATEdRWmi_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "uSIUE6dys9nMATEdRWmi",
+          "rounds_a": 0,
+          "rounds_b": 0,
+          "voted_at": "2026-07-25T20:50:10.919000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "3gBZUcNeVumkeeJ19CY2sX_3qiHUAX7zY4Qnjx8TNUzVx"
+    },
+    "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 3,
+      "rounds_b": 1,
+      "share_a": 0.75,
+      "share_b": 0.25,
+      "counted": true,
+      "updated_at": "2026-04-02T19:20:43.362000+00:00",
+      "polls": {
+        "wlPmnseFewZ5EHP7P6Em_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "wlPmnseFewZ5EHP7P6Em",
+          "rounds_a": 3,
+          "rounds_b": 1,
+          "voted_at": "2026-04-02T19:20:43.362000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 2,
+      "rounds_b": 6,
+      "share_a": 0.25,
+      "share_b": 0.75,
+      "counted": true,
+      "updated_at": "2026-04-01T21:21:58.846000+00:00",
+      "polls": {
+        "wlPmnseFewZ5EHP7P6Em_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "wlPmnseFewZ5EHP7P6Em",
+          "rounds_a": 2,
+          "rounds_b": 6,
+          "voted_at": "2026-04-01T21:21:58.846000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z"
+    },
+    "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD||N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+      "rounds_a": 1,
+      "rounds_b": 1,
+      "share_a": 0.5,
+      "share_b": 0.5,
+      "counted": true,
+      "updated_at": "2026-04-14T18:49:37.461000+00:00",
+      "polls": {
+        "zMHw4BPYwNv3FKx82kak_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": {
+          "versus_id": "zMHw4BPYwNv3FKx82kak",
+          "rounds_a": 1,
+          "rounds_b": 1,
+          "voted_at": "2026-04-14T18:49:37.461000+00:00"
+        }
+      },
+      "voter_id": "N9lmmDdc2RaiUD5Rz5xJ9UgiJy13",
+      "pair_key": "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD"
+    },
+    "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD||vXon4eA20GUCbu08Dil7kD0jt2w1": {
+      "rounds_a": 3,
+      "rounds_b": 1,
+      "share_a": 0.75,
+      "share_b": 0.25,
+      "counted": true,
+      "updated_at": "2026-04-23T15:47:09.675000+00:00",
+      "polls": {
+        "zMHw4BPYwNv3FKx82kak_vXon4eA20GUCbu08Dil7kD0jt2w1": {
+          "versus_id": "zMHw4BPYwNv3FKx82kak",
+          "rounds_a": 3,
+          "rounds_b": 1,
+          "voted_at": "2026-04-23T15:47:09.675000+00:00"
+        }
+      },
+      "voter_id": "vXon4eA20GUCbu08Dil7kD0jt2w1",
+      "pair_key": "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD"
+    }
+  },
+  "poll_pair_keys": {
+    "0SwGtIcUsPEjpNnN1q3d_vXon4eA20GUCbu08Dil7kD0jt2w1": "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4",
+    "31KlqtaY6fYPFC1Ix2o3": "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd",
+    "3R62Q0W7PxcX8EVqCfrG_vXon4eA20GUCbu08Dil7kD0jt2w1": "0du5cEVh5yTK9QJze8zA0C_1uNFoZAHBGtllmzznpCI3s",
+    "7MtS6wWaRshW5WVfMLRb": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u",
+    "8yCQkYXc0e8Cc0935HeY_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z",
+    "8yCQkYXc0e8Cc0935HeY_vXon4eA20GUCbu08Dil7kD0jt2w1": "0du5cEVh5yTK9QJze8zA0C_7bXgB6jMjp9ATFy66eO08Z",
+    "CHwlU0j7T3sgH3CH6efL": "2nLOHgzXzwFEpl62zAgCEC_4yP0hdKOZPNshxUOjY0cZj",
+    "DMvG21g9OjibtqULpPqs_vXon4eA20GUCbu08Dil7kD0jt2w1": "6oMuImdp5ZcFhWP0ESe6mG_7iZtZyCzp3LItcw1wtPI3D",
+    "KZk6z5eMJjY9X9PeccKW": "748dZDqSZy6aPXKcI9H80u_7ycBtnsMtyVbbwTfJwRjSP",
+    "LTiAlrl3JJQARWg3DUKC_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "5fMUXHkw8R8eOP2RNVYEZX_738wLrAtLtCtFOLvQBXOXp",
+    "M7IHIMgwb3GgYyNTziLS_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx",
+    "M7IHIMgwb3GgYyNTziLS_vXon4eA20GUCbu08Dil7kD0jt2w1": "3AA28KZvwAUcZuOKwyblJQ_3YQKmKGau1PzlVlkL1iodx",
+    "QN9k4HqcUuv6HsiOpjCh_vXon4eA20GUCbu08Dil7kD0jt2w1": "0iEtIxbK0KxaSlF7G42ZOp_5Y5TRrQiqgUO4S36tzjIRZ",
+    "TY9DFGNh24IUsBhDV6dc_vXon4eA20GUCbu08Dil7kD0jt2w1": "13ubrt8QOOCPljQ2FL1Kca_4O15NlyKLIASxsJ0PrXPfz",
+    "U3jED7oMk1iaUj4Hu72P": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u",
+    "VubOO1OIokBwH3fsn14r": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u",
+    "X6BLtZkythDXboKVGUPa": "4qZBW3f2Q8y0k1A84d4iAO_7zCODUHkfuRxsUjtuzNqbd",
+    "X7fStmgrsDWmsF2pcgtt_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5",
+    "X7fStmgrsDWmsF2pcgtt_vXon4eA20GUCbu08Dil7kD0jt2w1": "1Xyo4u8uXC1ZmMpatF05PJ_5cj0lLjcoR7YOSnhnX0Po5",
+    "XKHzCUi32umzTZDlE71c_vXon4eA20GUCbu08Dil7kD0jt2w1": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m",
+    "Y7DXV5UJybYBwlKMQLjt_vXon4eA20GUCbu08Dil7kD0jt2w1": "0Y5tJX1MQlPlqiwlOH1tJY_4O15NlyKLIASxsJ0PrXPfz",
+    "YKv2H40jB0A6Xyj0OK0m_vXon4eA20GUCbu08Dil7kD0jt2w1": "2YZyLoL8N0Wb9xBt1NhZWg_3TVXtAsR1Inumwj472S9r4",
+    "Yb0axgvm75LXIFsQtsKQ_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "2YZyLoL8N0Wb9xBt1NhZWg_5K4W6rqBFWDnAN6FQUkS6x",
+    "ZYRP2y7sQUm4Uv9srhWC_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m",
+    "ZYRP2y7sQUm4Uv9srhWC_vXon4eA20GUCbu08Dil7kD0jt2w1": "5pKCCKE2ajJHZ9KAiaK11H_6vWDO969PvNqNYHIOW5v0m",
+    "bATZpE5AwxYcB694mDgh_vXon4eA20GUCbu08Dil7kD0jt2w1": "1Xyo4u8uXC1ZmMpatF05PJ_3TVXtAsR1Inumwj472S9r4",
+    "bFBAoGMeCG8f1T6en6fI_vXon4eA20GUCbu08Dil7kD0jt2w1": "0Y5tJX1MQlPlqiwlOH1tJY_1RyvyyTE3xzB2ZywiAwp0i",
+    "d66LpLdyEuZfWldvRVnu_vXon4eA20GUCbu08Dil7kD0jt2w1": "0du5cEVh5yTK9QJze8zA0C_1Xyo4u8uXC1ZmMpatF05PJ",
+    "dBTx4Xc43dylfAx2ZhXv_BMV5PcNmOwNdhObD9xjcl1HqHn32": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5",
+    "dBTx4Xc43dylfAx2ZhXv_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5",
+    "dBTx4Xc43dylfAx2ZhXv_vXon4eA20GUCbu08Dil7kD0jt2w1": "246dkjvS1zLTtiykXe5h60_5cj0lLjcoR7YOSnhnX0Po5",
+    "hctRBAPuRvuBUa5fnF0W": "4SZko61aMnmgvNhfhgTuD3_748dZDqSZy6aPXKcI9H80u",
+    "luUuCNJY1VSfP533LxFc_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG",
+    "luUuCNJY1VSfP533LxFc_UrPbVkmk9NUGlHCrvBApU5hcVuv2": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG",
+    "luUuCNJY1VSfP533LxFc_vXon4eA20GUCbu08Dil7kD0jt2w1": "3TVXtAsR1Inumwj472S9r4_6oMuImdp5ZcFhWP0ESe6mG",
+    "oHUDuQ4mKmLe0GcUZ3r5_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z",
+    "oHUDuQ4mKmLe0GcUZ3r5_vXon4eA20GUCbu08Dil7kD0jt2w1": "3TVXtAsR1Inumwj472S9r4_7bXgB6jMjp9ATFy66eO08Z",
+    "pkHEGsjGZUdkY6SV1s5k_vXon4eA20GUCbu08Dil7kD0jt2w1": "2zhossaaVN2pXg5p8o101X_7KY9NaOVRmptl8vlpVomi6",
+    "q9mIkPGXzw50YcBZ6a1D_vXon4eA20GUCbu08Dil7kD0jt2w1": "13ubrt8QOOCPljQ2FL1Kca_2h93pZq0e7k5yf4dywlkpM",
+    "qzVcE2SbvqiCo1bhpJiD_BMV5PcNmOwNdhObD9xjcl1HqHn32": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "qzVcE2SbvqiCo1bhpJiD_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "qzVcE2SbvqiCo1bhpJiD_UrPbVkmk9NUGlHCrvBApU5hcVuv2": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "qzVcE2SbvqiCo1bhpJiD_vXon4eA20GUCbu08Dil7kD0jt2w1": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "rhwy13N5YsRm53Cf3ofH_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m",
+    "rhwy13N5YsRm53Cf3ofH_vXon4eA20GUCbu08Dil7kD0jt2w1": "4dpARuHxo51G3z768sgnrY_6vWDO969PvNqNYHIOW5v0m",
+    "uSIUE6dys9nMATEdRWmi_vXon4eA20GUCbu08Dil7kD0jt2w1": "3gBZUcNeVumkeeJ19CY2sX_3qiHUAX7zY4Qnjx8TNUzVx",
+    "ucec4ZSqCsib1VageXdV_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "ucec4ZSqCsib1VageXdV_UrPbVkmk9NUGlHCrvBApU5hcVuv2": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "ucec4ZSqCsib1VageXdV_vXon4eA20GUCbu08Dil7kD0jt2w1": "246dkjvS1zLTtiykXe5h60_7iZtZyCzp3LItcw1wtPI3D",
+    "wlPmnseFewZ5EHP7P6Em_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z",
+    "wlPmnseFewZ5EHP7P6Em_vXon4eA20GUCbu08Dil7kD0jt2w1": "23zg3TcAtWQy7J6upgbUnj_7bXgB6jMjp9ATFy66eO08Z",
+    "zMHw4BPYwNv3FKx82kak_N9lmmDdc2RaiUD5Rz5xJ9UgiJy13": "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD",
+    "zMHw4BPYwNv3FKx82kak_vXon4eA20GUCbu08Dil7kD0jt2w1": "4O15NlyKLIASxsJ0PrXPfz_699OTQXzgjhIYAHMy9RyPD"
+  }
+}

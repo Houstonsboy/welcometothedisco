@@ -1,6 +1,48 @@
 // lib/models/post_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Stored in Firestore field [remixenabled] as `false`, `same`, or `different`.
+enum RemixEnabled {
+  /// Remixes are not allowed.
+  disabled,
+  /// Remixes must use the same artist as the post.
+  same,
+  /// Remixes must use a different artist than the post.
+  different;
+
+  /// Value written to / read from Firestore [remixenabled].
+  Object get firestoreValue {
+    switch (this) {
+      case RemixEnabled.disabled:
+        return false;
+      case RemixEnabled.same:
+        return 'same';
+      case RemixEnabled.different:
+        return 'different';
+    }
+  }
+
+  static RemixEnabled fromFirestore(dynamic value) {
+    if (value == null) return RemixEnabled.same;
+    if (value is bool) return value ? RemixEnabled.same : RemixEnabled.disabled;
+    final s = value.toString().trim().toLowerCase();
+    switch (s) {
+      case 'same':
+        return RemixEnabled.same;
+      case 'different':
+        return RemixEnabled.different;
+      case 'false':
+      case 'off':
+      case 'none':
+        return RemixEnabled.disabled;
+      case 'true':
+        return RemixEnabled.same;
+      default:
+        return RemixEnabled.same;
+    }
+  }
+}
+
 class TrackItem {
   final String spotifyID;
   final String trackName;
@@ -31,6 +73,15 @@ class TrackItem {
   };
 }
 
+/// Result of a single paginated posts fetch (see FirebaseService.getPostsPage).
+class PostsPage {
+  final List<PostModel> posts;
+  final DocumentSnapshot? lastDoc;
+  final bool hasMore;
+
+  PostsPage({required this.posts, required this.lastDoc, required this.hasMore});
+}
+
 class PostModel {
   final String  id;           // Firestore document UID
   final String  authorID;
@@ -42,7 +93,9 @@ class PostModel {
   final String  description;
   final int     shareCount;
   final int     remixCount;
+  final RemixEnabled remixEnabled;
   final List<TrackItem> tracklist;
+  final List<String> mentionedUids;
   final Timestamp? createdAt;
   final Timestamp? modifiedAt;
 
@@ -57,7 +110,9 @@ class PostModel {
     required this.description,
     this.shareCount  = 0,
     this.remixCount  = 0,
+    this.remixEnabled = RemixEnabled.same,
     this.tracklist   = const [],
+    this.mentionedUids = const [],
     this.createdAt,
     this.modifiedAt,
   });
@@ -77,9 +132,13 @@ class PostModel {
       description:   data['Description']     ?? '',
       shareCount:    (data['Sharecount']  as num?)?.toInt() ?? 0,
       remixCount:    (data['Remixcount']  as num?)?.toInt() ?? 0,
+      remixEnabled:  RemixEnabled.fromFirestore(data['remixenabled']),
       tracklist:     rawTracklist
                        .map((t) => TrackItem.fromMap(t as Map<String, dynamic>))
                        .toList(),
+      mentionedUids: (data['mentionedUids'] as List<dynamic>?)
+                       ?.map((e) => e.toString())
+                       .toList() ?? const [],
       createdAt:     data['Created_at']   as Timestamp?,
       modifiedAt:    data['modified_at']  as Timestamp?,
     );
@@ -96,7 +155,9 @@ class PostModel {
     'Description':     description,
     'Sharecount':      shareCount,
     'Remixcount':      remixCount,
+    'remixenabled':    remixEnabled.firestoreValue,
     'Tracklist':       tracklist.map((t) => t.toMap()).toList(),
+    'mentionedUids':   mentionedUids,
     'Created_at':      createdAt  ?? FieldValue.serverTimestamp(),
     'modified_at':     modifiedAt ?? FieldValue.serverTimestamp(),
   };

@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/InboxedSongs.dart';
 import 'package:welcometothedisco/models/inbox_versus_entry.dart';
@@ -101,26 +101,65 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
     try {
       final List<InboxVersusEntry> entries =
           await FirebaseService.getInboxVersusList(typeFilter: widget.typeFilter);
-      // Enrich album entries with Spotify (titles, images)
+
+      // Enrich album entries with Spotify (titles, images).
+      // Docs that already have both image URLs skip the API call entirely.
       final albumVersus =
           entries.where((e) => e.albumVersus != null).map((e) => e.albumVersus!).toList();
       if (albumVersus.isNotEmpty) {
+        // Record which docs are missing images before enrichment so we can
+        // write the fetched values back to Firestore (lazy one-time backfill).
+        final needsBackfill = albumVersus
+            .where((v) =>
+                (v.album1ImageUrl?.isEmpty ?? true) ||
+                (v.album2ImageUrl?.isEmpty ?? true))
+            .toList();
         try {
           await _spotifyApi.enrichVersusList(albumVersus);
+          // Persist newly-fetched images so future inbox loads are API-free.
+          for (final v in needsBackfill) {
+            if ((v.album1ImageUrl?.isNotEmpty ?? false) ||
+                (v.album2ImageUrl?.isNotEmpty ?? false)) {
+              unawaited(FirebaseService.backfillAlbumVersusImages(
+                v.id,
+                album1ImageUrl: v.album1ImageUrl,
+                album1ArtistName: v.album1ArtistName,
+                album2ImageUrl: v.album2ImageUrl,
+                album2ArtistName: v.album2ArtistName,
+              ));
+            }
+          }
         } catch (e) {
           debugPrint('[Inbox] Spotify album enrichment failed: $e');
         }
       }
-      // Enrich artist entries with Spotify (artist profile images)
+
+      // Enrich artist entries with Spotify (artist profile images).
       final artistVersus =
           entries.where((e) => e.artistVersus != null).map((e) => e.artistVersus!).toList();
       if (artistVersus.isNotEmpty) {
+        final needsBackfill = artistVersus
+            .where((v) =>
+                (v.artist1ImageUrl?.isEmpty ?? true) ||
+                (v.artist2ImageUrl?.isEmpty ?? true))
+            .toList();
         try {
           await _spotifyApi.enrichArtistVersusList(artistVersus);
+          for (final v in needsBackfill) {
+            if ((v.artist1ImageUrl?.isNotEmpty ?? false) ||
+                (v.artist2ImageUrl?.isNotEmpty ?? false)) {
+              unawaited(FirebaseService.backfillArtistVersusImages(
+                v.id,
+                artist1ImageUrl: v.artist1ImageUrl,
+                artist2ImageUrl: v.artist2ImageUrl,
+              ));
+            }
+          }
         } catch (e) {
           debugPrint('[Inbox] Spotify artist enrichment failed: $e');
         }
       }
+
       return entries;
     } catch (e) {
       debugPrint('[Inbox] Failed to load versus list: $e');
@@ -141,7 +180,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
               borderRadius: BorderRadius.circular(20.0),
               gradient: AppTheme.glassPanelGradient(),
               border: Border.all(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 width: 0.8,
               ),
             ),
@@ -166,7 +205,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                         Text(
                           'Could not load versus right now.',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -177,7 +216,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                           child: Text(
                             'Tap to retry',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
+                              color: Colors.white.withValues(alpha: 0.55),
                               fontSize: 12,
                               decoration: TextDecoration.underline,
                             ),
@@ -197,7 +236,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                     child: Text(
                       'No versus entries yet.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -213,7 +252,7 @@ class _InboxState extends State<Inbox> with RouteAware, SingleTickerProviderStat
                     height: 0,
                     indent: 16,
                     endIndent: 16,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                   ),
                   itemBuilder: (context, index) {
                     return InboxedSongs(entry: entries[index]);
@@ -261,9 +300,9 @@ class _InboxRefreshButton extends StatelessWidget {
         height: 28,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(isRefreshing ? 0.06 : 0.10),
+          color: Colors.white.withValues(alpha: isRefreshing ? 0.06 : 0.10),
           border: Border.all(
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             width: 0.7,
           ),
         ),
@@ -273,7 +312,7 @@ class _InboxRefreshButton extends StatelessWidget {
             child: Icon(
               Icons.refresh_rounded,
               size: 15,
-              color: Colors.white.withOpacity(isRefreshing ? 0.45 : 0.70),
+              color: Colors.white.withValues(alpha: isRefreshing ? 0.45 : 0.70),
             ),
           ),
         ),

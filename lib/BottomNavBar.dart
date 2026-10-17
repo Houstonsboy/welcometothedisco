@@ -25,11 +25,10 @@ class BottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Home · Search · Posts · Friends
+  /// Posts · Versus · Friends
   static const List<_NavIconSpec> _items = [
-    _NavIconSpec.asset('assets/images/icons8-homepage.svg', svg: true),
-    _NavIconSpec.asset('assets/images/icons8-search.svg', svg: true),
     _NavIconSpec.material(Icons.menu_book_rounded),
+    _NavIconSpec.asset('assets/images/icons8-search.svg', svg: true),
     _NavIconSpec.asset('assets/images/icons8-friends-50.png'),
   ];
 
@@ -74,12 +73,12 @@ class BottomNavBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(34),
                 gradient: AppTheme.glassNavGradient(),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                     blurRadius: 22,
                     offset: const Offset(0, 10),
                   ),
@@ -91,7 +90,7 @@ class BottomNavBar extends StatelessWidget {
                   final bool isSelected = selectedIndex == index;
                   final Color iconColor = isSelected
                       ? AppTheme.navSelectedIcon
-                      : Colors.white.withOpacity(0.55);
+                      : Colors.white.withValues(alpha: 0.55);
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onTap(index),
@@ -102,12 +101,12 @@ class BottomNavBar extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isSelected
-                            ? Colors.white.withOpacity(0.10)
+                            ? Colors.white.withValues(alpha: 0.10)
                             : Colors.transparent,
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.gradientEnd.withOpacity(0.55),
+                                  color: AppTheme.gradientEnd.withValues(alpha: 0.55),
                                   blurRadius: 14,
                                   spreadRadius: 0,
                                 ),

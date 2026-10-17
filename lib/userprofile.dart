@@ -5,10 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/authentication/login.dart';
 import 'package:welcometothedisco/models/users_model.dart';
+import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/auth_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/services/spotify_auth.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/versus/versus_history.dart';
 
 const _kBlue = AppTheme.gradientStart;
 const _kPink = AppTheme.gradientEnd;
@@ -30,6 +33,7 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   bool _loggingOut = false;
+  bool _reconnectingSpotify = false;
   bool _editing = false;
   bool _savingProfile = false;
 
@@ -84,7 +88,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Avatar, username and bio are required.'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -111,12 +115,42 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Could not update profile: $e'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
       if (mounted) setState(() => _savingProfile = false);
+    }
+  }
+
+  Future<void> _handleReconnectSpotify() async {
+    if (_reconnectingSpotify) return;
+    setState(() => _reconnectingSpotify = true);
+    try {
+      final result = await SpotifyAuth().login();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isSuccess
+                ? 'Spotify reconnected.'
+                : 'Spotify: ${result.message ?? 'cancelled'}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Spotify error: $e'),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _reconnectingSpotify = false);
     }
   }
 
@@ -173,7 +207,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               size: 18,
             ),
             onPressed: () => Navigator.pop(context),
@@ -181,12 +215,46 @@ class _UserProfilePageState extends State<UserProfilePage> {
           title: const Text(
             'Welcome to the Disco',
             style: TextStyle(
-              fontSize: 14.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: AppTheme.titleAccent,
+              fontSize: 12.0,
+              fontFamily: AppTheme.fontHeader,
+              color: Color(0xFF17B5EE),
             ),
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: _reconnectingSpotify ? null : _handleReconnectSpotify,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.spotifyGreen.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: AppTheme.spotifyGreen.withValues(alpha: 0.45),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: Center(
+                    child: _reconnectingSpotify
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              color: AppTheme.spotifyGreen,
+                            ),
+                          )
+                        : Icon(
+                            Icons.headset_rounded,
+                            color: AppTheme.spotifyGreen,
+                            size: 17,
+                          ),
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: GestureDetector(
@@ -196,9 +264,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.22),
+                      color: Colors.white.withValues(alpha: 0.22),
                       width: 0.9,
                     ),
                   ),
@@ -209,12 +277,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 1.8,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                           )
                         : Icon(
                             Icons.logout_rounded,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             size: 17,
                           ),
                   ),
@@ -248,6 +316,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       key: ValueKey(user?.id ?? ''),
                       initialAlbums: user?.favoriteAlbums ?? const [],
                     ),
+                    const SizedBox(height: 12),
+                    _MyPollsCard(),
+                    if ((user?.id ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      ProfilePostsSection(authorUid: user!.id),
+                    ],
                   ],
                 ),
               );
@@ -275,17 +349,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _kBlue.withOpacity(0.45),
-                    _kPink.withOpacity(0.45),
+                    _kBlue.withValues(alpha: 0.45),
+                    _kPink.withValues(alpha: 0.45),
                   ],
                 ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   width: 0.8,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -297,7 +371,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Center(
                         child: CircularProgressIndicator(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           strokeWidth: 2,
                         ),
                       ),
@@ -319,17 +393,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _editing
-                      ? Colors.white.withOpacity(0.08)
-                      : Colors.white.withOpacity(0.18),
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.white.withValues(alpha: 0.18),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.28),
+                    color: Colors.white.withValues(alpha: 0.28),
                     width: 0.9,
                   ),
                 ),
                 child: Icon(
                   Icons.edit_rounded,
                   size: 15,
-                  color: Colors.white.withOpacity(_editing ? 0.35 : 0.9),
+                  color: Colors.white.withValues(alpha: _editing ? 0.35 : 0.9),
                 ),
               ),
             ),
@@ -360,12 +434,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   width: 2.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: _kPink.withOpacity(0.32),
+                    color: _kPink.withValues(alpha: 0.32),
                     blurRadius: 18,
                     spreadRadius: 1,
                   ),
@@ -413,7 +487,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           ],
         ),
         const SizedBox(height: 16),
-        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
         const SizedBox(height: 14),
         if (_editing) ...[
           _buildAvatarPicker(),
@@ -428,7 +502,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             Text(
               email,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.38),
+                color: Colors.white.withValues(alpha: 0.38),
                 fontSize: 11,
               ),
             ),
@@ -437,7 +511,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             Text(
               user!.bio,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.78),
+                color: Colors.white.withValues(alpha: 0.78),
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 height: 1.55,
@@ -453,10 +527,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           width: 0.8,
         ),
       ),
@@ -474,7 +548,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             TextSpan(
               text: label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
+                color: Colors.white.withValues(alpha: 0.65),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -486,10 +560,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _avatarFallback() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.65),
+          color: Colors.white.withValues(alpha: 0.65),
           size: 40,
         ),
       );
@@ -505,9 +579,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.65)),
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.35)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
         ),
         focusedBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.white),
@@ -523,7 +597,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         Text(
           'Choose avatar',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -546,7 +620,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       border: Border.all(
                         color: selected
                             ? Colors.white
-                            : Colors.white.withOpacity(0.22),
+                            : Colors.white.withValues(alpha: 0.22),
                         width: selected ? 2.2 : 1,
                       ),
                     ),
@@ -573,8 +647,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: OutlinedButton(
             onPressed: _savingProfile ? null : () => _cancelEditing(user),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.2)),
-              foregroundColor: Colors.white.withOpacity(0.85),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              foregroundColor: Colors.white.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(vertical: 13),
             ),
             child: const Text('Cancel'),
@@ -585,7 +659,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: ElevatedButton(
             onPressed: _savingProfile ? null : _saveProfile,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.18),
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -596,408 +670,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white.withOpacity(0.75),
+                      color: Colors.white.withValues(alpha: 0.75),
                     ),
                   )
                 : const Text(
                     'Save',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Friend Profile Page — read-only view of another user's profile
-// ══════════════════════════════════════════════════════════════════════════════
-
-class FriendProfilePage extends StatefulWidget {
-  final String uid;
-  final String? initialUsername;
-  final String? initialAvatarPath;
-
-  const FriendProfilePage({
-    super.key,
-    required this.uid,
-    this.initialUsername,
-    this.initialAvatarPath,
-  });
-
-  @override
-  State<FriendProfilePage> createState() => _FriendProfilePageState();
-}
-
-class _FriendProfilePageState extends State<FriendProfilePage> {
-  UserModel? _user;
-  bool _loading = true;
-  bool _notFound = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _notFound = false;
-    });
-    final user = await FirebaseService.getUserById(widget.uid);
-    if (!mounted) return;
-    setState(() {
-      _user = user;
-      _loading = false;
-      _notFound = user == null;
-    });
-  }
-
-  static String? _assetPath(String avatarPath) {
-    final p = avatarPath.trim();
-    if (p.isEmpty) return null;
-    if (p.startsWith('assets/')) return p;
-    if (p.startsWith('/')) return p.substring(1);
-    return 'assets/images/$p';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [_kBlue, _kPink],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white.withOpacity(0.9),
-              size: 18,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text(
-            _user?.username.isNotEmpty == true
-                ? _user!.username
-                : (widget.initialUsername ?? 'Profile'),
-            style: const TextStyle(
-              fontSize: 14.0,
-              fontFamily: 'Honk-Regular-VariableFont_MORF,SHLN',
-              color: AppTheme.titleAccent,
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : _notFound
-                  ? Center(
-                      child: Text(
-                        'Profile not found.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: 14,
-                        ),
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildProfileCard(),
-                          const SizedBox(height: 16),
-                          _FriendFavoriteAlbumsWidget(
-                            key: ValueKey(_user!.id),
-                            albums: _user!.favoriteAlbums,
-                          ),
-                        ],
-                      ),
-                    ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard() {
-    final user = _user!;
-    final assetPath = _assetPath(user.avatarPath);
-    final friendCount = user.friends.length;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _kBlue.withOpacity(0.45),
-                _kPink.withOpacity(0.45),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Avatar
-                  Container(
-                    width: 82,
-                    height: 82,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.35),
-                        width: 2.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _kPink.withOpacity(0.32),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: assetPath != null
-                          ? Image.asset(
-                              assetPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _avatarFallback(),
-                            )
-                          : _avatarFallback(),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  // Name + friends pill
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.username.isNotEmpty ? user.username : 'User',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _statPill(
-                          value: '$friendCount',
-                          label: friendCount == 1 ? 'friend' : 'friends',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Divider(color: Colors.white.withOpacity(0.12), height: 1),
-              const SizedBox(height: 14),
-              if (user.bio.isNotEmpty)
-                Text(
-                  user.bio,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.78),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    height: 1.55,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _statPill({required String value, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
-      ),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: '$value ',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            TextSpan(
-              text: label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _avatarFallback() => Container(
-        color: _kBlue.withOpacity(0.35),
-        child: Icon(
-          Icons.person_rounded,
-          color: Colors.white.withOpacity(0.65),
-          size: 40,
-        ),
-      );
-}
-
-// ── Read-only favourite albums display for a friend's profile ─────────────────
-class _FriendFavoriteAlbumsWidget extends StatelessWidget {
-  final List<FavoriteAlbumEntry> albums;
-
-  const _FriendFavoriteAlbumsWidget({
-    super.key,
-    required this.albums,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _kBlue.withOpacity(0.35),
-                _kPink.withOpacity(0.35),
-              ],
-            ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.16),
-              width: 0.8,
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'FAVORITE ALBUMS',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.8,
-                ),
-              ),
-              const SizedBox(height: 14),
-              albums.isEmpty
-                  ? Text(
-                      'No favourite albums added yet.',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.45),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: albums.asMap().entries.map((e) {
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              right: e.key < albums.length - 1 ? 8 : 0,
-                            ),
-                            child: _albumTile(e.value),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _albumTile(FavoriteAlbumEntry entry) {
-    final hasImage = (entry.imageUrl ?? '').trim().isNotEmpty;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: hasImage
-                ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
-                : Container(
-                    color: Colors.white.withOpacity(0.12),
-                    child: Icon(
-                      Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          entry.albumTitle,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            height: 1.2,
           ),
         ),
       ],
@@ -1137,7 +816,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Could not save: $e'),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1163,12 +842,12 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _kBlue.withOpacity(0.35),
-                    _kPink.withOpacity(0.35),
+                    _kBlue.withValues(alpha: 0.35),
+                    _kPink.withValues(alpha: 0.35),
                   ],
                 ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.16),
+                  color: Colors.white.withValues(alpha: 0.16),
                   width: 0.8,
                 ),
               ),
@@ -1205,16 +884,16 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                 height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.16),
+                  color: Colors.white.withValues(alpha: 0.16),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.26),
+                    color: Colors.white.withValues(alpha: 0.26),
                     width: 0.9,
                   ),
                 ),
                 child: Icon(
                   Icons.search_rounded,
                   size: 16,
-                  color: Colors.white.withOpacity(0.88),
+                  color: Colors.white.withValues(alpha: 0.88),
                 ),
               ),
             ),
@@ -1230,7 +909,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           Text(
             'FAVORITE ALBUMS',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.8,
@@ -1256,9 +935,9 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       width: 0.8,
                     ),
                   ),
@@ -1273,7 +952,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                           ? 'Max 5 albums selected'
                           : 'Search albums…',
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.38),
+                        color: Colors.white.withValues(alpha: 0.38),
                         fontSize: 14,
                       ),
                       prefixIcon: _isSearching
@@ -1284,13 +963,13 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                                 height: 14,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1.8,
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                             )
                           : Icon(
                               Icons.search_rounded,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                               size: 18,
                             ),
                       suffixIcon: _searchController.text.isNotEmpty
@@ -1301,7 +980,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                               },
                               child: Icon(
                                 Icons.close_rounded,
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 size: 16,
                               ),
                             )
@@ -1325,7 +1004,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
       return Text(
         'No favourite albums yet — tap 🔍 to add some.',
         style: TextStyle(
-          color: Colors.white.withOpacity(0.45),
+          color: Colors.white.withValues(alpha: 0.45),
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -1337,7 +1016,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
         return Text(
           'Search and add up to 5 albums.',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.45),
+            color: Colors.white.withValues(alpha: 0.45),
             fontSize: 12,
           ),
         );
@@ -1383,10 +1062,10 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
             child: hasImage
                 ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
                 : Container(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     child: Icon(
                       Icons.album_rounded,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
           ),
@@ -1432,12 +1111,12 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                         width: tileSize,
                         height: tileSize,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
+                          color: Colors.white.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           Icons.album_rounded,
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           size: 28,
                         ),
                       ),
@@ -1452,9 +1131,9 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                     height: 20,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _kPink.withOpacity(0.9),
+                      color: _kPink.withValues(alpha: 0.9),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha: 0.55),
                         width: 0.9,
                       ),
                     ),
@@ -1491,7 +1170,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Divider(color: Colors.white.withOpacity(0.12), height: 1),
+        Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
         const SizedBox(height: 10),
         if (atMax)
           Padding(
@@ -1499,7 +1178,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
             child: Text(
               'Maximum 5 albums selected.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: Colors.white.withValues(alpha: 0.55),
                 fontSize: 11,
               ),
             ),
@@ -1536,10 +1215,10 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
                                 width: double.infinity,
                               )
                             : Container(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 child: Icon(
                                   Icons.album_rounded,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha: 0.4),
                                 ),
                               ),
                       ),
@@ -1574,8 +1253,8 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           child: OutlinedButton(
             onPressed: _saving ? null : _cancelEditing,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.2)),
-              foregroundColor: Colors.white.withOpacity(0.85),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              foregroundColor: Colors.white.withValues(alpha: 0.85),
               padding: const EdgeInsets.symmetric(vertical: 11),
             ),
             child: const Text('Cancel'),
@@ -1586,7 +1265,7 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           child: ElevatedButton(
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.18),
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1607,6 +1286,89 @@ class _FavoriteAlbumsWidgetState extends State<_FavoriteAlbumsWidget> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── My Polls nav card ──────────────────────────────────────────────────────────
+class _MyPollsCard extends StatelessWidget {
+  const _MyPollsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const VersusHistoryScreen()),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.14),
+                width: 0.9,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF17B5EE).withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: const Color(0xFF17B5EE).withValues(alpha: 0.4),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.how_to_vote_outlined,
+                    color: Color(0xFF17B5EE),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'MY POLLS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'View your voting history',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.45),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.35),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

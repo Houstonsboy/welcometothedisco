@@ -20,8 +20,8 @@ import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
   // ── Brand gradient (full-screen backgrounds, panels, headers) ───────────
-  static const Color gradientStart = Color(0xFF1E3DE1); // deep blue / purple
-  static const Color gradientEnd   = Color(0xFFf85187); // hot pink
+  static const Color gradientStart = Color(0xFF0A1F5C); // deep navy
+  static const Color gradientEnd   = Color(0xFF081848); // darkest navy
 
   // ── Global typography ─────────────────────────────────────────────────────
   /// Use for decorative/title text (app bars, section headers).
@@ -29,6 +29,10 @@ abstract final class AppTheme {
 
   /// Use for standard UI/body text.
   static const String fontBody = 'Satoshi';
+  // static const String fontBody = 'Roboto';
+
+  /// Base body font size. 14 = Flutter default (no change); increase to scale up all body text.
+  static const double fontBodySize = 14.0;
 
   /// Default color for body typography (matches Stories friend username green).
   static const Color fontBodyColor = createGreen;
@@ -59,6 +63,14 @@ abstract final class AppTheme {
   /// Author profile chip accent (magenta — inbox tile, collaboration).
   static const Color authorAccent         = Color(0xFFE310EF);
 
+  // ── Splash screen ─────────────────────────────────────────────────────────
+  static const Color splashBackground    = Color(0xFF0A1F5C);
+  static const Color splashLogoYellow    = Color(0xFFF2DC00);
+  static const Color splashLogoDark      = Color(0xFF101010);
+  /// White at 25 % opacity — progress-bar track.
+  static const Color splashProgressTrack = Color(0x40FFFFFF);
+  static const Color splashProgressFill  = Colors.white;
+
   // ── Collaborator invite banner ───────────────────────────────────────────
   static const Color bannerDark1          = Color(0xFF0E0E1A);
   static const Color bannerDark2          = Color(0xFF14102A);
@@ -71,17 +83,31 @@ abstract final class AppTheme {
   /// Full-screen gradient decoration (use as `decoration:` on a `Container`).
   static const BoxDecoration backgroundDecoration = BoxDecoration(
     gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [gradientStart, gradientEnd],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: [0.0, 0.30, 0.45, 0.60, 1.0],
+      colors: [
+        Color(0xFF0A1F5C),
+        Color(0xFF0D3080),
+        Color(0xFF0F3A9A),
+        Color(0xFF0D3080),
+        Color(0xFF081848),
+      ],
     ),
   );
 
   /// Raw gradient (use wherever `Gradient` is expected directly).
   static const LinearGradient backgroundGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [gradientStart, gradientEnd],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 0.30, 0.45, 0.60, 1.0],
+    colors: [
+      Color(0xFF0A1F5C),
+      Color(0xFF0D3080),
+      Color(0xFF0F3A9A),
+      Color(0xFF0D3080),
+      Color(0xFF081848),
+    ],
   );
 
   /// Glass-panel gradient for cards / headers at [glassPanelOpacity].
@@ -92,8 +118,8 @@ abstract final class AppTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          gradientStart.withOpacity(opacity),
-          gradientEnd.withOpacity(opacity),
+          gradientStart.withValues(alpha: opacity),
+          gradientEnd.withValues(alpha: opacity),
         ],
       );
 
@@ -105,8 +131,8 @@ abstract final class AppTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          gradientStart.withOpacity(opacity),
-          gradientEnd.withOpacity(opacity),
+          gradientStart.withValues(alpha: opacity),
+          gradientEnd.withValues(alpha: opacity),
         ],
       );
 
@@ -118,6 +144,7 @@ abstract final class AppTheme {
     final text = base.textTheme.apply(
       fontFamily: fontBody,
       bodyColor: fontBodyColor,
+      fontSizeDelta: fontBodySize - 14,
     );
     TextStyle? minusOne(TextStyle? s) {
       if (s == null) return null;
