@@ -106,7 +106,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(usernameError),
-          backgroundColor: _kPink.withOpacity(0.9),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -132,7 +132,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not update profile: $e'),
           backgroundColor: _kPink.withValues(alpha: 0.9),
           content: Text(e is UsernameTakenException
               ? e.toString()
