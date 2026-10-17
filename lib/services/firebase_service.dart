@@ -15,6 +15,15 @@ import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/utils/pair_utils.dart';
 
+/// Thrown when a profile write tries to use a username another user owns.
+class UsernameTakenException implements Exception {
+  UsernameTakenException(this.username);
+  final String username;
+
+  @override
+  String toString() => 'The username "$username" is already taken.';
+}
+
 class FirebaseService {
   static final _firestore = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
@@ -1376,27 +1385,43 @@ class FirebaseService {
     return result;
   }
 
-  // ── Search users by username (prefix match, case-insensitive) ────────────
-  /// All usernames are stored lowercase, so lowercasing the query gives
-  /// case-insensitive prefix search with no extra Firestore index needed.
+  // ── Search users by username (substring match, case-insensitive) ─────────
+  /// `username_search` holds every 2+ char substring of the lowercase username
+  /// (written by the `onUserWritten` Cloud Function), so a substring search is
+  /// a single `array-contains` query — cost scales with results, not users.
+  /// 1-char queries use a prefix range instead. Prefix matches rank first
+  /// ("nolan" → "nolan_x" before "mrnolan").
   static Future<List<UserModel>> searchUsersByUsername(String query) async {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return [];
 
     final currentUid = _auth.currentUser?.uid;
+    const limit = 20;
 
     try {
-      final snapshot = await _firestore
-          .collection('users')
-          .where('username', isGreaterThanOrEqualTo: q)
-          .where('username', isLessThan: '$q\uf8ff')
-          .limit(20)
-          .get();
+      final users = _firestore.collection('users');
+      final snapshot = q.length >= 2
+          ? await users
+              .where('username_search', arrayContains: q)
+              .limit(limit + 1)
+              .get()
+          : await users
+              .where('username', isGreaterThanOrEqualTo: q)
+              .where('username', isLessThan: '$q\uf8ff')
+              .limit(limit + 1)
+              .get();
 
-      return snapshot.docs
+      final matches = snapshot.docs
           .where((doc) => doc.id != currentUid)
           .map((doc) => UserModel.fromFirestore(doc.data(), doc.id))
-          .toList();
+          .toList()
+        ..sort((a, b) {
+          final ap = a.username.startsWith(q) ? 0 : 1;
+          final bp = b.username.startsWith(q) ? 0 : 1;
+          if (ap != bp) return ap - bp;
+          return a.username.length - b.username.length;
+        });
+      return matches.take(limit).toList();
     } catch (e) {
       debugPrint('[FirebaseService] searchUsersByUsername("$q") failed: $e');
       return [];
@@ -1450,7 +1475,76 @@ class FirebaseService {
     return {'scanned': docs.length, 'updated': toUpdate.length};
   }
 
+  // ── Username rules & uniqueness ───────────────────────────────────────────
+  /// Returns an error message, or null if [raw] is an acceptable username.
+  /// Keep in sync with `isValidUsername` in firestore.rules.
+  static String? validateUsername(String raw) {
+    final name = raw.trim().toLowerCase();
+    if (name.length < 3 || name.length > 20) {
+      return 'Username must be 3–20 characters.';
+    }
+    if (!RegExp(r'^[a-z0-9_.]+$').hasMatch(name) ||
+        RegExp(r'^__.*__$').hasMatch(name)) {
+      return 'Use only letters, numbers, _ and .';
+    }
+    return null;
+  }
+
+  /// One read of `usernames/{name}`. Readable while signed out, so signup can
+  /// check before Google sign-in. Advisory only — the claim transaction in
+  /// [_writeProfileClaimingUsername] is what actually guarantees uniqueness.
+  static Future<bool> isUsernameAvailable(String raw) async {
+    final name = raw.trim().toLowerCase();
+    final claim = await _firestore.collection('usernames').doc(name).get();
+    if (!claim.exists) return true;
+    final owner = claim.data()?['uid'];
+    return owner != null && owner == _auth.currentUser?.uid;
+  }
+
+  /// Writes [data] to `users/{uid}` while atomically claiming
+  /// `usernames/{username}` and releasing the user's previous claim.
+  /// Throws [UsernameTakenException] if another user owns [username].
+  static Future<void> _writeProfileClaimingUsername({
+    required String uid,
+    required String username,
+    required Map<String, dynamic> data,
+  }) async {
+    final userRef = _firestore.collection('users').doc(uid);
+    final names = _firestore.collection('usernames');
+    final newClaimRef = names.doc(username);
+
+    await _firestore.runTransaction((tx) async {
+      // All reads before any writes (Firestore transaction requirement).
+      final userSnap = await tx.get(userRef);
+      final newClaim = await tx.get(newClaimRef);
+      final oldName = userSnap.data()?['username'] as String?;
+      final oldClaimRef = (oldName != null && oldName.isNotEmpty && oldName != username)
+          ? names.doc(oldName)
+          : null;
+      final oldClaim = oldClaimRef == null ? null : await tx.get(oldClaimRef);
+
+      final claimedByOther =
+          newClaim.exists && newClaim.data()?['uid'] != uid;
+      if (oldName == username) {
+        // Keeping the current name. Pre-uniqueness accounts may hold a name
+        // that is invalid or duplicated; rules allow keeping it, so only claim
+        // it when that's possible.
+        if (!newClaim.exists && validateUsername(username) == null) {
+          tx.set(newClaimRef, {'uid': uid});
+        }
+      } else {
+        if (claimedByOther) throw UsernameTakenException(username);
+        if (!newClaim.exists) tx.set(newClaimRef, {'uid': uid});
+      }
+      tx.set(userRef, {...data, 'username': username}, SetOptions(merge: true));
+      if (oldClaim != null && oldClaim.exists && oldClaim.data()?['uid'] == uid) {
+        tx.delete(oldClaimRef!);
+      }
+    });
+  }
+
   // ── Create / update user profile ─────────────────────────────────────────
+  /// Throws [UsernameTakenException] if [username] belongs to someone else.
   static Future<void> createUserProfile({
     required String uid,
     required String email,
@@ -1459,19 +1553,23 @@ class FirebaseService {
     String bio = '',
     List<FavoriteAlbumEntry>? favoriteAlbums,
   }) async {
-    await _firestore.collection('users').doc(uid).set({
-      'email': email,
-      'username': username.trim().toLowerCase(),
-      'bio': bio.trim(),
-      'avatar_path': avatarPath,
-      'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
-    }, SetOptions(merge: true));
+    await _writeProfileClaimingUsername(
+      uid: uid,
+      username: username.trim().toLowerCase(),
+      data: {
+        'email': email,
+        'bio': bio.trim(),
+        'avatar_path': avatarPath,
+        'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
+      },
+    );
     if (_auth.currentUser?.uid == uid) {
       await _fetchCurrentUserFromFirestore(uid);
     }
   }
 
   // ── Update current user's editable profile fields ─────────────────────────
+  /// Throws [UsernameTakenException] if [username] belongs to someone else.
   static Future<void> updateCurrentUserProfile({
     required String username,
     required String bio,
@@ -1481,17 +1579,15 @@ class FirebaseService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
 
-    final data = <String, dynamic>{
-      'username': username.trim().toLowerCase(),
-      'bio': bio.trim(),
-      'avatar_path': avatarPath.trim(),
-      if (favoriteAlbums != null)
-        'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
-    };
-
-    await _firestore.collection('users').doc(uid).set(
-      data,
-      SetOptions(merge: true),
+    await _writeProfileClaimingUsername(
+      uid: uid,
+      username: username.trim().toLowerCase(),
+      data: {
+        'bio': bio.trim(),
+        'avatar_path': avatarPath.trim(),
+        if (favoriteAlbums != null)
+          'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
+      },
     );
     await _fetchCurrentUserFromFirestore(uid);
   }

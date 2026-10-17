@@ -41,6 +41,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   final _bioController = TextEditingController();
   String? _selectedAvatar;
   String _lastHydratedUserId = '';
+  // Username as last loaded; legacy names that predate validation are only
+  // checked once the user changes them.
+  String _savedUsername = '';
 
   @override
   void dispose() {
@@ -55,6 +58,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final key = '${user.id}:${user.username}:${user.bio}:${user.avatarPath}';
     if (_lastHydratedUserId == key) return;
     _lastHydratedUserId = key;
+    _savedUsername = user.username;
     _usernameController.text = user.username;
     _bioController.text = user.bio;
     _selectedAvatar = user.avatarPath;
@@ -95,6 +99,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
       return;
     }
 
+    final usernameError = username == _savedUsername
+        ? null
+        : FirebaseService.validateUsername(username);
+    if (usernameError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(usernameError),
+          backgroundColor: _kPink.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _savingProfile = true);
     try {
       await FirebaseService.updateCurrentUserProfile(
@@ -114,7 +132,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not update profile: $e'),
+          content: Text(e is UsernameTakenException
+              ? e.toString()
+              : "Couldn't update your profile. Please try again."),
           backgroundColor: _kPink.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
         ),

@@ -8,6 +8,7 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const {
+  usernameSubstrings,
   makePairKey,
   countRounds,
   mapRoundsToAB,
@@ -454,6 +455,37 @@ async function _processVersusDoc(versusId, data) {
 
   return pairKey;
 }
+
+// ── onUserWritten ─────────────────────────────────────────────────────────────
+// Server-owned username search index. Clients may not write `username_search`
+// (firestore.rules), so this trigger is its only writer. Also releases the
+// `usernames/{name}` claim when a user doc is deleted.
+exports.onUserWritten = onDocumentWritten("users/{uid}", async (event) => {
+  const uid = event.params.uid;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after  = event.data?.after?.exists  ? event.data.after.data()  : null;
+
+  if (!after) {
+    const oldName = before?.username;
+    if (typeof oldName === "string" && oldName) {
+      const claimRef = db.collection("usernames").doc(oldName);
+      await db.runTransaction(async (tx) => {
+        const claim = await tx.get(claimRef);
+        if (claim.exists && claim.data().uid === uid) tx.delete(claimRef);
+      });
+    }
+    return;
+  }
+
+  const wanted  = usernameSubstrings(after.username);
+  const current = Array.isArray(after.username_search) ? after.username_search : null;
+  // Skips our own write-back (and unrelated profile edits), avoiding a loop.
+  if (current && current.length === wanted.length &&
+      current.every((v, i) => v === wanted[i])) {
+    return;
+  }
+  await event.data.after.ref.update({ username_search: wanted });
+});
 
 // ── onVersusCreated ───────────────────────────────────────────────────────────
 exports.onVersusCreated = onDocumentCreated("versus/{versusId}", async (event) => {

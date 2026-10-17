@@ -513,3 +513,125 @@ describeEmulator("Rules — poll UPDATE with mismatched pair_key is denied", () 
     );
   });
 });
+
+// ── Rules: username uniqueness + server-owned search index ────────────────────
+describeEmulator("Rules — usernames claims and users.username", () => {
+  let testEnv;
+  let rut;
+
+  beforeAll(async () => {
+    try {
+      rut = require("@firebase/rules-unit-testing");
+      const fs = require("fs");
+      const path = require("path");
+      const rules = fs.readFileSync(path.resolve(__dirname, "../../firestore.rules"), "utf8");
+      testEnv = await rut.initializeTestEnvironment({
+        projectId: "jukebox-996de-usernames",
+        firestore: {
+          host: "127.0.0.1",
+          port: parseInt(EMULATOR_HOST.split(":")[1] || "8080"),
+          rules,
+        },
+      });
+    } catch (e) {
+      console.warn("@firebase/rules-unit-testing not available, skipping username rules tests:", e.message);
+    }
+  });
+
+  afterAll(async () => {
+    if (testEnv) await testEnv.cleanup();
+  });
+
+  beforeEach(async () => {
+    if (testEnv) await testEnv.clearFirestore();
+  });
+
+  // Mirrors FirebaseService._writeProfileClaimingUsername.
+  async function claimAndWrite(db, uid, name, extra = {}) {
+    await db.runTransaction(async (tx) => {
+      tx.set(db.collection("usernames").doc(name), { uid });
+      tx.set(db.collection("users").doc(uid), { username: name, ...extra }, { merge: true });
+    });
+  }
+
+  test("signup: claim + profile in one transaction succeeds", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await rut.assertSucceeds(claimAndWrite(db, "alice", "mrnolan"));
+  });
+
+  test("profile create without a claim is denied", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await rut.assertFails(db.collection("users").doc("alice").set({ username: "mrnolan" }));
+  });
+
+  test("cannot claim a name already owned by someone else", async () => {
+    if (!testEnv) return;
+    await rut.assertSucceeds(
+      claimAndWrite(testEnv.authenticatedContext("alice").firestore(), "alice", "mrnolan"));
+    await rut.assertFails(
+      claimAndWrite(testEnv.authenticatedContext("bob").firestore(), "bob", "mrnolan"));
+  });
+
+  test("cannot claim a name for another uid or hoard extra names", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await claimAndWrite(db, "alice", "alice");
+    await rut.assertFails(db.collection("usernames").doc("spare").set({ uid: "alice" }));
+    await rut.assertFails(db.collection("usernames").doc("bobby").set({ uid: "bob" }));
+  });
+
+  test("invalid usernames cannot be claimed", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    for (const bad of ["ab", "Has Caps", "bad-dash", "a".repeat(21)]) {
+      await rut.assertFails(claimAndWrite(db, "alice", bad));
+    }
+  });
+
+  test("rename: claim new, release old in one transaction", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await claimAndWrite(db, "alice", "oldname");
+    await rut.assertSucceeds(db.runTransaction(async (tx) => {
+      tx.set(db.collection("usernames").doc("newname"), { uid: "alice" });
+      tx.set(db.collection("users").doc("alice"), { username: "newname" }, { merge: true });
+      tx.delete(db.collection("usernames").doc("oldname"));
+    }));
+  });
+
+  test("cannot release a claim still in use, or someone else's", async () => {
+    if (!testEnv) return;
+    await claimAndWrite(testEnv.authenticatedContext("alice").firestore(), "alice", "alice");
+    await rut.assertFails(
+      testEnv.authenticatedContext("alice").firestore().collection("usernames").doc("alice").delete());
+    await rut.assertFails(
+      testEnv.authenticatedContext("bob").firestore().collection("usernames").doc("alice").delete());
+  });
+
+  test("legacy user can edit other fields without a claim", async () => {
+    if (!testEnv) return;
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("users").doc("legacy").set({ username: "Old Name", bio: "" });
+    });
+    const db = testEnv.authenticatedContext("legacy").firestore();
+    await rut.assertSucceeds(db.collection("users").doc("legacy").set({ bio: "hi" }, { merge: true }));
+  });
+
+  test("clients cannot write username_search", async () => {
+    if (!testEnv) return;
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await claimAndWrite(db, "alice", "alice");
+    await rut.assertFails(
+      db.collection("users").doc("alice").update({ username_search: ["anything"] }));
+  });
+
+  test("availability check: get is public, list is not", async () => {
+    if (!testEnv) return;
+    await claimAndWrite(testEnv.authenticatedContext("alice").firestore(), "alice", "alice");
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await rut.assertSucceeds(anon.collection("usernames").doc("alice").get());
+    await rut.assertFails(anon.collection("usernames").get());
+  });
+});

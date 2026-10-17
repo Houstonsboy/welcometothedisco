@@ -90,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_usernameController.text.trim().isEmpty) {
       return 'Please enter a username.';
     }
-    return null;
+    return FirebaseService.validateUsername(_usernameController.text);
   }
 
   Future<void> _handleGoogleSignUp() async {
@@ -104,7 +104,14 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
+    final username = _usernameController.text.trim().toLowerCase();
     try {
+      // Check before Google sign-in so a taken name doesn't leave a stray
+      // Auth user behind. The claim in createUserProfile is the real guard.
+      if (!await FirebaseService.isUsernameAvailable(username)) {
+        throw UsernameTakenException(username).toString();
+      }
+
       final cred = await _authService.signInWithGoogle(
         requireExistingUserProfile: false,
       );
@@ -114,17 +121,32 @@ class _SignupScreenState extends State<SignupScreen> {
       }
 
       final user = cred!.user!;
-      await FirebaseService.createUserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        username: _usernameController.text.trim(),
-        avatarPath: _selectedAvatar!,
-      );
+      try {
+        await FirebaseService.createUserProfile(
+          uid: user.uid,
+          email: user.email ?? '',
+          username: username,
+          avatarPath: _selectedAvatar!,
+        );
+      } catch (e) {
+        // Someone claimed the name between the check and now (or the write
+        // failed): undo the sign-in so we don't leave a profile-less user.
+        if (cred.additionalUserInfo?.isNewUser ?? false) {
+          try {
+            await user.delete();
+          } catch (_) {}
+        }
+        await _authService.signOut();
+        if (e is UsernameTakenException) throw e.toString();
+        rethrow;
+      }
 
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
-      setState(() => _errorMessage = e is String ? e : e.toString());
+      debugPrint('[SignupScreen] Google sign-up failed: $e');
+      setState(() => _errorMessage =
+          e is String ? e : "Couldn't create your account. Please try again.");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

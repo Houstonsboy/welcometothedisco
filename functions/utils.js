@@ -253,7 +253,26 @@ function computeRanks(points, stats, { minOpponents, minVoters }) {
   return result;
 }
 
+/**
+ * Every distinct substring (length >= 2) of a lowercased username, used as the
+ * `username_search` array so clients can find users with a single
+ * `array-contains` query. 1-char queries fall back to a prefix query instead.
+ * A 20-char username yields at most 190 entries, well under Firestore's
+ * 40k index-entries-per-doc limit.
+ */
+function usernameSubstrings(username) {
+  const name = String(username || "").trim().toLowerCase();
+  const out = new Set();
+  for (let i = 0; i < name.length; i++) {
+    for (let j = i + 2; j <= name.length; j++) {
+      out.add(name.slice(i, j));
+    }
+  }
+  return [...out].sort();
+}
+
 module.exports = {
+  usernameSubstrings,
   makePairKey, countRounds, mapRoundsToAB,
   computeNewVoterState, computePairIncrements, isSelfMatchup,
   computeBradleyTerry, computeEntityStats, computeRanks,

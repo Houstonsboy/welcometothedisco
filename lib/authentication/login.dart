@@ -19,6 +19,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
+  // Set when a Google account with no app profile tries to sign in, so the
+  // "Create an account" button can prefill signup.
+  String? _pendingSignupEmail;
+  String? _pendingSignupDisplayName;
+
+  void _openSignup() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => SignupScreen(
+          initialEmail: _pendingSignupEmail,
+          initialDisplayName: _pendingSignupDisplayName,
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleGoogleSignIn() async {
     setState(() {
       _isLoading = true;
@@ -39,22 +56,18 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           return;
         case GoogleLoginScreenResultKind.needsRegistration:
-          setState(() => _isLoading = false);
-          await Navigator.push<void>(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => SignupScreen(
-                initialEmail: result.signupEmail,
-                initialDisplayName: result.signupDisplayName,
-              ),
-            ),
-          );
+          setState(() {
+            _isLoading = false;
+            _pendingSignupEmail = result.signupEmail;
+            _pendingSignupDisplayName = result.signupDisplayName;
+            _errorMessage =
+                "You don't have an account yet. Tap \"Create an account\" below to sign up.";
+          });
           return;
         case GoogleLoginScreenResultKind.usePasswordInstead:
           setState(() {
             _isLoading = false;
-            _errorMessage =
-                'This email is tied to an older sign-in method. Use the Google account you registered with, or try a different Google account.';
+            _errorMessage = 'This email uses a different sign-in method.';
           });
           return;
         case GoogleLoginScreenResultKind.cancelled:
@@ -62,10 +75,12 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
       }
     } catch (e) {
+      debugPrint('[LoginScreen] Google sign-in failed: $e');
       if (mounted && FirebaseAuth.instance.currentUser == null) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e is String ? e : e.toString();
+          _errorMessage =
+              e is String ? e : "Couldn't sign in. Please try again.";
         });
       }
     }
@@ -190,16 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
                       TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () {
-                                Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => const SignupScreen(),
-                                  ),
-                                );
-                              },
+                        onPressed: _isLoading ? null : _openSignup,
                         child: Text(
                           'New here? Create an account',
                           style: TextStyle(
