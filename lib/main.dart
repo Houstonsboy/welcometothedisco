@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,6 +28,14 @@ import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/models/users_model.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/posts/view_posts.dart';
+import 'package:welcometothedisco/posts/post_view.dart';
+import 'package:welcometothedisco/versus/playground.dart';
+import 'package:welcometothedisco/versus/artistplayground.dart';
+import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
+
+/// Lets notification tap handling push screens without a BuildContext of its
+/// own — set as the MaterialApp's navigatorKey below.
+final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +45,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  NotificationService.onNotificationTap = _handleNotificationTap;
   await NotificationService.initialize();
 
   // Cold-start: app opened by Spotify redirect URI.
@@ -58,12 +66,74 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// Routes a tapped push notification (foreground banner, background tap, or
+/// cold-start launch) to the right screen based on its `data` payload.
+void _handleNotificationTap(Map<String, dynamic> data) {
+  final navigator = navigatorKey.currentState;
+  if (navigator == null) return;
+
+  final type = data['type'] as String?;
+  final id = data['id'] as String?;
+  if (id == null || id.isEmpty) return;
+
+  switch (type) {
+    case 'follow':
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      );
+      break;
+    case 'invite':
+      navigator.push(
+        MaterialPageRoute(builder: (_) => CollaboratorBackroom(versusID: id)),
+      );
+      break;
+    case 'versus':
+      _openVersusFromNotification(navigator, id, data['versusType'] as String?);
+      break;
+    case 'post':
+    case 'mention':
+      _openPostFromNotification(navigator, id);
+      break;
+  }
+}
+
+Future<void> _openVersusFromNotification(
+  NavigatorState navigator,
+  String versusId,
+  String? versusType,
+) async {
+  if (versusType == 'artist') {
+    final model = await FirebaseService.getArtistVersusById(versusId);
+    if (model == null) return;
+    navigator.push(MaterialPageRoute(
+      builder: (_) => ArtistVersusPlayground(versus: model, versusId: versusId),
+    ));
+    return;
+  }
+
+  final model = await FirebaseService.getAlbumVersusById(versusId);
+  if (model == null) return;
+  navigator.push(MaterialPageRoute(
+    builder: (_) => VersusPlayground(versus: model, versusId: versusId),
+  ));
+}
+
+Future<void> _openPostFromNotification(
+  NavigatorState navigator,
+  String postId,
+) async {
+  final post = await FirebaseService.getPostStream(postId).first;
+  if (post == null) return;
+  navigator.push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.appTheme(),
       initialRoute: '/splash',
@@ -108,6 +178,7 @@ class _AuthGateState extends State<AuthGate> {
       _initializing = false;
       unawaited(FirebaseService.ensureCurrentUserProfileCached());
       unawaited(NotificationService.saveTokenForUser(current.uid));
+      NotificationService.startBadgeSync();
     }
     // Stream handles future sign-in / sign-out events.
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -120,6 +191,7 @@ class _AuthGateState extends State<AuthGate> {
       if (user != null) {
         unawaited(FirebaseService.ensureCurrentUserProfileCached());
         unawaited(NotificationService.saveTokenForUser(user.uid));
+        NotificationService.startBadgeSync();
       }
     });
   }
@@ -153,8 +225,6 @@ class _AppShellState extends State<_AppShell> {
   final SpotifyAuth _spotifyAuth = SpotifyAuth();
   final SpotifyApi _spotifyApi = SpotifyApi();
 
-  SpotifyUser? _spotifyUser;
-  bool _spotifyLoading = true;
   bool _spotifyConnecting = false;
   int _selectedIndex = 0;
   DateTime? _lastBackExitPrompt;
@@ -186,7 +256,6 @@ class _AppShellState extends State<_AppShell> {
     } else {
       await _runSpotifyAuth();
     }
-    if (mounted) setState(() => _spotifyLoading = false);
   }
 
   Future<void> _runSpotifyAuth() async {
@@ -204,8 +273,8 @@ class _AppShellState extends State<_AppShell> {
   }
 
   Future<void> _loadSpotifyProfile() async {
-    final user = await _spotifyApi.getCurrentUser();
-    if (mounted) setState(() => _spotifyUser = user);
+    // Warms the token/profile cache; the result isn't shown by this widget.
+    await _spotifyApi.getCurrentUser();
   }
 
   void _onTabTapped(int index) {
@@ -324,7 +393,7 @@ class _AppShellState extends State<_AppShell> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
           child: Container(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -337,7 +406,7 @@ class _AppShellState extends State<_AppShell> {
                       'Connecting to Spotify…\nComplete login in the browser.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 15,
                         height: 1.4,
                       ),
@@ -493,37 +562,6 @@ class _GlassExitHintOverlay extends StatelessWidget {
   }
 }
 
-/// Placeholder for nav tabs that haven't been built yet.
-class _ComingSoonPage extends StatelessWidget {
-  const _ComingSoonPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.sports_mma_rounded,
-            size: 52,
-            color: Colors.white.withOpacity(0.18),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'COMING SOON',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── Bell icon that shows a pink dot when there are unread follow notifications ─
 class _NotificationBell extends StatelessWidget {
   const _NotificationBell();
@@ -545,7 +583,7 @@ class _NotificationBell extends StatelessWidget {
                 hasUnread
                     ? Icons.notifications_rounded
                     : Icons.notifications_outlined,
-                color: Colors.white.withOpacity(hasUnread ? 1.0 : 0.65),
+                color: Colors.white.withValues(alpha: hasUnread ? 1.0 : 0.65),
                 size: 24,
               ),
               if (hasUnread)
@@ -625,12 +663,12 @@ class _FirebaseHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(compact ? 20 : 16),
                   gradient: AppTheme.glassPanelGradient(opacity: 0.40),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withValues(alpha: 0.18),
                     width: 0.8,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 6),
                     ),
@@ -646,14 +684,14 @@ class _FirebaseHeader extends StatelessWidget {
                             height: compact ? 16 : 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           SizedBox(width: compact ? 8 : 12),
                           Text(
                             compact ? '…' : 'Loading profile…',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontSize: compact ? 12 : 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -676,10 +714,10 @@ class _FirebaseHeader extends StatelessWidget {
                                 : Container(
                                     width: size,
                                     height: size,
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     child: Icon(
                                       Icons.person_rounded,
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(alpha: 0.8),
                                       size: compact ? 18 : 24,
                                     ),
                                   ),
@@ -694,7 +732,7 @@ class _FirebaseHeader extends StatelessWidget {
                                   Text(
                                     'Account',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Colors.white.withValues(alpha: 0.6),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
@@ -733,7 +771,7 @@ class _FirebaseHeader extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.62),
+                                  color: Colors.white.withValues(alpha: 0.62),
                                   fontSize: 11,
                                 ),
                               ),

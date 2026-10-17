@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/models/post_model.dart';
@@ -14,7 +13,6 @@ import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/widgets/expanding_search_bar.dart';
 
 const _kGreen      = AppTheme.createGreen;
-const _kPink       = AppTheme.gradientEnd;
 const _kTextPrimary = Colors.white;
 const _kTextMuted  = Color(0x66FFFFFF);
 const _kDivider    = Color(0x1AFFFFFF);
@@ -54,6 +52,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _trackSectionOpen = false;
   bool _isPublishing = false;
   RemixEnabled _remixEnabled = RemixEnabled.same;
+
+  // ── Tagged friends (mentions) ────────────────────────────────────────────────
+  bool _mentionsSectionOpen = false;
+  final Set<String> _mentionedUids = {};
+
+  void _toggleMention(FriendEntry friend) {
+    setState(() {
+      if (!_mentionedUids.remove(friend.uid)) {
+        _mentionedUids.add(friend.uid);
+      }
+    });
+  }
 
   List<SpotifyTrack> get _visibleTracks =>
       (_trackFilterQuery.isNotEmpty && _trackSearchResults != null)
@@ -213,6 +223,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 })
             .toList(),
         remixEnabled: _remixEnabled,
+        mentionedUids: _mentionedUids.toList(),
       );
       final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
       final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
@@ -267,7 +278,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       TextField(
                         controller: _descController,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withValues(alpha: 0.75),
                           fontFamily: AppTheme.fontBody,
                           fontSize: 15,
                           height: 1.6,
@@ -316,7 +327,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                             ),
                           ),
                         ),
@@ -336,7 +347,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           child: Text(
                             'No artists found',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.35),
+                              color: Colors.white.withValues(alpha: 0.35),
                               fontFamily: AppTheme.fontBody,
                               fontSize: 13,
                             ),
@@ -373,6 +384,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         isOpen: _trackSectionOpen,
                         onToggleOpen: () =>
                             setState(() => _trackSectionOpen = !_trackSectionOpen),
+                      ),
+
+                      const SizedBox(height: 24),
+                      _Divider(),
+                      const SizedBox(height: 16),
+
+                      // ── Tag friends (mentions) ───────────────────────────
+                      _TagFriendsSection(
+                        selectedUids: _mentionedUids,
+                        onToggle: _toggleMention,
+                        isOpen: _mentionsSectionOpen,
+                        onToggleOpen: () => setState(
+                            () => _mentionsSectionOpen = !_mentionsSectionOpen),
                       ),
                     ],
                   ),
@@ -413,10 +437,10 @@ class _CurrentUserAuthorRow extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
         ),
         child: Icon(Icons.person_rounded,
-            color: Colors.white.withOpacity(0.85), size: size * 0.55),
+            color: Colors.white.withValues(alpha: 0.85), size: size * 0.55),
       );
     }
 
@@ -428,7 +452,7 @@ class _CurrentUserAuthorRow extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => Icon(Icons.person_rounded,
-            color: Colors.white.withOpacity(0.85), size: size * 0.55),
+            color: Colors.white.withValues(alpha: 0.85), size: size * 0.55),
       );
     } else {
       final asset = p.startsWith('assets/')
@@ -442,7 +466,7 @@ class _CurrentUserAuthorRow extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => Icon(Icons.person_rounded,
-            color: Colors.white.withOpacity(0.85), size: size * 0.55),
+            color: Colors.white.withValues(alpha: 0.85), size: size * 0.55),
       );
     }
 
@@ -468,7 +492,7 @@ class _CurrentUserAuthorRow extends StatelessWidget {
                     height: 38,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                   )
                 : _avatar(avatarPath, 38),
@@ -476,7 +500,7 @@ class _CurrentUserAuthorRow extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontFamily: AppTheme.fontBody,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -509,7 +533,7 @@ class _TopBar extends StatelessWidget {
           Text(
             'New Post',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontFamily: AppTheme.fontBody,
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -522,10 +546,10 @@ class _TopBar extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
               decoration: BoxDecoration(
-                color: _kGreen.withOpacity(isPublishing ? 0.07 : 0.15),
+                color: _kGreen.withValues(alpha: isPublishing ? 0.07 : 0.15),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: _kGreen.withOpacity(isPublishing ? 0.30 : 0.65),
+                  color: _kGreen.withValues(alpha: isPublishing ? 0.30 : 0.65),
                   width: 1,
                 ),
               ),
@@ -535,7 +559,7 @@ class _TopBar extends StatelessWidget {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: _kGreen.withOpacity(0.7),
+                        color: _kGreen.withValues(alpha: 0.7),
                       ),
                     )
                   : Text(
@@ -577,14 +601,14 @@ class _SelectedArtistRow extends StatelessWidget {
             child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
                 ? Image.network(artist.imageUrl!, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       child: Icon(Icons.music_note_rounded,
-                          color: Colors.white.withOpacity(0.45), size: 22),
+                          color: Colors.white.withValues(alpha: 0.45), size: 22),
                     ))
                 : Container(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     child: Icon(Icons.music_note_rounded,
-                        color: Colors.white.withOpacity(0.45), size: 22),
+                        color: Colors.white.withValues(alpha: 0.45), size: 22),
                   ),
           ),
         ),
@@ -607,7 +631,7 @@ class _SelectedArtistRow extends StatelessWidget {
               Text(
                 'Artist',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontFamily: AppTheme.fontBody,
                   fontSize: 11,
                 ),
@@ -618,7 +642,7 @@ class _SelectedArtistRow extends StatelessWidget {
         GestureDetector(
           onTap: onClear,
           child: Icon(Icons.close_rounded,
-              color: Colors.white.withOpacity(0.45), size: 20),
+              color: Colors.white.withValues(alpha: 0.45), size: 20),
         ),
       ],
     );
@@ -699,14 +723,14 @@ class _ArtistResultCard extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? _kCyan.withOpacity(0.85)
-                              : Colors.white.withOpacity(0.12),
+                              ? _kCyan.withValues(alpha: 0.85)
+                              : Colors.white.withValues(alpha: 0.12),
                           width: isSelected ? 2.5 : 1,
                         ),
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: _kCyan.withOpacity(0.40),
+                                  color: _kCyan.withValues(alpha: 0.40),
                                   blurRadius: 16,
                                   spreadRadius: 2,
                                 )
@@ -735,7 +759,7 @@ class _ArtistResultCard extends StatelessWidget {
                           color: _kCyan,
                           boxShadow: [
                             BoxShadow(
-                                color: _kCyan.withOpacity(0.55),
+                                color: _kCyan.withValues(alpha: 0.55),
                                 blurRadius: 8)
                           ],
                         ),
@@ -756,7 +780,7 @@ class _ArtistResultCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.75),
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.75),
               fontFamily: AppTheme.fontBody,
               fontSize: 11.5,
               fontWeight:
@@ -770,9 +794,9 @@ class _ArtistResultCard extends StatelessWidget {
   }
 
   Widget _placeholder(double size) => Container(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         child: Icon(Icons.person_rounded,
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             size: size * 0.40),
       );
 }
@@ -824,20 +848,20 @@ class _TrackSection extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               color: hasArtist
-                  ? _kCyan.withOpacity(0.12)
-                  : Colors.white.withOpacity(0.06),
+                  ? _kCyan.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.06),
               border: Border.all(
                 color: hasArtist
-                    ? _kCyan.withOpacity(0.35)
-                    : Colors.white.withOpacity(0.10),
+                    ? _kCyan.withValues(alpha: 0.35)
+                    : Colors.white.withValues(alpha: 0.10),
                 width: 1,
               ),
             ),
             child: Icon(
               Icons.queue_music_rounded,
               color: hasArtist
-                  ? _kCyan.withOpacity(0.85)
-                  : Colors.white.withOpacity(0.30),
+                  ? _kCyan.withValues(alpha: 0.85)
+                  : Colors.white.withValues(alpha: 0.30),
               size: 20,
             ),
           ),
@@ -850,8 +874,8 @@ class _TrackSection extends StatelessWidget {
                   'Add tracks',
                   style: TextStyle(
                     color: hasArtist
-                        ? Colors.white.withOpacity(0.85)
-                        : Colors.white.withOpacity(0.30),
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : Colors.white.withValues(alpha: 0.30),
                     fontFamily: AppTheme.fontBody,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -861,7 +885,7 @@ class _TrackSection extends StatelessWidget {
                   Text(
                     'Select an artist first',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.22),
+                      color: Colors.white.withValues(alpha: 0.22),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 11,
                     ),
@@ -870,7 +894,7 @@ class _TrackSection extends StatelessWidget {
                   Text(
                     '${selectedTracks.length} track${selectedTracks.length == 1 ? '' : 's'} added',
                     style: TextStyle(
-                      color: _kCyan.withOpacity(0.75),
+                      color: _kCyan.withValues(alpha: 0.75),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -884,7 +908,7 @@ class _TrackSection extends StatelessWidget {
               isOpen
                   ? Icons.keyboard_arrow_up_rounded
                   : Icons.keyboard_arrow_down_rounded,
-              color: Colors.white.withOpacity(0.45),
+              color: Colors.white.withValues(alpha: 0.45),
               size: 22,
             ),
         ],
@@ -908,8 +932,8 @@ class _TrackSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color: _kCyan.withOpacity(0.15),
-                  border: Border.all(color: _kCyan.withOpacity(0.55), width: 1),
+                  color: _kCyan.withValues(alpha: 0.15),
+                  border: Border.all(color: _kCyan.withValues(alpha: 0.55), width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -934,7 +958,7 @@ class _TrackSection extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Icon(Icons.close_rounded, size: 13, color: _kCyan.withOpacity(0.7)),
+                    Icon(Icons.close_rounded, size: 13, color: _kCyan.withValues(alpha: 0.7)),
                   ],
                 ),
               ),
@@ -951,14 +975,14 @@ class _TrackSection extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white.withOpacity(0.07),
-          border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+          color: Colors.white.withValues(alpha: 0.07),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
         ),
         child: Row(
           children: [
             const SizedBox(width: 12),
             Icon(Icons.search_rounded,
-                color: Colors.white.withOpacity(0.4), size: 18),
+                color: Colors.white.withValues(alpha: 0.4), size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -966,7 +990,7 @@ class _TrackSection extends StatelessWidget {
                 focusNode: trackSearchFocus,
                 onChanged: (_) => onFilterChanged(),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontFamily: AppTheme.fontBody,
                   fontSize: 13.5,
                 ),
@@ -974,7 +998,7 @@ class _TrackSection extends StatelessWidget {
                   hintText:
                       'Filter ${artist!.name} tracks…',
                   hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.28),
+                    color: Colors.white.withValues(alpha: 0.28),
                     fontFamily: AppTheme.fontBody,
                     fontSize: 13.5,
                   ),
@@ -997,7 +1021,7 @@ class _TrackSection extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: Icon(Icons.close_rounded,
-                      color: Colors.white.withOpacity(0.40), size: 16),
+                      color: Colors.white.withValues(alpha: 0.40), size: 16),
                 ),
               ),
           ],
@@ -1016,7 +1040,7 @@ class _TrackSection extends StatelessWidget {
             height: 22,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ),
@@ -1030,7 +1054,7 @@ class _TrackSection extends StatelessWidget {
             height: 22,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: _kCyan.withOpacity(0.6),
+              color: _kCyan.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -1042,7 +1066,7 @@ class _TrackSection extends StatelessWidget {
           child: Text(
             'No tracks found',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.30),
+              color: Colors.white.withValues(alpha: 0.30),
               fontFamily: AppTheme.fontBody,
               fontSize: 13,
             ),
@@ -1061,12 +1085,12 @@ class _TrackSection extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: selected
-                    ? _kCyan.withOpacity(0.12)
-                    : Colors.white.withOpacity(0.04),
+                    ? _kCyan.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.04),
                 border: Border.all(
                   color: selected
-                      ? _kCyan.withOpacity(0.50)
-                      : Colors.white.withOpacity(0.08),
+                      ? _kCyan.withValues(alpha: 0.50)
+                      : Colors.white.withValues(alpha: 0.08),
                   width: 1,
                 ),
               ),
@@ -1103,7 +1127,7 @@ class _TrackSection extends StatelessWidget {
                           style: TextStyle(
                             color: selected
                                 ? Colors.white
-                                : Colors.white.withOpacity(0.80),
+                                : Colors.white.withValues(alpha: 0.80),
                             fontFamily: AppTheme.fontBody,
                             fontSize: 13,
                             fontWeight: selected
@@ -1116,7 +1140,7 @@ class _TrackSection extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.40),
+                            color: Colors.white.withValues(alpha: 0.40),
                             fontFamily: AppTheme.fontBody,
                             fontSize: 11,
                           ),
@@ -1142,7 +1166,7 @@ class _TrackSection extends StatelessWidget {
                         : Icon(
                             key: const ValueKey('unchecked'),
                             Icons.add_rounded,
-                            color: Colors.white.withOpacity(0.25),
+                            color: Colors.white.withValues(alpha: 0.25),
                             size: 20,
                           ),
                   ),
@@ -1168,9 +1192,9 @@ class _TrackSection extends StatelessWidget {
   }
 
   Widget _trackArtFallback() => Container(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         child: Icon(Icons.music_note_rounded,
-            color: Colors.white.withOpacity(0.30), size: 18),
+            color: Colors.white.withValues(alpha: 0.30), size: 18),
       );
 }
 
@@ -1203,7 +1227,7 @@ class _RemixEnabledSelector extends StatelessWidget {
         Text(
           'Remixes',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.85),
+            color: Colors.white.withValues(alpha: 0.85),
             fontFamily: AppTheme.fontBody,
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -1213,7 +1237,7 @@ class _RemixEnabledSelector extends StatelessWidget {
         Text(
           _subtitle(value),
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontFamily: AppTheme.fontBody,
             fontSize: 11,
             height: 1.35,
@@ -1273,12 +1297,12 @@ class _RemixOption extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           color: selected
-              ? _kGreen.withOpacity(0.18)
-              : Colors.white.withOpacity(0.06),
+              ? _kGreen.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.06),
           border: Border.all(
             color: selected
-                ? _kGreen.withOpacity(0.70)
-                : Colors.white.withOpacity(0.12),
+                ? _kGreen.withValues(alpha: 0.70)
+                : Colors.white.withValues(alpha: 0.12),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -1286,12 +1310,327 @@ class _RemixOption extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? _kGreen : Colors.white.withOpacity(0.65),
+            color: selected ? _kGreen : Colors.white.withValues(alpha: 0.65),
             fontFamily: AppTheme.fontBody,
             fontSize: 13,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Tag friends (mentions) section ───────────────────────────────────────────
+class _TagFriendsSection extends StatelessWidget {
+  const _TagFriendsSection({
+    required this.selectedUids,
+    required this.onToggle,
+    required this.isOpen,
+    required this.onToggleOpen,
+  });
+
+  final Set<String> selectedUids;
+  final ValueChanged<FriendEntry> onToggle;
+  final bool isOpen;
+  final VoidCallback onToggleOpen;
+
+  static const _kCyan = Color(0xFF17B5EE);
+
+  @override
+  Widget build(BuildContext context) {
+    final header = GestureDetector(
+      onTap: onToggleOpen,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: _kCyan.withValues(alpha: 0.12),
+              border: Border.all(color: _kCyan.withValues(alpha: 0.35), width: 1),
+            ),
+            child: Icon(Icons.alternate_email_rounded,
+                color: _kCyan.withValues(alpha: 0.85), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tag friends',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (selectedUids.isEmpty)
+                  Text(
+                    'Tagged friends get notified',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.30),
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 11,
+                    ),
+                  )
+                else
+                  Text(
+                    '${selectedUids.length} friend${selectedUids.length == 1 ? '' : 's'} tagged',
+                    style: TextStyle(
+                      color: _kCyan.withValues(alpha: 0.75),
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Icon(
+            isOpen
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: Colors.white.withValues(alpha: 0.45),
+            size: 22,
+          ),
+        ],
+      ),
+    );
+
+    if (!isOpen) return header;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        const SizedBox(height: 12),
+        StreamBuilder<UserModel?>(
+          stream: FirebaseService.getCurrentUserStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+              );
+            }
+            final friends = snapshot.data?.friends ?? const <FriendEntry>[];
+            if (friends.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Add friends from Find Friends to tag them in posts',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.30),
+                    fontFamily: AppTheme.fontBody,
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+            return Column(
+              children: friends.map((f) {
+                return _FriendTagTile(
+                  key: ValueKey(f.uid),
+                  friend: f,
+                  selected: selectedUids.contains(f.uid),
+                  onTap: () => onToggle(f),
+                );
+              }).toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+// Legacy friend entries (added before `friends` stored a {uid, username,
+// avatar_path} map) only carry a uid — resolve the real profile on demand
+// instead of showing the raw uid.
+class _FriendTagTile extends StatefulWidget {
+  const _FriendTagTile({
+    super.key,
+    required this.friend,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final FriendEntry friend;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_FriendTagTile> createState() => _FriendTagTileState();
+}
+
+class _FriendTagTileState extends State<_FriendTagTile> {
+  static const _kCyan = Color(0xFF17B5EE);
+
+  UserModel? _resolved;
+  bool _resolving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FriendTagTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.friend.uid != widget.friend.uid) {
+      _resolved = null;
+      _resolveIfNeeded();
+    }
+  }
+
+  void _resolveIfNeeded() {
+    if (widget.friend.username.trim().isNotEmpty) return;
+    final uid = widget.friend.uid.trim();
+    if (uid.isEmpty) return;
+    setState(() => _resolving = true);
+    FirebaseService.getUserById(uid).then((user) {
+      if (!mounted) return;
+      setState(() {
+        _resolved = user;
+        _resolving = false;
+      });
+    });
+  }
+
+  String get _label {
+    final own = widget.friend.username.trim();
+    if (own.isNotEmpty) return own;
+    final resolved = _resolved?.username.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    if (_resolving) return '…';
+    return widget.friend.uid.isNotEmpty ? widget.friend.uid : '—';
+  }
+
+  String get _avatarPath {
+    final own = widget.friend.avatarPath.trim();
+    if (own.isNotEmpty) return own;
+    return _resolved?.avatarPath.trim() ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var label = _label;
+    if (!label.startsWith('@')) label = '@$label';
+    final selected = widget.selected;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? _kCyan.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
+          border: Border.all(
+            color: selected
+                ? _kCyan.withValues(alpha: 0.50)
+                : Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            _MentionFriendAvatar(avatarPath: _avatarPath, size: 32),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.80),
+                  fontFamily: AppTheme.fontBody,
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: selected
+                  ? Container(
+                      key: const ValueKey('checked'),
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _kCyan,
+                      ),
+                      child: const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 13),
+                    )
+                  : Icon(
+                      key: const ValueKey('unchecked'),
+                      Icons.add_rounded,
+                      color: Colors.white.withValues(alpha: 0.25),
+                      size: 20,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MentionFriendAvatar extends StatelessWidget {
+  const _MentionFriendAvatar({required this.avatarPath, required this.size});
+
+  final String avatarPath;
+  final double size;
+
+  String? _assetPath(String avatarPath) {
+    final p = avatarPath.trim();
+    if (p.isEmpty) return null;
+    if (p.startsWith('assets/')) return p;
+    if (p.startsWith('/')) return p.substring(1);
+    return 'assets/images/$p';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _assetPath(avatarPath);
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: Colors.white.withValues(alpha: 0.10),
+        child: asset != null
+            ? Image.asset(
+                asset,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(Icons.person_rounded,
+                    color: Colors.white.withValues(alpha: 0.6),
+                    size: size * 0.55),
+              )
+            : Icon(Icons.person_rounded,
+                color: Colors.white.withValues(alpha: 0.6), size: size * 0.55),
       ),
     );
   }
@@ -1315,7 +1654,7 @@ class _IconBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Icon(icon, color: Colors.white.withOpacity(0.7), size: 22),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 22),
     );
   }
 }

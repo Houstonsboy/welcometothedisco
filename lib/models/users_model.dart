@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ── Friend entry stored inside a user's friends array ─────────────────────────
 // Each element is a map: { uid, username, avatar_path }

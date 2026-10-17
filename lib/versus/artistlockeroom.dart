@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
@@ -66,7 +65,7 @@ class ArtistLockeroom extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Failed to create versus: $e'),
-                backgroundColor: Colors.red.withOpacity(0.85),
+                backgroundColor: Colors.red.withValues(alpha: 0.85),
               ),
             );
           }
@@ -449,8 +448,8 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               width: 40, height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.15),
-                border: Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+                color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
                   color: Colors.white, size: 16),
@@ -465,7 +464,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                 fontWeight: FontWeight.w900, letterSpacing: 3.5,
               )),
               Text('pick two artists', style: TextStyle(
-                color: Colors.white.withOpacity(0.55), fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.55), fontSize: 11,
                 fontWeight: FontWeight.w500, letterSpacing: 0.3,
               )),
             ],
@@ -490,12 +489,12 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
         color: balanced
-            ? Colors.white.withOpacity(0.15)
-            : Colors.orange.withOpacity(0.2),
+            ? Colors.white.withValues(alpha: 0.15)
+            : Colors.orange.withValues(alpha: 0.2),
         border: Border.all(
           color: balanced
-              ? Colors.white.withOpacity(0.3)
-              : Colors.orange.withOpacity(0.5),
+              ? Colors.white.withValues(alpha: 0.3)
+              : Colors.orange.withValues(alpha: 0.5),
           width: 0.8,
         ),
       ),
@@ -513,7 +512,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text('vs',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 10, fontWeight: FontWeight.w600,
               ),
             ),
@@ -528,7 +527,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
           if (balanced) ...[
             const SizedBox(width: 5),
             Icon(Icons.check_circle_rounded,
-                color: Colors.white.withOpacity(0.7), size: 13),
+                color: Colors.white.withValues(alpha: 0.7), size: 13),
           ],
         ],
       ),
@@ -564,7 +563,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                             c1 != c2 && c1 > 0 && c2 > 0
                                 ? Icons.balance_rounded
                                 : Icons.info_outline_rounded,
-                            color: Colors.white.withOpacity(0.45),
+                            color: Colors.white.withValues(alpha: 0.45),
                             size: 13,
                           ),
                           const SizedBox(width: 6),
@@ -573,7 +572,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                               hint,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.45),
+                                color: Colors.white.withValues(alpha: 0.45),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -599,17 +598,17 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                       : null,
                   color: _canSubmit
                       ? null
-                      : Colors.white.withOpacity(0.08),
+                      : Colors.white.withValues(alpha: 0.08),
                   border: Border.all(
                     color: _canSubmit
                         ? Colors.transparent
-                        : Colors.white.withOpacity(0.12),
+                        : Colors.white.withValues(alpha: 0.12),
                     width: 0.8,
                   ),
                   boxShadow: _canSubmit
                       ? [
                           BoxShadow(
-                            color: _kPink.withOpacity(0.35),
+                            color: _kPink.withValues(alpha: 0.35),
                             blurRadius: 18,
                             offset: const Offset(0, 5),
                           ),
@@ -633,7 +632,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                                   : Icons.lock_outline_rounded,
                               color: _canSubmit
                                   ? Colors.white
-                                  : Colors.white.withOpacity(0.3),
+                                  : Colors.white.withValues(alpha: 0.3),
                               size: 16,
                             ),
                             const SizedBox(width: 8),
@@ -642,7 +641,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                               style: TextStyle(
                                 color: _canSubmit
                                     ? Colors.white
-                                    : Colors.white.withOpacity(0.3),
+                                    : Colors.white.withValues(alpha: 0.3),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.5,
@@ -673,8 +672,8 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
-              border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
             ),
             child: TextField(
               controller: _searchController,
@@ -687,14 +686,14 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
               decoration: InputDecoration(
                 hintText: 'Search artists...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.35), fontSize: 15),
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 15),
                 prefixIcon: Icon(Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.5), size: 20),
+                    color: Colors.white.withValues(alpha: 0.5), size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? GestureDetector(
                         onTap: () { _searchController.clear(); _onSearchChanged(''); },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.4), size: 18),
+                            color: Colors.white.withValues(alpha: 0.4), size: 18),
                       )
                     : null,
                 border: InputBorder.none,
@@ -721,12 +720,12 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               color: inSearchMode
-                  ? Colors.white.withOpacity(0.14)
-                  : Colors.white.withOpacity(0.09),
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : Colors.white.withValues(alpha: 0.09),
               border: Border.all(
                 color: inSearchMode
-                    ? Colors.white.withOpacity(0.28)
-                    : Colors.white.withOpacity(0.14),
+                    ? Colors.white.withValues(alpha: 0.28)
+                    : Colors.white.withValues(alpha: 0.14),
                 width: 0.8,
               ),
             ),
@@ -741,7 +740,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                     ? 'Searching Spotify...'
                     : 'Search tracks from these artists...',
                 hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.3), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
                 prefixIcon: _isSearchingTracks
                     ? Padding(
                         padding: const EdgeInsets.all(11),
@@ -749,7 +748,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                           width: 16, height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.8,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                           ),
                         ),
                       )
@@ -757,7 +756,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                         inSearchMode
                             ? Icons.manage_search_rounded
                             : Icons.queue_music_rounded,
-                        color: Colors.white.withOpacity(0.4), size: 18,
+                        color: Colors.white.withValues(alpha: 0.4), size: 18,
                       ),
                 suffixIcon: _trackFilterQuery.isNotEmpty
                     ? GestureDetector(
@@ -766,7 +765,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                           _trackFilterFocus.unfocus();
                         },
                         child: Icon(Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.35), size: 16),
+                            color: Colors.white.withValues(alpha: 0.35), size: 16),
                       )
                     : null,
                 border: InputBorder.none,
@@ -806,7 +805,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Text('VS', style: TextStyle(
-                      color: Colors.white.withOpacity(0.6), fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.6), fontSize: 13,
                       fontWeight: FontWeight.w900, letterSpacing: 2,
                     )),
                   ),
@@ -924,9 +923,9 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                 height: 0.8,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [
-                    accentColor.withOpacity(0.0),
-                    accentColor.withOpacity(0.4),
-                    accentColor.withOpacity(0.0),
+                    accentColor.withValues(alpha: 0.0),
+                    accentColor.withValues(alpha: 0.4),
+                    accentColor.withValues(alpha: 0.0),
                   ]),
                 ),
               ),
@@ -954,11 +953,11 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             padding: const EdgeInsets.only(top: 24),
             child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.search_off_rounded,
-                  color: Colors.white.withOpacity(0.25), size: 36),
+                  color: Colors.white.withValues(alpha: 0.25), size: 36),
               const SizedBox(height: 10),
               Text('No tracks found for "${artist.name}"',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                      color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
             ])),
           )
         else if (tracks.isEmpty)
@@ -966,7 +965,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
             padding: const EdgeInsets.only(top: 24),
             child: Center(child: Text('No top tracks available',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.35), fontSize: 13))),
+                    color: Colors.white.withValues(alpha: 0.35), fontSize: 13))),
           )
         else
           ...tracks.asMap().entries.map((entry) {
@@ -1003,14 +1002,14 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
                   width: 12, height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 1.5,
-                    color: accentColor.withOpacity(0.4),
+                    color: accentColor.withValues(alpha: 0.4),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'loading full discography...',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.28),
+                    color: Colors.white.withValues(alpha: 0.28),
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.5,
@@ -1036,13 +1035,13 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       width: 32, height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: accentColor.withOpacity(0.7), width: 1.5),
-        boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 8)],
+        border: Border.all(color: accentColor.withValues(alpha: 0.7), width: 1.5),
+        boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.3), blurRadius: 8)],
       ),
       child: ClipOval(
         child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
             ? Image.network(artist.imageUrl!, fit: BoxFit.cover)
-            : Container(color: accentColor.withOpacity(0.3),
+            : Container(color: accentColor.withValues(alpha: 0.3),
                 child: const Icon(Icons.person_rounded,
                     color: Colors.white, size: 16)),
       ),
@@ -1052,12 +1051,12 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: accentColor.withOpacity(0.2),
-        border: Border.all(color: accentColor.withOpacity(0.4), width: 0.8),
+        color: accentColor.withValues(alpha: 0.2),
+        border: Border.all(color: accentColor.withValues(alpha: 0.4), width: 0.8),
       ),
       child: Text(
         isSearchMode ? 'SEARCH' : (isDiscography ? 'DISCOGRAPHY' : 'TOP TRACKS'),
-        style: TextStyle(color: accentColor.withOpacity(0.9),
+        style: TextStyle(color: accentColor.withValues(alpha: 0.9),
             fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5),
       ),
     );
@@ -1095,10 +1094,10 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 2),
       child: Row(children: [
-        Icon(icon, size: 13, color: accentColor.withOpacity(dimmed ? 0.35 : 0.7)),
+        Icon(icon, size: 13, color: accentColor.withValues(alpha: dimmed ? 0.35 : 0.7)),
         const SizedBox(width: 6),
         Text(label, style: TextStyle(
-          color: Colors.white.withOpacity(dimmed ? 0.3 : 0.5),
+          color: Colors.white.withValues(alpha: dimmed ? 0.3 : 0.5),
           fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2,
         )),
         const SizedBox(width: 6),
@@ -1106,10 +1105,10 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
-            color: accentColor.withOpacity(dimmed ? 0.1 : 0.2),
+            color: accentColor.withValues(alpha: dimmed ? 0.1 : 0.2),
           ),
           child: Text('$count', style: TextStyle(
-            color: accentColor.withOpacity(dimmed ? 0.4 : 0.9),
+            color: accentColor.withValues(alpha: dimmed ? 0.4 : 0.9),
             fontSize: 9, fontWeight: FontWeight.w800,
           )),
         ),
@@ -1135,10 +1134,10 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
     if (_results.isEmpty && _lastQuery.isNotEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.search_off_rounded,
-            color: Colors.white.withOpacity(0.25), size: 40),
+            color: Colors.white.withValues(alpha: 0.25), size: 40),
         const SizedBox(height: 10),
         Text('No artists found', style: TextStyle(
-          color: Colors.white.withOpacity(0.4), fontSize: 14,
+          color: Colors.white.withValues(alpha: 0.4), fontSize: 14,
           fontWeight: FontWeight.w500,
         )),
       ]));
@@ -1146,7 +1145,7 @@ class _ArtistSearchScreenState extends State<ArtistSearchScreen>
 
     if (_results.isEmpty) {
       return Center(child: Text('Start typing to search', style: TextStyle(
-        color: Colors.white.withOpacity(0.3), fontSize: 14,
+        color: Colors.white.withValues(alpha: 0.3), fontSize: 14,
         fontWeight: FontWeight.w500,
       )));
     }
@@ -1192,10 +1191,10 @@ class _SelectedTrackTile extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: accentColor.withOpacity(0.18),
-              border: Border.all(color: accentColor.withOpacity(0.45), width: 1.0),
+              color: accentColor.withValues(alpha: 0.18),
+              border: Border.all(color: accentColor.withValues(alpha: 0.45), width: 1.0),
               boxShadow: [BoxShadow(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Padding(
@@ -1208,9 +1207,9 @@ class _SelectedTrackTile extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: accentColor.withOpacity(0.3), width: 1),
+                          color: accentColor.withValues(alpha: 0.3), width: 1),
                       boxShadow: [BoxShadow(
-                          color: accentColor.withOpacity(0.2), blurRadius: 6)],
+                          color: accentColor.withValues(alpha: 0.2), blurRadius: 6)],
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(5),
@@ -1229,7 +1228,7 @@ class _SelectedTrackTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(track.artistName,
                         maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: accentColor.withOpacity(0.8),
+                        style: TextStyle(color: accentColor.withValues(alpha: 0.8),
                             fontSize: 11, fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -1241,12 +1240,12 @@ class _SelectedTrackTile extends StatelessWidget {
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: accentColor.withOpacity(0.2),
+                      color: accentColor.withValues(alpha: 0.2),
                       border: Border.all(
-                          color: accentColor.withOpacity(0.35), width: 0.8),
+                          color: accentColor.withValues(alpha: 0.35), width: 0.8),
                     ),
                     child: Icon(Icons.remove_rounded,
-                        color: Colors.white.withOpacity(0.8), size: 14),
+                        color: Colors.white.withValues(alpha: 0.8), size: 14),
                   ),
                 ),
               ]),
@@ -1288,7 +1287,7 @@ class _TopTrackRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(7),
                   boxShadow: [BoxShadow(
-                      color: Colors.black.withOpacity(0.2), blurRadius: 6)],
+                      color: Colors.black.withValues(alpha: 0.2), blurRadius: 6)],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(7),
@@ -1304,14 +1303,14 @@ class _TopTrackRow extends StatelessWidget {
                     color: Colors.white, fontSize: 14,
                     fontWeight: FontWeight.w600, letterSpacing: -0.1,
                     decoration: isSelected ? TextDecoration.lineThrough : null,
-                    decorationColor: Colors.white.withOpacity(0.4),
+                    decorationColor: Colors.white.withValues(alpha: 0.4),
                   ),
                 ),
                 if (track.artistName.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(track.artistName,
                     maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withOpacity(0.45),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 12, fontWeight: FontWeight.w400),
                   ),
                 ],
@@ -1326,14 +1325,14 @@ class _TopTrackRow extends StatelessWidget {
                   width: 30, height: 30,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: accentColor.withOpacity(0.22),
+                    color: accentColor.withValues(alpha: 0.22),
                     border: Border.all(
-                        color: accentColor.withOpacity(0.55), width: 1.0),
+                        color: accentColor.withValues(alpha: 0.55), width: 1.0),
                     boxShadow: [BoxShadow(
-                        color: accentColor.withOpacity(0.2), blurRadius: 8)],
+                        color: accentColor.withValues(alpha: 0.2), blurRadius: 8)],
                   ),
                   child: Icon(Icons.add_rounded,
-                      color: Colors.white.withOpacity(0.9), size: 16),
+                      color: Colors.white.withValues(alpha: 0.9), size: 16),
                 ),
               )
             else
@@ -1341,18 +1340,18 @@ class _TopTrackRow extends StatelessWidget {
                 width: 30, height: 30,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   border: Border.all(
-                      color: accentColor.withOpacity(0.3), width: 0.8),
+                      color: accentColor.withValues(alpha: 0.3), width: 0.8),
                 ),
                 child: Icon(Icons.check_rounded,
-                    color: accentColor.withOpacity(0.5), size: 14),
+                    color: accentColor.withValues(alpha: 0.5), size: 14),
               ),
           ]),
         ),
         if (!isLast)
           Divider(height: 0, indent: 0,
-              color: Colors.white.withOpacity(0.06)),
+              color: Colors.white.withValues(alpha: 0.06)),
       ]),
     );
   }
@@ -1376,9 +1375,9 @@ class _ShimmerTrackRow extends StatelessWidget {
         LinearGradient shimmerGrad(double opacity) => LinearGradient(
           begin: Alignment(-1 + s * 2, 0), end: Alignment(s * 2, 0),
           colors: [
-            Colors.white.withOpacity(opacity * 0.5),
-            Colors.white.withOpacity(opacity),
-            Colors.white.withOpacity(opacity * 0.5),
+            Colors.white.withValues(alpha: opacity * 0.5),
+            Colors.white.withValues(alpha: opacity),
+            Colors.white.withValues(alpha: opacity * 0.5),
           ],
         );
         return Padding(
@@ -1440,12 +1439,12 @@ class _SelectedSlot extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             color: artist != null
-                ? accentColor.withOpacity(0.22)
-                : Colors.white.withOpacity(0.07),
+                ? accentColor.withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.07),
             border: Border.all(
               color: artist != null
-                  ? accentColor.withOpacity(0.55)
-                  : Colors.white.withOpacity(0.10),
+                  ? accentColor.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.10),
               width: 1.0,
             ),
           ),
@@ -1454,13 +1453,13 @@ class _SelectedSlot extends StatelessWidget {
                   Container(width: 28, height: 28,
                     decoration: BoxDecoration(shape: BoxShape.circle,
                       border: Border.all(
-                          color: Colors.white.withOpacity(0.15), width: 1)),
+                          color: Colors.white.withValues(alpha: 0.15), width: 1)),
                     child: Icon(Icons.add_rounded,
-                        color: Colors.white.withOpacity(0.25), size: 14),
+                        color: Colors.white.withValues(alpha: 0.25), size: 14),
                   ),
                   const SizedBox(width: 8),
                   Text(label, style: TextStyle(
-                    color: Colors.white.withOpacity(0.3), fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.3), fontSize: 11,
                     fontWeight: FontWeight.w700, letterSpacing: 1.2,
                   )),
                 ])
@@ -1471,7 +1470,7 @@ class _SelectedSlot extends StatelessWidget {
                     child: ClipOval(
                       child: artist!.imageUrl != null && artist!.imageUrl!.isNotEmpty
                           ? Image.network(artist!.imageUrl!, fit: BoxFit.cover)
-                          : Container(color: accentColor.withOpacity(0.3),
+                          : Container(color: accentColor.withValues(alpha: 0.3),
                               child: const Icon(Icons.person_rounded,
                                   color: Colors.white, size: 14)),
                     ),
@@ -1490,7 +1489,7 @@ class _SelectedSlot extends StatelessWidget {
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(99),
-                        color: accentColor.withOpacity(0.35),
+                        color: accentColor.withValues(alpha: 0.35),
                       ),
                       child: Text('$trackCount',
                         style: const TextStyle(color: Colors.white,
@@ -1502,7 +1501,7 @@ class _SelectedSlot extends StatelessWidget {
                   GestureDetector(
                     onTap: onRemove,
                     child: Icon(Icons.close_rounded,
-                        color: Colors.white.withOpacity(0.45), size: 14),
+                        color: Colors.white.withValues(alpha: 0.45), size: 14),
                   ),
                 ]),
         ),
@@ -1541,12 +1540,12 @@ class _ArtistCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isSelected
-                          ? _slotColor.withOpacity(0.8)
-                          : Colors.white.withOpacity(0.12),
+                          ? _slotColor.withValues(alpha: 0.8)
+                          : Colors.white.withValues(alpha: 0.12),
                       width: isSelected ? 2.5 : 1,
                     ),
                     boxShadow: isSelected ? [BoxShadow(
-                        color: _slotColor.withOpacity(0.45),
+                        color: _slotColor.withValues(alpha: 0.45),
                         blurRadius: 18, spreadRadius: 2)] : [],
                   ),
                   child: ClipOval(
@@ -1564,7 +1563,7 @@ class _ArtistCard extends StatelessWidget {
                     decoration: BoxDecoration(shape: BoxShape.circle,
                       color: _slotColor,
                       boxShadow: [BoxShadow(
-                          color: _slotColor.withOpacity(0.6), blurRadius: 8)],
+                          color: _slotColor.withValues(alpha: 0.6), blurRadius: 8)],
                     ),
                     child: Center(child: Text('${selectedSlot! + 1}',
                       style: const TextStyle(color: Colors.white,
@@ -1579,7 +1578,7 @@ class _ArtistCard extends StatelessWidget {
             maxLines: 2, overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               height: 1.3,
@@ -1591,9 +1590,9 @@ class _ArtistCard extends StatelessWidget {
   }
 
   Widget _placeholder(double size) => Container(
-    color: Colors.white.withOpacity(0.08),
+    color: Colors.white.withValues(alpha: 0.08),
     child: Icon(Icons.person_rounded,
-        size: size * 0.45, color: Colors.white.withOpacity(0.3)),
+        size: size * 0.45, color: Colors.white.withValues(alpha: 0.3)),
   );
 }
 
@@ -1610,8 +1609,8 @@ class _ShimmerArtistCard extends StatelessWidget {
         final s = shimmerController.value;
         LinearGradient shimmerGrad() => LinearGradient(
           begin: Alignment(-1 + s * 2, 0), end: Alignment(s * 2, 0),
-          colors: [Colors.white.withOpacity(0.06),
-            Colors.white.withOpacity(0.14), Colors.white.withOpacity(0.06)],
+          colors: [Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.06)],
         );
         return Column(mainAxisSize: MainAxisSize.min, children: [
           Expanded(child: Center(child: AspectRatio(aspectRatio: 1,
@@ -1643,7 +1642,7 @@ class _SwipeDot extends StatelessWidget {
       width: isActive ? 20 : 6, height: 6,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: isActive ? color : Colors.white.withOpacity(0.3),
+        color: isActive ? color : Colors.white.withValues(alpha: 0.3),
       ),
     );
   }

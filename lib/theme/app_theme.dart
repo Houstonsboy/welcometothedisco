@@ -118,8 +118,8 @@ abstract final class AppTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          gradientStart.withOpacity(opacity),
-          gradientEnd.withOpacity(opacity),
+          gradientStart.withValues(alpha: opacity),
+          gradientEnd.withValues(alpha: opacity),
         ],
       );
 
@@ -131,8 +131,8 @@ abstract final class AppTheme {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          gradientStart.withOpacity(opacity),
-          gradientEnd.withOpacity(opacity),
+          gradientStart.withValues(alpha: opacity),
+          gradientEnd.withValues(alpha: opacity),
         ],
       );
 

@@ -54,13 +54,13 @@ class _StoriesTemplateState extends State<StoriesTemplate> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      _kBlue.withOpacity(0.40),
-                      _kPink.withOpacity(0.40),
+                      _kBlue.withValues(alpha: 0.40),
+                      _kPink.withValues(alpha: 0.40),
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 20,
                       spreadRadius: 0,
                       offset: const Offset(0, 6),
@@ -94,7 +94,7 @@ class _StoriesTemplateState extends State<StoriesTemplate> {
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: Colors.white.withOpacity(0.45),
+          color: Colors.white.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -108,13 +108,13 @@ class _StoriesTemplateState extends State<StoriesTemplate> {
           Icon(
             Icons.people_outline_rounded,
             size: 28,
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.25),
           ),
           const SizedBox(height: 6),
           Text(
             'Find friends to see them here',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -172,7 +172,7 @@ class _FriendBubble extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
+                          color: Colors.black.withValues(alpha: 0.25),
                           blurRadius: 12,
                           spreadRadius: 0,
                           offset: const Offset(0, 4),
@@ -211,10 +211,10 @@ class _FriendBubble extends StatelessWidget {
   }
 
   Widget _fallbackAvatar() => Container(
-        color: _kBlue.withOpacity(0.35),
+        color: _kBlue.withValues(alpha: 0.35),
         child: Icon(
           Icons.person_rounded,
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           size: 32,
         ),
       );

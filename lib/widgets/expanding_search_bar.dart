@@ -148,14 +148,14 @@ class _GlassPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = Color.lerp(
-      Colors.white.withOpacity(0.15),
-      _kGreen.withOpacity(0.55),
+      Colors.white.withValues(alpha: 0.15),
+      _kGreen.withValues(alpha: 0.55),
       widthFactor,
     )!;
 
     final bgColor = Color.lerp(
-      Colors.white.withOpacity(0.08),
-      Colors.white.withOpacity(0.10),
+      Colors.white.withValues(alpha: 0.08),
+      Colors.white.withValues(alpha: 0.10),
       widthFactor,
     )!;
 
@@ -169,7 +169,7 @@ class _GlassPill extends StatelessWidget {
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: _kGreen.withOpacity(0.08 * widthFactor),
+              color: _kGreen.withValues(alpha: 0.08 * widthFactor),
               blurRadius: 12,
             ),
           ],
@@ -183,7 +183,7 @@ class _GlassPill extends StatelessWidget {
                 child: Icon(
                   Icons.search_rounded,
                   color: Color.lerp(
-                    Colors.white.withOpacity(0.55),
+                    Colors.white.withValues(alpha: 0.55),
                     _kGreen,
                     widthFactor,
                   ),
@@ -201,14 +201,14 @@ class _GlassPill extends StatelessWidget {
                     onChanged: onChanged,
                     onSubmitted: onSubmitted,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontFamily: AppTheme.fontBody,
                       fontSize: 14,
                     ),
                     decoration: InputDecoration(
                       hintText: hint,
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha: 0.35),
                         fontFamily: AppTheme.fontBody,
                         fontSize: 14,
                       ),
@@ -231,7 +231,7 @@ class _GlassPill extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 12),
                     child: Icon(
                       Icons.close_rounded,
-                      color: Colors.white.withOpacity(0.45),
+                      color: Colors.white.withValues(alpha: 0.45),
                       size: 18,
                     ),
                   ),

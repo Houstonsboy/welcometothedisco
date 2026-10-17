@@ -203,9 +203,9 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 border:
-                    Border.all(color: Colors.white.withOpacity(0.2), width: 0.8),
+                    Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.8),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -230,7 +230,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
               Text(
                 'search artists or albums to see their rank',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -252,8 +252,8 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withOpacity(0.12),
-              border: Border.all(color: Colors.white.withOpacity(0.18), width: 0.8),
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.8),
             ),
             child: TextField(
               controller: _searchController,
@@ -271,7 +271,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                     ? 'Search Spotify artists...'
                     : 'Search Spotify albums...',
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 15,
                 ),
                 prefixIcon: _isSearching
@@ -282,13 +282,13 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                           ),
                         ),
                       )
                     : Icon(
                         Icons.search_rounded,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         size: 20,
                       ),
                 suffixIcon: Padding(
@@ -300,9 +300,9 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                         duration: const Duration(milliseconds: 220),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(99),
-                          color: Colors.white.withOpacity(0.12),
+                          color: Colors.white.withValues(alpha: 0.12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.24),
+                            color: Colors.white.withValues(alpha: 0.24),
                             width: 0.8,
                           ),
                         ),
@@ -323,7 +323,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                                     _searchMode == _SearchMode.artist
                                         ? Icons.person_rounded
                                         : Icons.album_rounded,
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                     size: 13,
                                   ),
                                   const SizedBox(width: 4),
@@ -332,7 +332,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                                         ? 'Artist'
                                         : 'Album',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withValues(alpha: 0.9),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -352,7 +352,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
                           },
                           child: Icon(
                             Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             size: 18,
                           ),
                         ),
@@ -376,7 +376,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
         child: Text(
           'Start typing to search',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
@@ -389,7 +389,7 @@ class _EntityHistoryScreenState extends State<EntityHistoryScreen> {
         child: Text(
           'No results found',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
@@ -499,7 +499,7 @@ class _SearchResultRow extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: borderRadius,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         width: 0.9,
                       ),
                     ),
@@ -536,7 +536,7 @@ class _SearchResultRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
+                            color: Colors.white.withValues(alpha: 0.55),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -559,7 +559,7 @@ class _SearchResultRow extends StatelessWidget {
                       Text(
                         rankLabel,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: Colors.white.withValues(alpha: 0.55),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -575,7 +575,7 @@ class _SearchResultRow extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 0.5,
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
           ),
       ],
     );
@@ -583,10 +583,10 @@ class _SearchResultRow extends StatelessWidget {
 
   Widget _placeholder(bool isArtist) {
     return Container(
-      color: Colors.white.withOpacity(0.10),
+      color: Colors.white.withValues(alpha: 0.10),
       child: Icon(
         isArtist ? Icons.person_rounded : Icons.album_rounded,
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.white.withValues(alpha: 0.5),
         size: 22,
       ),
     );

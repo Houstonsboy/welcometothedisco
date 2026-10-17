@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // Top-level handler required by FCM for background messages.
 // Must be a top-level function (not a class method).
@@ -15,6 +20,21 @@ class NotificationService {
   static final FirebaseMessaging  _fcm       = FirebaseMessaging.instance;
   static final FirebaseFirestore  _db        = FirebaseFirestore.instance;
   static final FirebaseFunctions  _functions = FirebaseFunctions.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  static const AndroidNotificationChannel _androidChannel =
+      AndroidNotificationChannel(
+    'high_importance_channel',
+    'Notifications',
+    description: 'Friend activity: follows, invites, posts, and versus battles.',
+    importance: Importance.high,
+  );
+
+  /// Set by main.dart to a function that routes a tapped notification's
+  /// `data` payload to the right screen via a global navigatorKey — this
+  /// service has no BuildContext of its own.
+  static void Function(Map<String, dynamic> data)? onNotificationTap;
 
   // ── Initialise ────────────────────────────────────────────────────────────
   /// Call once from main() after Firebase.initializeApp().
@@ -22,6 +42,8 @@ class NotificationService {
   static Future<void> initialize() async {
     // Register the background handler before anything else.
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+
+    await _initLocalNotifications();
 
     // Request permission (iOS prompts the user; Android 13+ also needs this).
     final settings = await _fcm.requestPermission(
@@ -33,7 +55,10 @@ class NotificationService {
 
     // Persist token for the current user if already signed in.
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) await saveTokenForUser(uid);
+    if (uid != null) {
+      await saveTokenForUser(uid);
+      startBadgeSync();
+    }
 
     // Refresh token whenever FCM rotates it.
     _fcm.onTokenRefresh.listen((token) async {
@@ -43,25 +68,85 @@ class NotificationService {
       }
     });
 
-    // Foreground message handler — show a local notification or update UI.
+    // Foreground message handler — FCM only auto-shows a banner when the app
+    // is backgrounded/terminated, so show one ourselves while it's open.
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('[FCM foreground] ${message.notification?.title}');
-      // TODO: plug in flutter_local_notifications here if you want
-      // foreground banners (FCM auto-shows them in background/terminated).
+      _showLocalNotification(message);
     });
 
     // Notification tap when app was in background.
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('[FCM opened] ${message.data}');
-      // TODO: navigate based on message.data['type'] / message.data['id']
+      _handleNotificationTap(message.data);
     });
 
     // Notification tap that launched the app from terminated state.
     final initial = await _fcm.getInitialMessage();
     if (initial != null) {
       debugPrint('[FCM launch] ${initial.data}');
-      // TODO: same navigation handling
+      _handleNotificationTap(initial.data);
     }
+  }
+
+  // ── Local notification display (foreground FCM banners) ────────────────────
+  static Future<void> _initLocalNotifications() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      // FCM's requestPermission() above already asks for alert/badge/sound.
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    await _localNotifications.initialize(
+      const InitializationSettings(android: androidInit, iOS: iosInit),
+      onDidReceiveNotificationResponse: _onLocalNotificationTap,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_androidChannel);
+  }
+
+  static Future<void> _showLocalNotification(RemoteMessage message) async {
+    final notification = message.notification;
+    if (notification == null) return;
+
+    await _localNotifications.show(
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      payload: jsonEncode(message.data),
+    );
+  }
+
+  // Tap on a local banner shown while the app was in the foreground.
+  @pragma('vm:entry-point')
+  static void _onLocalNotificationTap(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      _handleNotificationTap(data);
+    } catch (e) {
+      debugPrint('[FCM] failed to decode local notification payload: $e');
+    }
+  }
+
+  static void _handleNotificationTap(Map<String, dynamic> data) {
+    onNotificationTap?.call(data);
   }
 
   // ── Token management ──────────────────────────────────────────────────────
@@ -87,7 +172,46 @@ class NotificationService {
     if (uid.isEmpty) return;
     await _db.collection('users').doc(uid).update({'fcm_token': FieldValue.delete()});
     await _fcm.deleteToken();
+    stopBadgeSync();
     debugPrint('[FCM] token cleared for $uid');
+  }
+
+  // ── OS app-icon badge ─────────────────────────────────────────────────────
+  static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _badgeSub;
+
+  /// Keeps the app-icon badge in sync with the signed-in user's unread
+  /// notification count for as long as the app process is alive. Call on
+  /// sign-in (also called from initialize() if already signed in).
+  static void startBadgeSync() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _badgeSub?.cancel();
+    _badgeSub = _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .listen((snap) => _updateBadge(snap.docs.length));
+  }
+
+  /// Call on sign-out so the badge doesn't keep showing the previous user's
+  /// unread count.
+  static void stopBadgeSync() {
+    _badgeSub?.cancel();
+    _badgeSub = null;
+    _updateBadge(0);
+  }
+
+  static Future<void> _updateBadge(int count) async {
+    try {
+      if (await AppBadgePlus.isSupported()) {
+        await AppBadgePlus.updateBadge(count);
+      }
+    } catch (e) {
+      debugPrint('[FCM] badge update failed: $e');
+    }
   }
 
   // ── Friend token lookup ───────────────────────────────────────────────────
@@ -107,15 +231,17 @@ class NotificationService {
         .where((id) => id.isNotEmpty)
         .toList();
 
-    if (friendUids.isEmpty) return [];
+    return _getTokensForUids(friendUids);
+  }
 
-    // Batch-fetch up to 30 friend docs (Firestore whereIn limit).
+  // Returns the stored FCM tokens for an arbitrary list of uids (batched to
+  // respect Firestore's 30-value whereIn limit).
+  static Future<List<String>> _getTokensForUids(List<String> uids) async {
+    if (uids.isEmpty) return [];
+
     final tokens = <String>[];
-    for (int i = 0; i < friendUids.length; i += 30) {
-      final batch = friendUids.sublist(
-        i,
-        (i + 30).clamp(0, friendUids.length),
-      );
+    for (int i = 0; i < uids.length; i += 30) {
+      final batch = uids.sublist(i, (i + 30).clamp(0, uids.length));
       final snap = await _db
           .collection('users')
           .where(FieldPath.documentId, whereIn: batch)
@@ -128,9 +254,78 @@ class NotificationService {
     return tokens;
   }
 
+  // Returns the FCM token stored on a single user's doc, if any.
+  static Future<String?> _getUserToken(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    final token = doc.data()?['fcm_token'] as String?;
+    return (token != null && token.isNotEmpty) ? token : null;
+  }
+
   // ── Notification triggers ─────────────────────────────────────────────────
   // These methods collect friend tokens and hand off to your Cloud Function.
   // Replace the TODO body with your actual sending logic once you set it up.
+
+  /// Call this right after FirebaseService._sendFollowNotification() writes
+  /// the inbox doc, to also push to the followed user's device.
+  static Future<void> notifyFriendNewFollow({
+    required String recipientUid,
+    required String followerUid,
+    required String followerName,
+  }) async {
+    final token = await _getUserToken(recipientUid);
+    if (token == null) return;
+
+    await _callSendFunction(
+      tokens: [token],
+      title: '$followerName followed you',
+      body: 'Check out their profile',
+      data: {'type': 'follow', 'id': followerUid},
+    );
+  }
+
+  /// Call this right after FirebaseService.createCollaborationInvite() writes
+  /// the inbox doc, to also push to the invited collaborator's device.
+  static Future<void> notifyFriendNewInvite({
+    required String recipientUid,
+    required String senderUid,
+    required String senderName,
+    required String versusId,
+  }) async {
+    final token = await _getUserToken(recipientUid);
+    if (token == null) return;
+
+    await _callSendFunction(
+      tokens: [token],
+      title: '$senderName invited you to a versus',
+      body: 'Join the battle',
+      data: {'type': 'invite', 'id': versusId},
+    );
+  }
+
+  /// Call this right after FirebaseService._sendMentionNotifications() writes
+  /// the inbox docs, to also push to each tagged friend's device.
+  static Future<void> notifyUsersMentionedInPost({
+    required List<String> recipientUids,
+    required String authorUid,
+    required String authorName,
+    required String postId,
+  }) async {
+    final uids = recipientUids
+        .where((u) => u.isNotEmpty && u != authorUid)
+        .toSet()
+        .toList();
+    if (uids.isEmpty) return;
+
+    final tokens = await _getTokensForUids(uids);
+    if (tokens.isEmpty) return;
+
+    await _callSendFunction(
+      tokens: tokens,
+      title: '$authorName mentioned you in a post',
+      body: 'Tap to view the post',
+      data: {'type': 'mention', 'id': postId},
+    );
+  }
 
   /// Call this right after FirebaseService.createPost() succeeds.
   static Future<void> notifyFriendsNewPost({

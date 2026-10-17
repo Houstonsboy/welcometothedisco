@@ -13,7 +13,6 @@ import '../config/app_config.dart';
 /// (first time or after tokens were removed / long time unused).
 class TokenStorageService {
   static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 

@@ -26,7 +26,7 @@ class _AuthStep {
   final String label;
   _StepStatus status;
   String detail;
-  _AuthStep(this.label, {this.status = _StepStatus.idle, this.detail = ''});
+  _AuthStep(this.label) : detail = '', status = _StepStatus.idle;
 }
 
 class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
@@ -314,13 +314,13 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.queue_music_rounded,
-                size: 72, color: Colors.white.withOpacity(0.4)),
+                size: 72, color: Colors.white.withValues(alpha: 0.4)),
             const SizedBox(height: 24),
             Text(
               'Connect to Spotify to control playback\nand queue tracks',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 15,
                 height: 1.5,
               ),
@@ -348,7 +348,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                 style: TextStyle(
                   color: _connected
                       ? const Color(0xFF1DB954)
-                      : Colors.redAccent.withOpacity(0.9),
+                      : Colors.redAccent.withValues(alpha: 0.9),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -377,7 +377,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
             color = Colors.redAccent;
             icon = Icons.cancel_rounded;
           case _StepStatus.idle:
-            color = Colors.white.withOpacity(0.3);
+            color = Colors.white.withValues(alpha: 0.3);
             icon = Icons.radio_button_unchecked_rounded;
         }
         return Padding(
@@ -399,7 +399,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                     if (step.detail.isNotEmpty)
                       Text(step.detail,
                           style: TextStyle(
-                              color: color.withOpacity(0.75),
+                              color: color.withValues(alpha: 0.75),
                               fontSize: 11)),
                   ],
                 ),
@@ -432,9 +432,9 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.5), width: 1),
+            border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
           ),
           child: Row(
             children: [
@@ -448,7 +448,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                     Text(
                       'Authentication status',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0.5,
@@ -484,7 +484,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
           Text(
             'Authentication: Successful',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -518,7 +518,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                 _statusMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
+                  color: Colors.white.withValues(alpha: 0.65),
                   fontSize: 13,
                 ),
               ),
@@ -539,7 +539,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         child: np == null
             ? Text(
                 'Nothing playing',
-                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 15),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15),
               )
             : Row(
                 children: [
@@ -550,9 +550,9 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                         : Container(
                             width: 56,
                             height: 56,
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             child: Icon(Icons.music_note_rounded,
-                                color: Colors.white.withOpacity(0.6), size: 28),
+                                color: Colors.white.withValues(alpha: 0.6), size: 28),
                           ),
                   ),
                   const SizedBox(width: 14),
@@ -575,7 +575,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                           np.artistName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                         ),
                       ],
                     ),
@@ -584,7 +584,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                     np.isPlaying
                         ? Icons.play_circle_outline_rounded
                         : Icons.pause_circle_outline_rounded,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     size: 24,
                   ),
                 ],
@@ -624,7 +624,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
             Text(
               'Search tracks',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.3,
@@ -645,9 +645,9 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                         decoration: InputDecoration(
                           hintText: 'Song name, artist…',
                           hintStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.4), fontSize: 13),
+                              color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
+                          fillColor: Colors.white.withValues(alpha: 0.1),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
@@ -666,7 +666,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.gradientEnd.withOpacity(0.7),
+                      color: AppTheme.gradientEnd.withValues(alpha: 0.7),
                     ),
                     child: _searching
                         ? const SizedBox(
@@ -709,7 +709,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                                 : Container(
                                     width: 40,
                                     height: 40,
-                                    color: Colors.white.withOpacity(0.1),
+                                    color: Colors.white.withValues(alpha: 0.1),
                                     child: Icon(Icons.music_note,
                                         color: Colors.white38, size: 18),
                                   ),
@@ -730,13 +730,13 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                        color: Colors.white.withOpacity(0.5),
+                                        color: Colors.white.withValues(alpha: 0.5),
                                         fontSize: 12)),
                               ],
                             ),
                           ),
                           Icon(Icons.play_arrow_rounded,
-                              color: Colors.white.withOpacity(0.4), size: 22),
+                              color: Colors.white.withValues(alpha: 0.4), size: 22),
                         ],
                       ),
                     ),
@@ -747,7 +747,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
               Text(
                 'Tap to play • Long press to queue',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 11,
                 ),
               ),
@@ -770,7 +770,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
             Text(
               'Queue by URI',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.3,
@@ -787,9 +787,9 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
                   decoration: InputDecoration(
                     hintText: 'spotify:track:xxxxxxxxxxxxxxxx',
                     hintStyle:
-                        TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                        TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -827,13 +827,13 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.gradientStart.withOpacity(0.40),
-                AppTheme.gradientEnd.withOpacity(0.40),
+                AppTheme.gradientStart.withValues(alpha: 0.40),
+                AppTheme.gradientEnd.withValues(alpha: 0.40),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -859,12 +859,12 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(50),
           color: highlight
-              ? AppTheme.gradientEnd.withOpacity(onTap != null ? 0.75 : 0.35)
-              : Colors.white.withOpacity(0.12),
+              ? AppTheme.gradientEnd.withValues(alpha: onTap != null ? 0.75 : 0.35)
+              : Colors.white.withValues(alpha: 0.12),
           boxShadow: highlight && onTap != null
               ? [
                   BoxShadow(
-                    color: AppTheme.gradientEnd.withOpacity(0.45),
+                    color: AppTheme.gradientEnd.withValues(alpha: 0.45),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),
@@ -905,7 +905,7 @@ class _SpotifyAPIplayerState extends State<SpotifyAPIplayer> {
         padding: EdgeInsets.all(large ? 14 : 10),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(large ? 0.15 : 0.08),
+          color: Colors.white.withValues(alpha: large ? 0.15 : 0.08),
         ),
         child: Icon(
           icon,
