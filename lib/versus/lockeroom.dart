@@ -233,14 +233,8 @@ class _LockeroomState extends State<Lockeroom> with TickerProviderStateMixin {
       if (!mounted) return;
 
       final uid  = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
-      final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
       unawaited(NotificationService.notifyFriendsNewVersus(
-        creatorUid:  uid,
-        creatorName: name,
-        versusId:    versusId,
-        versusType:  'album',
-        entityName1: album1.name,
-        entityName2: album2.name,
+        versusId: versusId,
       ));
 
       final versus = VersusModel(

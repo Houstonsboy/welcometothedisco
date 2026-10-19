@@ -178,7 +178,6 @@ class FirebaseService {
     await NotificationService.notifyFriendNewFollow(
       recipientUid: recipientUid,
       followerUid: followerUid,
-      followerName: follower.username,
     );
   }
 
@@ -863,8 +862,6 @@ class FirebaseService {
 
         await NotificationService.notifyFriendNewInvite(
           recipientUid: collaboratorUID.trim(),
-          senderUid: uid,
-          senderName: author?.username ?? '',
           versusId: versusID,
         );
       } catch (e) {
@@ -1731,8 +1728,6 @@ class FirebaseService {
 
     await NotificationService.notifyUsersMentionedInPost(
       recipientUids: recipientUids,
-      authorUid: authorUid,
-      authorName: authorName,
       postId: postId,
     );
   }

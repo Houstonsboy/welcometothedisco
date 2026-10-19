@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:welcometothedisco/notification/notification_service.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
@@ -48,15 +47,8 @@ class ArtistLockeroom extends StatelessWidget {
             '[ArtistLockeroom] createArtistVersus success | versus_id: '
             '${createdVersusId.trim().isEmpty ? '(missing)' : createdVersusId}',
           );
-          final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
-          final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
           unawaited(NotificationService.notifyFriendsNewVersus(
-            creatorUid:  uid,
-            creatorName: name,
-            versusId:    createdVersusId,
-            versusType:  'artist',
-            entityName1: artist1.name,
-            entityName2: artist2.name,
+            versusId: createdVersusId,
           ));
           if (context.mounted) Navigator.of(context).pop();
         } catch (e) {

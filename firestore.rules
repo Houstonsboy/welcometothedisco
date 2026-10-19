@@ -31,6 +31,13 @@ service cloud.firestore {
             || callerOwnsUsernameAfter(request.resource.data.get('username', null)));
       allow delete: if request.auth != null && request.auth.uid == userId;
 
+      // Owner-only data kept off the world-readable profile doc (FCM token at
+      // private/messaging). The sendFriendNotification function reads it via
+      // the Admin SDK.
+      match /private/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
       // Follow notifications subcollection
       // Doc ID = followerUID so one follower can only ever create one doc per recipient.
       match /notifications/{notifId} {
