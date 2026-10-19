@@ -97,11 +97,9 @@ See [spotify-api.md](./spotify-api.md) for full detail; key open items:
       beta sized to this cap, not around requesting more quota.
 - [ ] `spotify_api.dart` has no `429` / `Retry-After` handling — fine at current scale, worth adding
       before opening past the 25-user cap.
-- [ ] `functions/index.js`'s `exchangeSpotifyCode` callable appears to be dead code — the app's actual
-      auth flow (`spotify_auth.dart`) exchanges the PKCE code directly with Spotify, never calling this
-      function. Confirm that and either delete it or document why it's still deployed (it's also
-      unauthenticated and uninvolved-by-nobody-but-still-callable-by-anyone in its current form, which is
-      an unnecessary surface if it's genuinely unused).
+- [x] Dead `exchangeSpotifyCode` callable removed from `functions/index.js` (the app exchanges the PKCE
+      code directly with Spotify). Remove the deployed copy with
+      `firebase functions:delete exchangeSpotifyCode` and drop `SPOTIFY_CLIENT_SECRET` from `functions/.env`.
 - [ ] **Premium-required messaging was removed, not fixed, by the recent free-tier work.** Commits
       `f4cb90c` ("free spotify users can banjo") and `100b1c8` ("free spotify users can tango") deleted
       `lib/services/playback_gate.dart` (133 lines) and the `PlaybackResult.premiumRequired` /

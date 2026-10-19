@@ -12,7 +12,7 @@ Project: `jukebox-996de` (see `.firebaserc` / `firebase.json`).
 |---|---|---|
 | **Firebase Auth** | Email/password + Google Sign-In; the `_AuthGate` in `lib/main.dart` gates the whole app on `FirebaseAuth.instance.currentUser` | `lib/services/auth_service.dart`, `lib/authentication/` |
 | **Cloud Firestore** | All app data: `users`, `versus` (battles), `rankings`, `polls`, plus `users/{uid}/notifications` | `lib/services/firebase_service.dart`, `firestore.rules`, `firestore.indexes.json` |
-| **Cloud Functions (v2)** | `exchangeSpotifyCode` (Spotify token exchange — appears unused, see spotify-api.md §1) and `sendFriendNotification` (server-side FCM fan-out, called via `httpsCallable`) | `functions/index.js` |
+| **Cloud Functions (v2)** | `sendFriendNotification` (server-side FCM fan-out, called via `httpsCallable`) | `functions/index.js` |
 | **Firebase Cloud Messaging** | Push notifications for follows/invites; device tokens saved per-user on sign-in | `lib/notification/notification_service.dart` |
 
 There's no Crashlytics, Analytics, Performance Monitoring, Remote Config, or App Check in `pubspec.yaml`
@@ -32,7 +32,7 @@ correct" and more "is anything other than the real app able to call these at all
 Firebase's free **Spark** plan can *run* Cloud Functions locally in the emulator, but **cannot deploy
 them to production at all** — deploying any Cloud Function (1st or 2nd gen) requires the **Blaze**
 (pay-as-you-go) plan, because Functions need billing enabled to make any outbound network call (the
-`exchangeSpotifyCode`/`sendFriendNotification` functions both do: Spotify's token endpoint, FCM). If
+`sendFriendNotification` function does: FCM). If
 `npm run deploy` has ever succeeded against this project, Blaze is already active — if not, enabling it
 is step zero, before anything else here.
 (<https://firebase.google.com/docs/functions/version-comparison>,
