@@ -644,9 +644,8 @@ class _FirebaseHeader extends StatelessWidget {
                     false)
                 ? FirebaseAuth.instance.currentUser!.displayName!.trim()
                 : 'Profile';
-        final subtitle = (user?.email.trim().isNotEmpty ?? false)
-            ? user!.email.trim()
-            : (FirebaseAuth.instance.currentUser?.email ?? 'Logged in');
+        final subtitle =
+            FirebaseAuth.instance.currentUser?.email ?? 'Logged in';
         final assetPath = _assetPathFromAvatar(user?.avatarPath ?? '');
 
         return Padding(

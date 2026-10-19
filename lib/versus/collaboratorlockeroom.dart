@@ -2385,11 +2385,10 @@ class CollaboratorLockeroomGate extends StatelessWidget {
             ),
           );
         }
-        final name = user.username.trim().isNotEmpty
-            ? user.username.trim()
-            : user.email.trim().isNotEmpty
-                ? user.email.trim()
-                : 'user';
+        // Never fall back to the email: this name is written into the
+        // world-readable versus doc.
+        final name =
+            user.username.trim().isNotEmpty ? user.username.trim() : 'user';
         return CollaboratorLockeroom(
           authorUsername: name,
           authorAvatarPath: user.avatarPath,
@@ -2456,9 +2455,7 @@ class PostRemixLockeroom extends StatelessWidget {
         final user = snap.data;
         final username = (user?.username.trim().isNotEmpty == true)
             ? user!.username.trim()
-            : (user?.email.trim().isNotEmpty == true
-                ? user!.email.trim().split('@').first
-                : 'you');
+            : 'you';
         return PostRemixScreen(
           post: post,
           remixerUsername: username,

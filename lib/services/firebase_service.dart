@@ -1558,7 +1558,6 @@ class FirebaseService {
   /// Throws [UsernameTakenException] if [username] belongs to someone else.
   static Future<void> createUserProfile({
     required String uid,
-    required String email,
     required String username,
     required String avatarPath,
     String bio = '',
@@ -1568,7 +1567,6 @@ class FirebaseService {
       uid: uid,
       username: username.trim().toLowerCase(),
       data: {
-        'email': email,
         'bio': bio.trim(),
         'avatar_path': avatarPath,
         'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
@@ -1652,7 +1650,7 @@ class FirebaseService {
         ? profile!.username.trim()
         : (_auth.currentUser?.displayName?.trim().isNotEmpty ?? false
             ? _auth.currentUser!.displayName!.trim()
-            : (_auth.currentUser?.email?.split('@').first ?? 'User'));
+            : 'User');
     final authorAvatar = profile?.avatarPath.trim() ?? '';
 
     final recipients = mentionedUids

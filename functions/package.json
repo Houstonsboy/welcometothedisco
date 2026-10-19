@@ -7,7 +7,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "jest --testPathPatterns=test/"
+    "test": "jest --testPathPatterns=test/",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rules \"npx jest test/rules.test.js\""
   },
   "engines": {
     "node": "24"

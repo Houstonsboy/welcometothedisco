@@ -20,13 +20,18 @@ service cloud.firestore {
     // `username_search` is maintained by the onUserWritten Cloud Function only.
     // Setting or changing `username` must claim usernames/{username} in the same
     // transaction (see FirebaseService.createUserProfile / updateCurrentUserProfile).
+    // `email` must never be stored here — this doc is world-readable; Firebase
+    // Auth holds the email. Removing a legacy `email` field is still allowed.
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId
         && !('username_search' in request.resource.data)
+        && !('email' in request.resource.data)
         && callerOwnsUsernameAfter(request.resource.data.get('username', null));
       allow update: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['username_search'])
+        && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['email'])
+             && 'email' in request.resource.data)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['username'])
             || callerOwnsUsernameAfter(request.resource.data.get('username', null)));
       allow delete: if request.auth != null && request.auth.uid == userId;

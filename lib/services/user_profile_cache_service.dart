@@ -17,7 +17,6 @@ class UserProfileCacheService {
     final payload = <String, dynamic>{
       'id': user.id,
       'username': user.username,
-      'email': user.email,
       'bio': user.bio,
       'avatar_path': user.avatarPath,
       'friends': user.friends.map((f) => f.toMap()).toList(),
@@ -57,7 +56,6 @@ class UserProfileCacheService {
       return UserModel(
         id: id,
         username: (decoded['username'] as String?) ?? '',
-        email: (decoded['email'] as String?) ?? '',
         bio: (decoded['bio'] as String?) ?? '',
         avatarPath: (decoded['avatar_path'] as String?) ?? '',
         friends: friends,
