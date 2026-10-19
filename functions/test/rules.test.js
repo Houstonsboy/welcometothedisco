@@ -85,3 +85,174 @@ describeEmulator("users/{uid}: email must never be stored", () => {
     });
   });
 });
+
+const fieldValue = () => require("firebase/compat/app").default.firestore.FieldValue;
+const IMG = "https://i.scdn.co/image/ab67616d0000b273abcdef";
+
+describeEmulator("versus: authorship on create", () => {
+  test("album versus authored by the caller is allowed", async () => {
+    await assertSucceeds(asUser("alice").collection("versus").add(
+      { type: "album", status: "open", Author: "alice", album1ID: "a", album2ID: "b" }));
+  });
+
+  test("artist versus authored by the caller is allowed", async () => {
+    await assertSucceeds(asUser("alice").collection("versus").add(
+      { type: "artist", status: "open", authorID: "alice", artist1ID: "a" }));
+  });
+
+  test("versus attributed to someone else is rejected", async () => {
+    await assertFails(asUser("mallory").collection("versus").add(
+      { type: "album", status: "open", Author: "alice" }));
+    await assertFails(asUser("mallory").collection("versus").add(
+      { type: "artist", status: "open", authorID: "alice" }));
+  });
+
+  test("versus with no author is rejected", async () => {
+    await assertFails(asUser("mallory").collection("versus").add({ type: "album" }));
+  });
+
+  describe("post remix (author = source post's author)", () => {
+    beforeEach(() => seed("posts/p1", { authorID: "bob" }));
+    const remix = (over) => ({
+      type: "collaborator", status: "open", sourcePostID: "p1",
+      authorID: "bob", collaboratorID: "alice", ...over,
+    });
+
+    test("remixer may create it", async () => {
+      await assertSucceeds(asUser("alice").collection("versus").add(remix({})));
+    });
+
+    test("naming someone other than the post's author is rejected", async () => {
+      await assertFails(asUser("alice").collection("versus").add(remix({ authorID: "carol" })));
+    });
+
+    test("a missing source post is rejected", async () => {
+      await assertFails(asUser("alice").collection("versus").add(remix({ sourcePostID: "nope" })));
+    });
+
+    test("the caller must be the collaborator", async () => {
+      await assertFails(asUser("alice").collection("versus").add(remix({ collaboratorID: "carol" })));
+    });
+  });
+});
+
+describeEmulator("versus: updates by non-authors", () => {
+  beforeEach(() => seed("versus/v1", {
+    type: "album", status: "open", Author: "alice", album1ID: "a", album2ID: "b",
+    album1ImageUrl: IMG,
+  }));
+
+  test("changing type is rejected", async () => {
+    await assertFails(asUser("mallory").doc("versus/v1").update({ type: "artist" }));
+  });
+
+  test("filling an empty image with a Spotify URL is allowed", async () => {
+    await assertSucceeds(asUser("bob").doc("versus/v1").update({ album2ImageUrl: IMG }));
+  });
+
+  test("filling an empty image with a non-Spotify URL is rejected", async () => {
+    await assertFails(asUser("mallory").doc("versus/v1").update(
+      { album2ImageUrl: "https://evil.example/x.png" }));
+    await assertFails(asUser("mallory").doc("versus/v1").update(
+      { album2ImageUrl: "https://i.scdn.co.evil.example/image/x" }));
+  });
+
+  test("overwriting an existing image is rejected", async () => {
+    await assertFails(asUser("mallory").doc("versus/v1").update(
+      { album1ImageUrl: "https://i.scdn.co/image/other" }));
+  });
+
+  test("re-sending an unchanged image alongside a new one is allowed", async () => {
+    await assertSucceeds(asUser("bob").doc("versus/v1").update(
+      { album1ImageUrl: IMG, album2ImageUrl: IMG }));
+  });
+
+  test("the author can still edit their versus", async () => {
+    await assertSucceeds(asUser("alice").doc("versus/v1").update({ status: "closed" }));
+  });
+});
+
+describeEmulator("notifications", () => {
+  const follow = (over) => ({
+    type: "follow", read: false, followerID: "alice",
+    follower_username: "alice", follower_avatar: "", follower_bio: "", ...over,
+  });
+
+  test("follow keyed by the follower's uid is allowed", async () => {
+    await assertSucceeds(asUser("alice").doc("users/bob/notifications/alice").set(follow({})));
+  });
+
+  test("follow under any other doc ID is rejected (no spam)", async () => {
+    await assertFails(asUser("alice").doc("users/bob/notifications/x1").set(follow({})));
+  });
+
+  test("notifying yourself is rejected", async () => {
+    await assertFails(asUser("alice").doc("users/alice/notifications/alice").set(follow({})));
+  });
+
+  test("extra fields or pre-read notifications are rejected", async () => {
+    await assertFails(asUser("alice").doc("users/bob/notifications/alice")
+      .set(follow({ message: "click this link" })));
+    await assertFails(asUser("alice").doc("users/bob/notifications/alice")
+      .set(follow({ read: true })));
+  });
+
+  describe("invite", () => {
+    beforeEach(() => seed("versus/v1",
+      { type: "collaboration", status: "incomplete", authorID: "alice", collaboratorID: "bob" }));
+    const invite = { type: "invite", read: false, authorID: "alice", authorName: "alice",
+      author_avatar: "", versusID: "v1", artist1ID: "a", artist1Name: "A", artist2Name: "" };
+
+    test("author may invite the versus's collaborator", async () => {
+      await assertSucceeds(asUser("alice").collection("users/bob/notifications").add(invite));
+    });
+
+    test("inviting someone who isn't the collaborator is rejected", async () => {
+      await assertFails(asUser("alice").collection("users/carol/notifications").add(invite));
+    });
+
+    test("a non-author can't send an invite for the versus", async () => {
+      await assertFails(asUser("mallory").collection("users/bob/notifications")
+        .add({ ...invite, authorID: "mallory" }));
+    });
+
+    test("an invite for a missing versus is rejected", async () => {
+      await assertFails(asUser("alice").collection("users/bob/notifications")
+        .add({ ...invite, versusID: "nope" }));
+    });
+  });
+
+  describe("mention", () => {
+    beforeEach(() => seed("posts/p1", { authorID: "alice", mentionedUids: ["bob"] }));
+    const mention = { type: "mention", read: false, authorID: "alice", authorName: "alice",
+      author_avatar: "", postID: "p1" };
+
+    test("post author may notify a mentioned user", async () => {
+      await assertSucceeds(asUser("alice").collection("users/bob/notifications").add(mention));
+    });
+
+    test("notifying a user the post doesn't mention is rejected", async () => {
+      await assertFails(asUser("alice").collection("users/carol/notifications").add(mention));
+    });
+  });
+});
+
+describeEmulator("posts: counters", () => {
+  beforeEach(() => seed("posts/p1", { authorID: "alice", Remixcount: 3, Sharecount: 0 }));
+
+  test("anyone may bump Remixcount by one", async () => {
+    await assertSucceeds(asUser("bob").doc("posts/p1")
+      .update({ Remixcount: fieldValue().increment(1) }));
+  });
+
+  test("setting a counter to an arbitrary value is rejected", async () => {
+    await assertFails(asUser("bob").doc("posts/p1").update({ Remixcount: 9999 }));
+    await assertFails(asUser("bob").doc("posts/p1").update({ Sharecount: -5 }));
+  });
+
+  test("bumping a counter that was never set starts from zero", async () => {
+    await seed("posts/p2", { authorID: "alice" });
+    await assertSucceeds(asUser("bob").doc("posts/p2")
+      .update({ Sharecount: fieldValue().increment(1) }));
+  });
+});

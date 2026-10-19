@@ -373,31 +373,6 @@ class FirebaseService {
     return entries;
   }
 
-  /// One-time migration — adds type: "album" to all versus docs missing the field.
-  /// Call this once from a dev screen or admin button, then delete it.
-  /// Note: Firestore batch limit is 500; if you have more docs, run multiple times or chunk.
-  static Future<void> backfillVersusType() async {
-    final snapshot = await _firestore.collection('versus').get();
-
-    final batch = _firestore.batch();
-    int count = 0;
-
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      if (!data.containsKey('type')) {
-        batch.update(doc.reference, {'type': 'album'});
-        count++;
-      }
-    }
-
-    if (count > 0) {
-      await batch.commit();
-      debugPrint('[FirebaseService] backfillVersusType → updated $count docs');
-    } else {
-      debugPrint('[FirebaseService] backfillVersusType → nothing to update');
-    }
-  }
-
   // ── Lazy image backfill — write Spotify images back to old versus docs ───────
 
   /// Writes missing image/artist-name fields back into an album versus doc so
