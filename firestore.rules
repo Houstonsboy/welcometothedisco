@@ -371,7 +371,22 @@ service cloud.firestore {
           && voterId() == request.auth.uid
           && versusId() != ''
           && ownerDocIdMatches()
+          && exists(/databases/$(database)/documents/versus/$(versusId()))
           && validPollPairKey();
+      }
+
+      /// Which matchup a poll counts towards is fixed at creation: onPollWritten
+      /// validates it against the versus then, and reverses a deleted poll's
+      /// contribution using these same fields. (Older polls may lack a field;
+      /// filling it in is fine, changing it isn't.)
+      function fixedOnceSet(f) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([f])
+          || !(f in resource.data);
+      }
+
+      function identityUnchanged() {
+        return fixedOnceSet('entity1_id') && fixedOnceSet('entity2_id')
+          && fixedOnceSet('entity_type') && fixedOnceSet('pair_key');
       }
 
       function isOwnerUpdate() {
@@ -388,7 +403,7 @@ service cloud.firestore {
 
       allow read: if isAuthed();
       allow create: if isOwnerCreate();
-      allow update: if isOwnerUpdate() && validPollPairKey();
+      allow update: if isOwnerUpdate() && identityUnchanged() && validPollPairKey();
       allow delete: if false;
     }
 

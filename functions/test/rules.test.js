@@ -256,3 +256,45 @@ describeEmulator("posts: counters", () => {
       .update({ Sharecount: fieldValue().increment(1) }));
   });
 });
+
+describeEmulator("polls", () => {
+  const newPoll = (over = {}) => ({
+    versus_id: "v1", voter_id: "alice", entity_type: "artist",
+    entity1_id: "x1", entity2_id: "y1", pair_key: "x1_y1", track_details: [], ...over,
+  });
+
+  test("voting on an existing versus is allowed", async () => {
+    await seed("versus/v1", { type: "artist", authorID: "bob" });
+    await assertSucceeds(asUser("alice").doc("polls/v1_alice").set(newPoll()));
+  });
+
+  test("voting on a versus that doesn't exist is rejected", async () => {
+    await assertFails(asUser("alice").doc("polls/v1_alice").set(newPoll()));
+  });
+
+  describe("after voting", () => {
+    beforeEach(() => seed("polls/v1_alice", newPoll()));
+
+    test("changing the ballot is allowed", async () => {
+      await assertSucceeds(asUser("alice").doc("polls/v1_alice")
+        .update({ track_details: [{ round_number: 0, winner: "entity1" }] }));
+    });
+
+    test("re-sending the same identity fields is allowed", async () => {
+      await assertSucceeds(asUser("alice").doc("polls/v1_alice").update(
+        { entity_type: "artist", entity1_id: "x1", entity2_id: "y1", pair_key: "x1_y1" }));
+    });
+
+    test("switching the poll to other entities is rejected", async () => {
+      await assertFails(asUser("alice").doc("polls/v1_alice")
+        .update({ entity2_id: "z9", pair_key: "x1_z9" }));
+      await assertFails(asUser("alice").doc("polls/v1_alice").update({ entity_type: "album" }));
+    });
+  });
+
+  test("an older poll may fill in a missing identity field", async () => {
+    const { entity_type: _omit, ...legacy } = newPoll();
+    await seed("polls/v1_alice", legacy);
+    await assertSucceeds(asUser("alice").doc("polls/v1_alice").update({ entity_type: "artist" }));
+  });
+});

@@ -14,6 +14,8 @@ const {
   computeNewVoterState,
   computePairIncrements,
   isSelfMatchup,
+  resolveVersusSides,
+  sanitizeTrackDetails,
   computeBradleyTerry,
   computeEntityStats,
   computeRanks,
@@ -721,10 +723,6 @@ async function _handlePollUpsert(pollId, data) {
   const entity2Id       = (data.entity2_id  || "").trim();
   const voterId         = (data.voter_id    || "").trim();
   const versusId        = (data.versus_id   || "").trim();
-  const entityType      = (data.entity_type || "").trim();
-  const entity1Name     = (data.entity1_name || "").trim();
-  const entity2Name     = (data.entity2_name || "").trim();
-  const trackDetails    = Array.isArray(data.track_details) ? data.track_details : [];
 
   if (!entity1Id || !entity2Id || !voterId || !versusId) {
     logger.error("onPollWritten: missing required fields", { pollId, fields: Object.keys(data) });
@@ -736,6 +734,25 @@ async function _handlePollUpsert(pollId, data) {
     logger.info("onPollWritten: self-matchup — skipping pair updates", { pollId });
     return;
   }
+
+  // The voter wrote this poll doc, so none of its identity fields can be
+  // trusted: it must belong to a real two-sided versus and name that versus's
+  // entities side-for-side (a swap would flip the result). Names, type and the
+  // round cap come from the versus, never from the poll.
+  const versusSnap = await db.collection("versus").doc(versusId).get();
+  const sides = versusSnap.exists ? resolveVersusSides(versusSnap.data()) : null;
+  if (!sides) {
+    logger.warn("onPollWritten: versus missing or one-sided — poll ignored", { pollId, versusId });
+    return;
+  }
+  if (sides.entity1Id !== entity1Id || sides.entity2Id !== entity2Id) {
+    logger.warn("onPollWritten: poll entities don't match its versus — poll ignored", {
+      pollId, versusId, poll: [entity1Id, entity2Id], versus: [sides.entity1Id, sides.entity2Id],
+    });
+    return;
+  }
+  const { entityType, entity1Name, entity2Name } = sides;
+  const trackDetails = sanitizeTrackDetails(data.track_details, sides.maxPairedRounds);
 
   // Always derive pairKey from entity IDs — the stored pair_key is advisory only.
   const pairKey = makePairKey(entity1Id, entity2Id);
@@ -862,6 +879,9 @@ async function _handlePollUpsert(pollId, data) {
     roundsA: thisVersusNewRoundsA, roundsB: thisVersusNewRoundsB,
   });
 }
+
+// Exported for the emulator tests (plain functions are not deployed).
+exports._handlePollUpsert = _handlePollUpsert;
 
 // ── deleteAccount ─────────────────────────────────────────────────────────────
 // In-app account + data deletion (required by Google Play). Deletes everything
