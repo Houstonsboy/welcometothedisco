@@ -68,10 +68,19 @@ list with context; summarized + a few additions here:
       not something you can skip by being ready early.
 - [ ] Confirm the **Blaze plan** is active on the `jukebox-996de` Firebase project — Spark cannot deploy
       Cloud Functions at all, which would silently break `sendFriendNotification` in production.
-- [ ] App Check isn't wired up (`firebase_core`/`cloud_firestore` in `pubspec.yaml` have no
-      `firebase_app_check` alongside them) — not a store requirement, but it's the only thing standing
-      between "valid Firebase auth token" and "actually our app," and it would also close part of the
-      notification abuse gap above.
+- [ ] **App Check: wired up, not yet enforced.** The app activates App Check (Play Integrity /
+      App Attest; debug provider in debug builds) and `sendFriendNotification` can require it.
+      To turn it on:
+      1. Firebase console → App Check → register the Android app with **Play Integrity** (needs the
+         app's SHA-256 signing fingerprints, incl. Play App Signing) and the iOS app with
+         **App Attest** (needs your Apple Team ID).
+      2. Run a debug build once per test device, copy the debug token it logs, and add it under
+         App Check → Manage debug tokens.
+      3. Watch App Check → APIs → Cloud Firestore / Cloud Functions metrics until nearly all
+         requests show as verified (i.e. the released app is sending tokens).
+      4. Enforce: set `ENFORCE_APP_CHECK=true` in `functions/.env` and redeploy functions; click
+         **Enforce** for Cloud Firestore in the console. Old app builds without App Check stop
+         working at that point.
 - [x] `compileSdkVersion`/`targetSdkVersion` already at 36 — satisfies Play's Android 16 target
       requirement, nothing to do unless a future Flutter upgrade regresses it.
 - [ ] Adaptive icon isn't explicitly configured in `flutter_launcher_icons` (no

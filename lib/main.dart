@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -51,6 +53,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await _activateAppCheck();
   NotificationService.onNotificationTap = _handleNotificationTap;
   spotifyColdStartExchange = _handleSpotifyColdStartLink();
 
@@ -59,6 +62,27 @@ void main() async {
   // notification permission prompt waits on the user. Both run after this.
   runApp(const MyApp());
   unawaited(NotificationService.initialize());
+}
+
+/// App Check attaches a token proving requests come from this app (not a
+/// script holding a throwaway login) to Firestore and Cloud Functions calls.
+/// Activation only configures the provider; tokens are fetched lazily, so this
+/// doesn't block startup. Debug builds use the debug provider: on first run it
+/// logs a debug token that must be added in Firebase console → App Check →
+/// Manage debug tokens, or enforced backends will reject that device.
+Future<void> _activateAppCheck() async {
+  try {
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode
+          ? const AppleDebugProvider()
+          : const AppleAppAttestWithDeviceCheckFallbackProvider(),
+    );
+  } catch (e) {
+    debugPrint('[main] App Check activation failed: $e');
+  }
 }
 
 Future<void> _handleSpotifyColdStartLink() async {

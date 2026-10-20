@@ -33,6 +33,19 @@ const db = admin.firestore();
 
 setGlobalOptions({ maxInstances: 10 });
 
+// ── App Check ─────────────────────────────────────────────────────────────────
+// With ENFORCE_APP_CHECK=true in functions/.env, guarded callables reject calls
+// that carry no valid App Check token, i.e. that don't come from the real app
+// (a script holding a throwaway account, say). Off by default: turn it on only
+// once Firebase console → App Check shows the app's real traffic as verified,
+// or legitimate users (and debug builds without a registered debug token) are
+// locked out.
+function requireAppCheck(request) {
+  if (process.env.ENFORCE_APP_CHECK === "true" && !request.app) {
+    throw new HttpsError("failed-precondition", "Request must come from the app.");
+  }
+}
+
 // ── sendFriendNotification ────────────────────────────────────────────────────
 // The client names an event it just caused; this function checks the caller
 // really caused it, picks the recipients, and writes the text itself. Tokens
@@ -65,6 +78,7 @@ exports.sendFriendNotification = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in.");
   }
+  requireAppCheck(request);
   const senderUid = request.auth.uid;
   const { type, id, recipientUid, recipientUids } = request.data || {};
   if (typeof type !== "string" || typeof id !== "string" || !id) {
@@ -889,6 +903,9 @@ exports._handlePollUpsert = _handlePollUpsert;
 // the Auth user. Poll deletes go through onPollWritten, which reverses their
 // pair/voter contributions; deleting the users doc lets onUserWritten release
 // the username claim.
+// Deliberately not App Check–guarded: it only ever acts on the caller's own
+// account, and deletion must keep working (Play requires it) even on a device
+// that can't pass attestation.
 exports.deleteAccount = onCall({ timeoutSeconds: 540 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in.");

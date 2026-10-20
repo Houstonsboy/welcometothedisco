@@ -15,10 +15,9 @@ Project: `jukebox-996de` (see `.firebaserc` / `firebase.json`).
 | **Cloud Functions (v2)** | `sendFriendNotification` (server-side FCM fan-out, called via `httpsCallable`) | `functions/index.js` |
 | **Firebase Cloud Messaging** | Push notifications for follows/invites; device tokens saved per-user on sign-in | `lib/notification/notification_service.dart` |
 
-There's no Crashlytics, Analytics, Performance Monitoring, Remote Config, or App Check in `pubspec.yaml`
-today — not required to ship, but see §3 for why App Check in particular is worth adding before a
-public launch (Firestore rules currently only check `request.auth`, i.e. "is this a real Firebase user
-token," not "is this request coming from our actual app").
+There's no Crashlytics, Analytics, Performance Monitoring, or Remote Config in `pubspec.yaml`. App Check
+is wired up but not yet enforced (see §3): until it is, Firestore rules only check `request.auth`, i.e.
+"is this a real Firebase user token," not "is this request coming from our actual app".
 
 ### Firestore access model
 `firestore.rules` is already reasonably tight: users can only write their own profile doc, `versus`
@@ -101,11 +100,8 @@ These are specific to what's currently checked in, not generic advice:
       accounts to run a **closed testing track with at least 20 testers for 14 continuous days** before
       being allowed to publish to production — factor that lead time into a launch plan, it's not
       optional paperwork, it gates the production listing from appearing at all.
-- [ ] **App Check** isn't wired up. Not a store requirement, but worth doing alongside the above: it's
-      the mechanism that would stop something other than this exact app build from calling Firestore
-      directly with a stolen/valid-looking auth token — currently the rules only ask "is this a real
-      signed-in user," not "is this request from our app."
-      (<https://firebase.google.com/docs/app-check>)
+- [ ] **App Check** is wired up but not enforced yet — rollout steps in
+      [launch-checklist.md](./launch-checklist.md) (<https://firebase.google.com/docs/app-check>).
 - [ ] Confirm the **Blaze plan** is actually active (§1) — functions silently fail to deploy without it,
       which would currently break `sendFriendNotification` (follow/invite push notifications) in
       production.
