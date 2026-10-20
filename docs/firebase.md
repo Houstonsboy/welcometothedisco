@@ -56,13 +56,9 @@ These are specific to what's currently checked in, not generic advice:
       test track, but it's wrong for anything meant to go out broadly — set up a real upload keystore
       (or enroll in Play App Signing, which Google now does by default for new apps) before a
       production release. This also matters for Google Sign-In (next point).
-- [ ] **`applicationId` / iOS bundle ID are both still the Flutter template default**
-      (`com.example.welcometothedisco` in `android/app/build.gradle` *and*
-      `ios/Runner.xcodeproj/project.pbxproj`). Neither store will let you publish under `com.example.*`
-      long-term, and changing it means regenerating `google-services.json` (Android) and adding a
-      `GoogleService-Info.plist` (iOS, see next point) for the *new* ID — do this rename early, it
-      touches both platforms and Firebase config together.
-- [ ] **No `GoogleService-Info.plist` for iOS.** `android/app/google-services.json` exists and is
+- [x] **App ID / bundle ID renamed** to `com.jukebox.welcometothedisco` on both platforms, with
+      regenerated `google-services.json`, `firebase_options.dart` and `GoogleService-Info.plist`.
+- [x] ~~**No `GoogleService-Info.plist` for iOS.**~~ Added with the bundle ID rename. `android/app/google-services.json` exists and is
       committed, but there's no iOS equivalent anywhere in `ios/`. Without it, `Firebase.initializeApp()`
       won't have valid iOS config and auth/Firestore/FCM won't work on a release iOS build. Generate it
       from the Firebase console (or `flutterfire configure`) for the *final* bundle ID once that's

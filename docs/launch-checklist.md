@@ -50,9 +50,9 @@ list with context; summarized + a few additions here:
 
 - [ ] Release signing: `android/app/build.gradle` still has `release { signingConfig =
       signingConfigs.debug }` — no real upload keystore / `key.properties` found in the repo.
-- [ ] `applicationId` is still the Flutter template default, `com.example.welcometothedisco`
-      (`android/app/build.gradle`) — rename before publishing, which also means regenerating
-      `google-services.json`.
+- [x] `applicationId` renamed to `com.jukebox.welcometothedisco`, with a regenerated
+      `google-services.json`. Add the release and Play App Signing SHA-1/256 to that Firebase app
+      once they exist.
 - [ ] Google Sign-In needs the **release** SHA-1/SHA-256 fingerprint registered in Firebase (debug
       fingerprint is presumably already there; production build will `DEVELOPER_ERROR` without it).
 - [ ] **No in-app account deletion flow** (grepped `lib/` — nothing). Google Play policy requires apps
@@ -82,7 +82,9 @@ list with context; summarized + a few additions here:
 
 - [ ] No `GoogleService-Info.plist` — Firebase won't initialize correctly on iOS without it.
 - [ ] No Push Notifications entitlement / `.entitlements` file (see §1).
-- [ ] Bundle ID is still `com.example.welcometothedisco` in `ios/Runner.xcodeproj/project.pbxproj`.
+- [x] Bundle ID renamed to `com.jukebox.welcometothedisco` (new `GoogleService-Info.plist` and Google
+      Sign-In client in `Info.plist`). Still needed: an App ID with Push Notifications in the Apple
+      developer portal for this bundle ID.
 - [ ] **Sign in with Apple is required** (App Store Guideline 4.8) because the app offers Google Sign-In
       as an account option — there's no Apple Sign-In code anywhere in `lib/authentication/` or
       `auth_service.dart` today. This is close to certain to be an App Review rejection reason without it.

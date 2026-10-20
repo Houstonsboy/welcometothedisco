@@ -53,24 +53,23 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCl-6ccJAA5vVIt2Yq190OmUDzWpo3lEKU',
-    appId: '1:941925661587:android:c28151ca996d3c8d7ac666',
+    appId: '1:941925661587:android:85e9b8ad71a56c357ac666',
     messagingSenderId: '941925661587',
     projectId: 'jukebox-996de',
     databaseURL: 'https://jukebox-996de-default-rtdb.firebaseio.com',
     storageBucket: 'jukebox-996de.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBpGgk5YiFAQ0VO38WjlcgWhQJ-km-5fnA',
-    appId: '1:941925661587:ios:1bfb082ceee00f0c7ac666',
+    appId: '1:941925661587:ios:f16152763c571a7a7ac666',
     messagingSenderId: '941925661587',
     projectId: 'jukebox-996de',
     databaseURL: 'https://jukebox-996de-default-rtdb.firebaseio.com',
     storageBucket: 'jukebox-996de.firebasestorage.app',
-    iosClientId: '941925661587-5nr9m7ke9jjrhoci5tu5f6gmj8aj0pnr.apps.googleusercontent.com',
-    iosBundleId: 'com.example.welcometothedisco',
+    androidClientId: '941925661587-1gndft15jmlnnuau01nmubkpa7apba45.apps.googleusercontent.com',
+    iosClientId: '941925661587-7rd82bpchvhsncikcnro1pf0jvqfh3bt.apps.googleusercontent.com',
+    iosBundleId: 'com.jukebox.welcometothedisco',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyBpGgk5YiFAQ0VO38WjlcgWhQJ-km-5fnA',
     appId: '1:941925661587:ios:1bfb082ceee00f0c7ac666',
