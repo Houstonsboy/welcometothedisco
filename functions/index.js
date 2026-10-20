@@ -4,7 +4,6 @@ const { HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
-const axios = require("axios");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 const {
@@ -15,6 +14,8 @@ const {
   computeNewVoterState,
   computePairIncrements,
   isSelfMatchup,
+  resolveVersusSides,
+  sanitizeTrackDetails,
   computeBradleyTerry,
   computeEntityStats,
   computeRanks,
@@ -32,68 +33,145 @@ const db = admin.firestore();
 
 setGlobalOptions({ maxInstances: 10 });
 
-exports.exchangeSpotifyCode = onCall(async (request) => {
-  const code = request.data.code;
-
-  if (!code) {
-    throw new Error("Auth code is required");
+// ── App Check ─────────────────────────────────────────────────────────────────
+// With ENFORCE_APP_CHECK=true in functions/.env, guarded callables reject calls
+// that carry no valid App Check token, i.e. that don't come from the real app
+// (a script holding a throwaway account, say). Off by default: turn it on only
+// once Firebase console → App Check shows the app's real traffic as verified,
+// or legitimate users (and debug builds without a registered debug token) are
+// locked out.
+function requireAppCheck(request) {
+  if (process.env.ENFORCE_APP_CHECK === "true" && !request.app) {
+    throw new HttpsError("failed-precondition", "Request must come from the app.");
   }
+}
 
-  const clientId     = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  const redirectUri  = process.env.SPOTIFY_REDIRECT_URI;
+// ── sendFriendNotification ────────────────────────────────────────────────────
+// The client names an event it just caused; this function checks the caller
+// really caused it, picks the recipients, and writes the text itself. Tokens
+// live in users/{uid}/private/messaging (owner-only in firestore.rules), so a
+// client can never target arbitrary devices or send arbitrary text.
+const TOKEN_DOC = "messaging";
 
-  logger.info("Exchanging Spotify auth code for tokens");
+function friendUids(userData) {
+  const raw = Array.isArray(userData?.friends) ? userData.friends : [];
+  return raw
+    .map((e) => (typeof e === "string" ? e : e?.uid))
+    .filter((u) => typeof u === "string" && u);
+}
 
-  const response = await axios.post(
-    "https://accounts.spotify.com/api/token",
-    new URLSearchParams({
-      grant_type:    "authorization_code",
-      code:           code,
-      redirect_uri:   redirectUri,
-      client_id:      clientId,
-      client_secret:  clientSecret,
-    }),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
+function versusAuthor(v) {
+  return v.authorID || v.Author || "";
+}
 
-  return {
-    accessToken:  response.data.access_token,
-    refreshToken: response.data.refresh_token,
-    expiresIn:    response.data.expires_in,
-  };
-});
+async function loadTokens(uids) {
+  const refs = uids.map((u) =>
+    db.collection("users").doc(u).collection("private").doc(TOKEN_DOC));
+  if (refs.length === 0) return [];
+  const snaps = await db.getAll(...refs);
+  return snaps
+    .map((s, i) => ({ uid: uids[i], token: s.exists ? s.get("fcm_token") : null }))
+    .filter((t) => typeof t.token === "string" && t.token);
+}
 
 exports.sendFriendNotification = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in.");
   }
+  requireAppCheck(request);
+  const senderUid = request.auth.uid;
+  const { type, id, recipientUid, recipientUids } = request.data || {};
+  if (typeof type !== "string" || typeof id !== "string" || !id) {
+    throw new HttpsError("invalid-argument", "type and id are required.");
+  }
 
-  const { tokens, title, body, data } = request.data;
+  const senderSnap = await db.collection("users").doc(senderUid).get();
+  if (!senderSnap.exists) {
+    throw new HttpsError("failed-precondition", "Sender profile missing.");
+  }
+  const sender = senderSnap.data();
+  const senderName = (sender.username || "Someone").toString();
+  const notInvolved = () =>
+    new HttpsError("permission-denied", "Not allowed to notify these users.");
 
-  if (!Array.isArray(tokens) || tokens.length === 0) {
-    throw new HttpsError("invalid-argument", "tokens must be a non-empty array.");
+  let recipients;
+  let title;
+  let body;
+  const data = { type, id };
+
+  switch (type) {
+    case "follow": {
+      // id = follower (the caller); recipient must be someone they follow.
+      if (id !== senderUid || !friendUids(sender).includes(recipientUid)) {
+        throw notInvolved();
+      }
+      recipients = [recipientUid];
+      title = `${senderName} followed you`;
+      body = "Check out their profile";
+      break;
+    }
+    case "invite": {
+      const v = await db.collection("versus").doc(id).get();
+      if (!v.exists || versusAuthor(v.data()) !== senderUid ||
+          v.get("collaboratorID") !== recipientUid) {
+        throw notInvolved();
+      }
+      recipients = [recipientUid];
+      title = `${senderName} invited you to a versus`;
+      body = "Join the battle";
+      break;
+    }
+    case "mention": {
+      const p = await db.collection("posts").doc(id).get();
+      const mentioned = p.exists ? (p.get("mentionedUids") || []) : [];
+      if (!p.exists || p.get("authorID") !== senderUid) throw notInvolved();
+      const wanted = Array.isArray(recipientUids) ? recipientUids : [];
+      recipients = wanted.filter((u) => mentioned.includes(u));
+      title = `${senderName} mentioned you in a post`;
+      body = "Tap to view the post";
+      break;
+    }
+    case "post": {
+      const p = await db.collection("posts").doc(id).get();
+      if (!p.exists || p.get("authorID") !== senderUid) throw notInvolved();
+      recipients = friendUids(sender);
+      title = `${senderName} posted`;
+      body = "Check out their latest post";
+      break;
+    }
+    case "versus": {
+      const v = await db.collection("versus").doc(id).get();
+      if (!v.exists || versusAuthor(v.data()) !== senderUid) throw notInvolved();
+      const vd = v.data();
+      const isArtist = vd.type === "artist";
+      const name1 = (isArtist ? vd.artist1Name : vd.album1Name) || "?";
+      const name2 = (isArtist ? vd.artist2Name : vd.album2Name) || "?";
+      recipients = friendUids(sender);
+      title = `${senderName} started a versus`;
+      body = `${name1} vs ${name2}`;
+      data.versusType = vd.type || "album";
+      break;
+    }
+    default:
+      throw new HttpsError("invalid-argument", `Unknown type: ${type}`);
   }
-  if (typeof title !== "string" || !title.trim()) {
-    throw new HttpsError("invalid-argument", "title is required.");
-  }
-  if (typeof body !== "string" || !body.trim()) {
-    throw new HttpsError("invalid-argument", "body is required.");
-  }
+
+  recipients = [...new Set(recipients)].filter((u) => u && u !== senderUid);
+  const targets = await loadTokens(recipients);
 
   const BATCH = 500;
   let successCount = 0;
   let failureCount = 0;
 
-  for (let i = 0; i < tokens.length; i += BATCH) {
-    const chunk = tokens.slice(i, i + BATCH);
+  for (let i = 0; i < targets.length; i += BATCH) {
+    const chunk = targets.slice(i, i + BATCH);
     const message = {
-      tokens: chunk,
+      tokens: chunk.map((t) => t.token),
       notification: { title, body },
-      data: data && typeof data === "object" ? data : {},
+      data,
       android: {
         priority: "high",
-        notification: { sound: "default" },
+        notification: { sound: "default", channelId: "high_importance_channel" },
       },
       apns: {
         payload: { aps: { sound: "default" } },
@@ -104,17 +182,27 @@ exports.sendFriendNotification = onCall(async (request) => {
     successCount += result.successCount;
     failureCount += result.failureCount;
 
+    const stale = [];
     result.responses.forEach((resp, idx) => {
-      if (!resp.success) {
-        logger.warn("FCM send failed", {
-          token: chunk[idx].slice(0, 12) + "…",
-          error: resp.error?.code,
-        });
+      if (resp.success) return;
+      const code = resp.error?.code;
+      logger.warn("FCM send failed", { uid: chunk[idx].uid, error: code });
+      if (code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token") {
+        stale.push(chunk[idx]);
       }
     });
+    // Drop dead tokens, unless the device has re-registered a new one meanwhile.
+    await Promise.all(stale.map(async ({ uid, token }) => {
+      const ref = db.collection("users").doc(uid).collection("private").doc(TOKEN_DOC);
+      await db.runTransaction(async (tx) => {
+        const cur = await tx.get(ref);
+        if (cur.exists && cur.get("fcm_token") === token) tx.delete(ref);
+      });
+    }));
   }
 
-  logger.info("sendFriendNotification done", { successCount, failureCount });
+  logger.info("sendFriendNotification done", { type, successCount, failureCount });
   return { successCount, failureCount };
 });
 
@@ -649,10 +737,6 @@ async function _handlePollUpsert(pollId, data) {
   const entity2Id       = (data.entity2_id  || "").trim();
   const voterId         = (data.voter_id    || "").trim();
   const versusId        = (data.versus_id   || "").trim();
-  const entityType      = (data.entity_type || "").trim();
-  const entity1Name     = (data.entity1_name || "").trim();
-  const entity2Name     = (data.entity2_name || "").trim();
-  const trackDetails    = Array.isArray(data.track_details) ? data.track_details : [];
 
   if (!entity1Id || !entity2Id || !voterId || !versusId) {
     logger.error("onPollWritten: missing required fields", { pollId, fields: Object.keys(data) });
@@ -664,6 +748,25 @@ async function _handlePollUpsert(pollId, data) {
     logger.info("onPollWritten: self-matchup — skipping pair updates", { pollId });
     return;
   }
+
+  // The voter wrote this poll doc, so none of its identity fields can be
+  // trusted: it must belong to a real two-sided versus and name that versus's
+  // entities side-for-side (a swap would flip the result). Names, type and the
+  // round cap come from the versus, never from the poll.
+  const versusSnap = await db.collection("versus").doc(versusId).get();
+  const sides = versusSnap.exists ? resolveVersusSides(versusSnap.data()) : null;
+  if (!sides) {
+    logger.warn("onPollWritten: versus missing or one-sided — poll ignored", { pollId, versusId });
+    return;
+  }
+  if (sides.entity1Id !== entity1Id || sides.entity2Id !== entity2Id) {
+    logger.warn("onPollWritten: poll entities don't match its versus — poll ignored", {
+      pollId, versusId, poll: [entity1Id, entity2Id], versus: [sides.entity1Id, sides.entity2Id],
+    });
+    return;
+  }
+  const { entityType, entity1Name, entity2Name } = sides;
+  const trackDetails = sanitizeTrackDetails(data.track_details, sides.maxPairedRounds);
 
   // Always derive pairKey from entity IDs — the stored pair_key is advisory only.
   const pairKey = makePairKey(entity1Id, entity2Id);
@@ -790,3 +893,87 @@ async function _handlePollUpsert(pollId, data) {
     roundsA: thisVersusNewRoundsA, roundsB: thisVersusNewRoundsB,
   });
 }
+
+// Exported for the emulator tests (plain functions are not deployed).
+exports._handlePollUpsert = _handlePollUpsert;
+
+// ── deleteAccount ─────────────────────────────────────────────────────────────
+// In-app account + data deletion (required by Google Play). Deletes everything
+// the caller owns, scrubs their identity from other users' docs, then deletes
+// the Auth user. Poll deletes go through onPollWritten, which reverses their
+// pair/voter contributions; deleting the users doc lets onUserWritten release
+// the username claim.
+// Deliberately not App Check–guarded: it only ever acts on the caller's own
+// account, and deletion must keep working (Play requires it) even on a device
+// that can't pass attestation.
+exports.deleteAccount = onCall({ timeoutSeconds: 540 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in.");
+  }
+  const uid = request.auth.uid;
+  const writer = db.bulkWriter();
+  const deleteAll = (snap) => snap.docs.forEach((d) => writer.delete(d.ref));
+
+  // Versus the user authored (either author field), plus every vote on them.
+  const [byAuthorId, byAuthor] = await Promise.all([
+    db.collection("versus").where("authorID", "==", uid).get(),
+    db.collection("versus").where("Author", "==", uid).get(),
+  ]);
+  const authored = [...byAuthorId.docs, ...byAuthor.docs];
+  const authoredIds = [...new Set(authored.map((d) => d.id))];
+  for (let i = 0; i < authoredIds.length; i += 30) {
+    deleteAll(await db.collection("polls")
+      .where("versus_id", "in", authoredIds.slice(i, i + 30)).get());
+  }
+  authored.forEach((d) => writer.delete(d.ref));
+
+  // The user's own votes, posts and analytics events.
+  deleteAll(await db.collection("polls").where("voter_id", "==", uid).get());
+  deleteAll(await db.collection("posts").where("authorID", "==", uid).get());
+  deleteAll(await db.collection("playback_gate_events").where("uid", "==", uid).get());
+
+  // Battles they joined as collaborator stay (other people voted on them),
+  // but lose the user's identity.
+  const joined = await db.collection("versus").where("collaboratorID", "==", uid).get();
+  joined.docs.forEach((d) => writer.update(d.ref, {
+    collaboratorID: FieldValue.delete(),
+    collaborator_username: FieldValue.delete(),
+    collaborator_avatar: FieldValue.delete(),
+    collaboratorComment: FieldValue.delete(),
+  }));
+
+  // Notifications they sent into other users' inboxes.
+  const [follows, others] = await Promise.all([
+    db.collectionGroup("notifications").where("followerID", "==", uid).get(),
+    db.collectionGroup("notifications").where("authorID", "==", uid).get(),
+  ]);
+  deleteAll(follows);
+  deleteAll(others);
+
+  // Remove them from other users' friends lists. Entries are {uid, username,
+  // avatar_path} maps, so array-contains can't find them — scan in pages.
+  let last = null;
+  for (;;) {
+    let q = db.collection("users").select("friends")
+      .orderBy(admin.firestore.FieldPath.documentId()).limit(500);
+    if (last) q = q.startAfter(last);
+    const page = await q.get();
+    if (page.empty) break;
+    for (const d of page.docs) {
+      const friends = d.get("friends");
+      if (!Array.isArray(friends) || d.id === uid) continue;
+      const kept = friends.filter((e) => (typeof e === "string" ? e : e?.uid) !== uid);
+      if (kept.length !== friends.length) writer.update(d.ref, { friends: kept });
+    }
+    last = page.docs[page.docs.length - 1];
+  }
+
+  await writer.close();
+
+  // Profile doc and its subcollections (notifications, private token).
+  await db.recursiveDelete(db.collection("users").doc(uid));
+  await admin.auth().deleteUser(uid);
+
+  logger.info("deleteAccount done", { uid, versus: authoredIds.length });
+  return { ok: true };
+});

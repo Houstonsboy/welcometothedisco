@@ -37,28 +37,15 @@ class NotificationService {
   static void Function(Map<String, dynamic> data)? onNotificationTap;
 
   // ── Initialise ────────────────────────────────────────────────────────────
-  /// Call once from main() after Firebase.initializeApp().
-  /// Requests permission, saves the device token, and wires message handlers.
+  /// Call once from main() right after runApp(); never await it there.
+  /// Wires message handlers only. The permission prompt and token save happen
+  /// in [requestPermissionAndSaveToken] once a signed-in user is on screen,
+  /// and AuthGate saves the token / starts badge sync on every sign-in.
   static Future<void> initialize() async {
     // Register the background handler before anything else.
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
 
     await _initLocalNotifications();
-
-    // Request permission (iOS prompts the user; Android 13+ also needs this).
-    final settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    debugPrint('[FCM] permission: ${settings.authorizationStatus}');
-
-    // Persist token for the current user if already signed in.
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      await saveTokenForUser(uid);
-      startBadgeSync();
-    }
 
     // Refresh token whenever FCM rotates it.
     _fcm.onTokenRefresh.listen((token) async {
@@ -150,30 +137,78 @@ class NotificationService {
   }
 
   // ── Token management ──────────────────────────────────────────────────────
-  /// Fetch the current device token and save it to Firestore.
-  /// Call after sign-in and after sign-up.
-  static Future<void> saveTokenForUser(String uid) async {
-    final token = await _fcm.getToken();
-    if (token == null || uid.isEmpty) return;
-    await _storeToken(uid, token);
+  /// Asks for notification permission (the OS only shows its prompt once;
+  /// later calls just return the current status), then saves the device
+  /// token — on iOS no usable token exists until the user allows
+  /// notifications. Call when a signed-in user is on screen, never at startup.
+  static Future<void> requestPermissionAndSaveToken() async {
+    try {
+      final settings = await _fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('[FCM] permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('[FCM] permission request failed: $e');
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) await saveTokenForUser(uid);
   }
 
+  /// Fetch the current device token and save it to Firestore.
+  /// Call after sign-in and after sign-up. Never throws, and callers should
+  /// not await it on a user-visible path: the Firestore write only completes
+  /// on server ack, so offline it stays pending.
+  static Future<void> saveTokenForUser(String uid) async {
+    try {
+      final token = await _fcm.getToken();
+      if (token == null || uid.isEmpty) return;
+      await _storeToken(uid, token);
+    } catch (e) {
+      debugPrint('[FCM] failed to save token for $uid: $e');
+    }
+  }
+
+  // Tokens live in an owner-only subcollection (see firestore.rules) so other
+  // users can't read them off the public profile doc.
+  static DocumentReference<Map<String, dynamic>> _tokenDoc(String uid) =>
+      _db.collection('users').doc(uid).collection('private').doc('messaging');
+
   static Future<void> _storeToken(String uid, String token) async {
-    await _db.collection('users').doc(uid).set(
-      {'fcm_token': token},
-      SetOptions(merge: true),
-    );
+    await _tokenDoc(uid).set({
+      'fcm_token': token,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+    // Remove the legacy world-readable copy from the profile doc, if any.
+    await _db
+        .collection('users')
+        .doc(uid)
+        .update({'fcm_token': FieldValue.delete()})
+        .catchError((_) {});
     debugPrint('[FCM] token saved for $uid');
   }
 
   /// Clear the token on sign-out so the user stops receiving notifications
   /// on this device.
+  ///
+  /// Best effort and bounded: offline, the Firestore delete would never
+  /// complete and sign-out would hang. If it doesn't finish, this device may
+  /// keep getting the previous user's pushes until the next sign-in here
+  /// overwrites the token, or FCM reports it unregistered and
+  /// sendFriendNotification prunes it.
   static Future<void> clearTokenForUser(String uid) async {
     if (uid.isEmpty) return;
-    await _db.collection('users').doc(uid).update({'fcm_token': FieldValue.delete()});
-    await _fcm.deleteToken();
     stopBadgeSync();
-    debugPrint('[FCM] token cleared for $uid');
+    try {
+      await Future.wait([
+        _tokenDoc(uid).delete(),
+        _fcm.deleteToken(),
+      ]).timeout(const Duration(seconds: 4));
+      debugPrint('[FCM] token cleared for $uid');
+    } catch (e) {
+      debugPrint('[FCM] token clear incomplete for $uid: $e');
+    }
   }
 
   // ── OS app-icon badge ─────────────────────────────────────────────────────
@@ -214,192 +249,66 @@ class NotificationService {
     }
   }
 
-  // ── Friend token lookup ───────────────────────────────────────────────────
-  /// Returns the FCM tokens of all friends of [uid] who have one stored.
-  static Future<List<String>> _getFriendTokens(String uid) async {
-    final userDoc = await _db.collection('users').doc(uid).get();
-    if (!userDoc.exists) return [];
-
-    final rawFriends = userDoc.data()?['friends'] as List<dynamic>? ?? [];
-    final friendUids = rawFriends
-        .map((e) {
-          if (e is Map) return e['uid'] as String?;
-          if (e is String) return e;
-          return null;
-        })
-        .whereType<String>()
-        .where((id) => id.isNotEmpty)
-        .toList();
-
-    return _getTokensForUids(friendUids);
-  }
-
-  // Returns the stored FCM tokens for an arbitrary list of uids (batched to
-  // respect Firestore's 30-value whereIn limit).
-  static Future<List<String>> _getTokensForUids(List<String> uids) async {
-    if (uids.isEmpty) return [];
-
-    final tokens = <String>[];
-    for (int i = 0; i < uids.length; i += 30) {
-      final batch = uids.sublist(i, (i + 30).clamp(0, uids.length));
-      final snap = await _db
-          .collection('users')
-          .where(FieldPath.documentId, whereIn: batch)
-          .get();
-      for (final doc in snap.docs) {
-        final token = doc.data()['fcm_token'] as String?;
-        if (token != null && token.isNotEmpty) tokens.add(token);
-      }
-    }
-    return tokens;
-  }
-
-  // Returns the FCM token stored on a single user's doc, if any.
-  static Future<String?> _getUserToken(String uid) async {
-    final doc = await _db.collection('users').doc(uid).get();
-    final token = doc.data()?['fcm_token'] as String?;
-    return (token != null && token.isNotEmpty) ? token : null;
-  }
-
   // ── Notification triggers ─────────────────────────────────────────────────
-  // These methods collect friend tokens and hand off to your Cloud Function.
-  // Replace the TODO body with your actual sending logic once you set it up.
+  // Each call names an event the current user just caused. The
+  // sendFriendNotification Cloud Function verifies it, picks the recipients,
+  // looks up their tokens and writes the notification text server-side.
 
   /// Call this right after FirebaseService._sendFollowNotification() writes
   /// the inbox doc, to also push to the followed user's device.
   static Future<void> notifyFriendNewFollow({
     required String recipientUid,
     required String followerUid,
-    required String followerName,
-  }) async {
-    final token = await _getUserToken(recipientUid);
-    if (token == null) return;
-
-    await _callSendFunction(
-      tokens: [token],
-      title: '$followerName followed you',
-      body: 'Check out their profile',
-      data: {'type': 'follow', 'id': followerUid},
-    );
-  }
+  }) =>
+      _callSendFunction({
+        'type': 'follow',
+        'id': followerUid,
+        'recipientUid': recipientUid,
+      });
 
   /// Call this right after FirebaseService.createCollaborationInvite() writes
   /// the inbox doc, to also push to the invited collaborator's device.
   static Future<void> notifyFriendNewInvite({
     required String recipientUid,
-    required String senderUid,
-    required String senderName,
     required String versusId,
-  }) async {
-    final token = await _getUserToken(recipientUid);
-    if (token == null) return;
-
-    await _callSendFunction(
-      tokens: [token],
-      title: '$senderName invited you to a versus',
-      body: 'Join the battle',
-      data: {'type': 'invite', 'id': versusId},
-    );
-  }
+  }) =>
+      _callSendFunction({
+        'type': 'invite',
+        'id': versusId,
+        'recipientUid': recipientUid,
+      });
 
   /// Call this right after FirebaseService._sendMentionNotifications() writes
   /// the inbox docs, to also push to each tagged friend's device.
   static Future<void> notifyUsersMentionedInPost({
     required List<String> recipientUids,
-    required String authorUid,
-    required String authorName,
     required String postId,
   }) async {
-    final uids = recipientUids
-        .where((u) => u.isNotEmpty && u != authorUid)
-        .toSet()
-        .toList();
+    final uids = recipientUids.where((u) => u.isNotEmpty).toSet().toList();
     if (uids.isEmpty) return;
-
-    final tokens = await _getTokensForUids(uids);
-    if (tokens.isEmpty) return;
-
-    await _callSendFunction(
-      tokens: tokens,
-      title: '$authorName mentioned you in a post',
-      body: 'Tap to view the post',
-      data: {'type': 'mention', 'id': postId},
-    );
+    await _callSendFunction({
+      'type': 'mention',
+      'id': postId,
+      'recipientUids': uids,
+    });
   }
 
   /// Call this right after FirebaseService.createPost() succeeds.
-  static Future<void> notifyFriendsNewPost({
-    required String authorUid,
-    required String authorName,
-    required String postId,
-  }) async {
-    final tokens = await _tokensWithSelf(authorUid);
-    if (tokens.isEmpty) return;
-
-    debugPrint('[FCM] notifyFriendsNewPost → ${tokens.length} token(s)');
-
-    await _callSendFunction(
-      tokens: tokens,
-      title: '$authorName posted',
-      body: 'Check out their latest post',
-      data: {'type': 'post', 'id': postId},
-    );
-  }
+  static Future<void> notifyFriendsNewPost({required String postId}) =>
+      _callSendFunction({'type': 'post', 'id': postId});
 
   /// Call this right after FirebaseService.createVersus() /
   /// createArtistVersus() succeeds.
-  static Future<void> notifyFriendsNewVersus({
-    required String creatorUid,
-    required String creatorName,
-    required String versusId,
-    required String versusType, // "album" | "artist"
-    required String entityName1,
-    required String entityName2,
-  }) async {
-    final tokens = await _tokensWithSelf(creatorUid);
-    if (tokens.isEmpty) return;
-
-    debugPrint('[FCM] notifyFriendsNewVersus → ${tokens.length} token(s)');
-
-    await _callSendFunction(
-      tokens: tokens,
-      title: '$creatorName started a versus',
-      body: '$entityName1 vs $entityName2',
-      data: {'type': 'versus', 'id': versusId, 'versusType': versusType},
-    );
-  }
+  static Future<void> notifyFriendsNewVersus({required String versusId}) =>
+      _callSendFunction({'type': 'versus', 'id': versusId});
 
   // ── Internal helpers ──────────────────────────────────────────────────────
 
-  // Combines friend tokens with the creator's own device token so that the
-  // sender also receives the notification (useful for single-device debugging).
-  static Future<List<String>> _tokensWithSelf(String uid) async {
-    final results = await Future.wait([
-      _getFriendTokens(uid),
-      _fcm.getToken(),
-    ]);
-    final friendTokens = results[0] as List<String>;
-    final ownToken = results[1] as String?;
-    final all = {...friendTokens};
-    if (ownToken != null && ownToken.isNotEmpty) all.add(ownToken);
-    return all.toList();
-  }
-
-  static Future<void> _callSendFunction({
-    required List<String> tokens,
-    required String title,
-    required String body,
-    required Map<String, String> data,
-  }) async {
+  static Future<void> _callSendFunction(Map<String, dynamic> payload) async {
     try {
       final result = await _functions
           .httpsCallable('sendFriendNotification')
-          .call<Map<String, dynamic>>({
-        'tokens': tokens,
-        'title': title,
-        'body': body,
-        'data': data,
-      });
+          .call<Map<String, dynamic>>(payload);
       debugPrint('[FCM] sent — success:${result.data['successCount']} '
           'fail:${result.data['failureCount']}');
     } on FirebaseFunctionsException catch (e) {

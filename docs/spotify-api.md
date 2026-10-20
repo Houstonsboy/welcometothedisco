@@ -23,14 +23,8 @@ device:
 5. Tokens are persisted via `lib/services/token_storage_service.dart` (Flutter Secure Storage) and
    refreshed there using the `refresh_token` grant when expired.
 
-**⚠️ Discrepancy found while writing this doc:** `functions/index.js` exports an `exchangeSpotifyCode`
-callable Cloud Function that does a *client-secret* based token exchange
-(`grant_type=authorization_code` + `client_secret`), and `CLAUDE.md` currently describes this as the
-path the app uses. It isn't — grepping `lib/` for `exchangeSpotifyCode` / `httpsCallable` shows the
-Flutter app never calls it; `spotify_auth.dart` talks to Spotify directly with PKCE instead (step 4
-above). The Cloud Function appears to be dead code from an earlier (non-PKCE) implementation. Worth
-either deleting it or confirming there's a reason it's still deployed before relying on either
-description.
+**Note:** an earlier client-secret based `exchangeSpotifyCode` Cloud Function was dead code from a
+pre-PKCE implementation and has been removed; the PKCE exchange above is the only token path.
 
 The exact scopes requested live in `AppConfig.spotifyScopes` (`lib/config/app_config.dart` — gitignored
 and not present in this checkout, see `CLAUDE.md`). Based on the endpoints actually called in
@@ -136,8 +130,7 @@ most likely to need actual implementation work before a Developer Policy review 
 
 ## 4. Checklist: what's needed to go live (beyond app-store rules, see the Firebase doc for those)
 
-- [ ] Resolve the `exchangeSpotifyCode` dead-code discrepancy (§1) — delete it or document why it's
-      kept.
+- [x] Resolve the `exchangeSpotifyCode` dead-code discrepancy (§1) — deleted from `functions/index.js`.
 - [ ] Add `429` handling (respect `Retry-After`) in `spotify_api.dart` — cheap insurance, not just a
       scale concern.
 - [ ] Decide the Development Mode user cap is acceptable for however this launches (private

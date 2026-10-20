@@ -229,7 +229,7 @@ class SpotifyAuth {
           'client_id': _clientId,
           'code_verifier': verifier,
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         debugPrint('[SpotifyAuth] Token exchange failed ${response.statusCode}: ${response.body}');

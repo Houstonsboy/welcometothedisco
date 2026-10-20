@@ -225,13 +225,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         remixEnabled: _remixEnabled,
         mentionedUids: _mentionedUids.toList(),
       );
-      final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
-      final name = FirebaseAuth.instance.currentUser?.displayName ?? 'Someone';
-      unawaited(NotificationService.notifyFriendsNewPost(
-        authorUid:  uid,
-        authorName: name,
-        postId:     postId,
-      ));
+      unawaited(NotificationService.notifyFriendsNewPost(postId: postId));
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {

@@ -5,22 +5,23 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "firebase deploy --only functions && npm run check:callables",
+    "check:callables": "node scripts/check_callables.js",
     "logs": "firebase functions:log",
-    "test": "jest --testPathPatterns=test/"
+    "test": "jest --testPathPatterns=test/",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rules \"npx jest test/rules.test.js\""
   },
   "engines": {
     "node": "24"
   },
   "main": "index.js",
   "dependencies": {
-    "axios": "^1.13.6",
     "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.0"
+    "firebase-functions": "^7.4.0"
   },
   "devDependencies": {
-    "firebase-functions-test": "^3.4.1",
-    "@firebase/rules-unit-testing": "^3.0.4"
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-functions-test": "^3.4.1"
   },
   "private": true
 }

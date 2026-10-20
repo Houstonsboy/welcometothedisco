@@ -20,16 +20,28 @@ service cloud.firestore {
     // `username_search` is maintained by the onUserWritten Cloud Function only.
     // Setting or changing `username` must claim usernames/{username} in the same
     // transaction (see FirebaseService.createUserProfile / updateCurrentUserProfile).
+    // `email` must never be stored here — this doc is world-readable; Firebase
+    // Auth holds the email. Removing a legacy `email` field is still allowed.
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId
         && !('username_search' in request.resource.data)
+        && !('email' in request.resource.data)
         && callerOwnsUsernameAfter(request.resource.data.get('username', null));
       allow update: if request.auth != null && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['username_search'])
+        && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['email'])
+             && 'email' in request.resource.data)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['username'])
             || callerOwnsUsernameAfter(request.resource.data.get('username', null)));
       allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // Owner-only data kept off the world-readable profile doc (FCM token at
+      // private/messaging). The sendFriendNotification function reads it via
+      // the Admin SDK.
+      match /private/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
 
       // Follow notifications subcollection
       // Doc ID = followerUID so one follower can only ever create one doc per recipient.
@@ -37,19 +49,53 @@ service cloud.firestore {
         // Only the recipient reads their own notifications
         allow read: if request.auth != null && request.auth.uid == userId;
 
-        // Follow: sender is the follower — must match followerID.
-        // Invite: sender is author — must match authorID; written under recipient userId.
-        // Mention: sender is the post author — must match authorID; written under each tagged userId.
-        allow create: if request.auth != null && (
-          request.resource.data.type == 'follow'
-            && request.resource.data.followerID == request.auth.uid
-          || request.resource.data.type == 'invite'
-            && request.resource.data.authorID == request.auth.uid
-            && userId != request.auth.uid
-          || request.resource.data.type == 'mention'
-            && request.resource.data.authorID == request.auth.uid
-            && userId != request.auth.uid
-        );
+        // Each type must point at something the sender really did to this
+        // recipient (mirrors sendFriendNotification's server-side checks), with
+        // a fixed field set, created unread. Never to yourself.
+        // Follow: doc ID = follower UID (one per follower).
+        // Invite: a versus the sender authored that names the recipient as collaborator.
+        // Mention: a post the sender authored that lists the recipient in mentionedUids.
+        function notifData() { return request.resource.data; }
+
+        function isFollowNotif() {
+          return notifData().type == 'follow'
+            && notifId == request.auth.uid
+            && notifData().followerID == request.auth.uid
+            && notifData().keys().hasOnly(['type', 'read', 'timestamp', 'followerID',
+                 'follower_username', 'follower_avatar', 'follower_bio']);
+        }
+
+        function isInviteNotif() {
+          let vid = notifData().get('versusID', '');
+          let v = get(/databases/$(database)/documents/versus/$(vid)).data;
+          return notifData().type == 'invite'
+            && notifData().authorID == request.auth.uid
+            && vid is string && vid != ''
+            && exists(/databases/$(database)/documents/versus/$(vid))
+            && v.get('authorID', v.get('Author', '')) == request.auth.uid
+            && v.get('collaboratorID', '') == userId
+            && notifData().keys().hasOnly(['type', 'read', 'timestamp', 'authorID',
+                 'authorName', 'author_avatar', 'versusID', 'artist1ID', 'artist1Name',
+                 'artist2ID', 'artist2Name']);
+        }
+
+        function isMentionNotif() {
+          let pid = notifData().get('postID', '');
+          let p = get(/databases/$(database)/documents/posts/$(pid)).data;
+          return notifData().type == 'mention'
+            && notifData().authorID == request.auth.uid
+            && pid is string && pid != ''
+            && exists(/databases/$(database)/documents/posts/$(pid))
+            && p.get('authorID', '') == request.auth.uid
+            && userId in p.get('mentionedUids', [])
+            && notifData().keys().hasOnly(['type', 'read', 'timestamp', 'authorID',
+                 'authorName', 'author_avatar', 'postID']);
+        }
+
+        allow create: if request.auth != null
+          && userId != request.auth.uid
+          && notifData().get('read', false) == false
+          && (isFollowNotif() || isInviteNotif() || isMentionNotif());
 
         // Only the recipient can update — restricted to marking as read only
         allow update: if request.auth != null
@@ -196,6 +242,46 @@ service cloud.firestore {
             ]);
       }
 
+      /// Author uid on the incoming doc (same Author/authorID fallback as above).
+      function versusAuthorUidAfter() {
+        return request.resource.data.get('authorID', request.resource.data.get('Author', ''));
+      }
+
+      /// Post-remix versus (FirebaseService.createPostRemixVersus): the remixer
+      /// creates it with the *source post's author* as author and themselves as
+      /// collaborator. Only allowed when that really is the source post's author.
+      function isPostRemixCreate() {
+        let postId = request.resource.data.get('sourcePostID', '');
+        return request.resource.data.get('type', '') == 'collaborator'
+          && request.resource.data.get('collaboratorID', '') == request.auth.uid
+          && postId is string && postId != ''
+          && exists(/databases/$(database)/documents/posts/$(postId))
+          && get(/databases/$(database)/documents/posts/$(postId)).data.get('authorID', '')
+               == versusAuthorUidAfter();
+      }
+
+      /// A backfilled cache field may only be filled in where it was empty —
+      /// never overwrite what the author (or an earlier backfill) stored.
+      function fillsEmptyOnly(f) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([f])
+          || resource.data.get(f, '') == ''
+          || resource.data.get(f, '') == null;
+      }
+
+      /// Cached image URLs must point at Spotify's image CDN, so nobody can make
+      /// the shared feed render an arbitrary image.
+      function isSpotifyImageUrl(f) {
+        return !(f in request.resource.data)
+          || request.resource.data[f] is string
+             && request.resource.data[f].matches(
+                  '^https://(i[.]scdn[.]co|mosaic[.]scdn[.]co|image-cdn-[a-z]+[.]spotifycdn[.]com)/[A-Za-z0-9/_.-]+$');
+      }
+
+      function isShortString(f) {
+        return !(f in request.resource.data)
+          || request.resource.data[f] is string && request.resource.data[f].size() <= 200;
+      }
+
       /// Lazy Spotify image/name cache fill-in: any viewer (not just the author) may
       /// populate these fields, since they're just cached display data keyed off the
       /// doc's own Spotify IDs and are read in the shared Inbox feed (see
@@ -207,19 +293,24 @@ service cloud.firestore {
                 'album1ImageUrl', 'album1ArtistName',
                 'album2ImageUrl', 'album2ArtistName',
                 'artist1ImageUrl', 'artist2ImageUrl'
-              ]);
+              ])
+          && fillsEmptyOnly('album1ImageUrl') && fillsEmptyOnly('album2ImageUrl')
+          && fillsEmptyOnly('artist1ImageUrl') && fillsEmptyOnly('artist2ImageUrl')
+          && fillsEmptyOnly('album1ArtistName') && fillsEmptyOnly('album2ArtistName')
+          && isSpotifyImageUrl('album1ImageUrl') && isSpotifyImageUrl('album2ImageUrl')
+          && isSpotifyImageUrl('artist1ImageUrl') && isSpotifyImageUrl('artist2ImageUrl')
+          && isShortString('album1ArtistName') && isShortString('album2ArtistName');
       }
 
       allow read: if request.auth != null;
       allow create: if request.auth != null
+        && (versusAuthorUidAfter() == request.auth.uid || isPostRemixCreate())
         && validArtistPairKeyAtCreate()
         && validAlbumPairKeyAtCreate();
       allow update: if request.auth != null
         && selfMatchupImmutable()
         && (
-          // One-off type backfill (e.g. album versus migration)
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type'])
-          || isVersusAuthor()
+          isVersusAuthor()
           || collaborationCollaboratorUpdate()
           || artistVersusOpenJoinUpdate()
           || versusImageCacheBackfill()
@@ -280,7 +371,22 @@ service cloud.firestore {
           && voterId() == request.auth.uid
           && versusId() != ''
           && ownerDocIdMatches()
+          && exists(/databases/$(database)/documents/versus/$(versusId()))
           && validPollPairKey();
+      }
+
+      /// Which matchup a poll counts towards is fixed at creation: onPollWritten
+      /// validates it against the versus then, and reverses a deleted poll's
+      /// contribution using these same fields. (Older polls may lack a field;
+      /// filling it in is fine, changing it isn't.)
+      function fixedOnceSet(f) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([f])
+          || !(f in resource.data);
+      }
+
+      function identityUnchanged() {
+        return fixedOnceSet('entity1_id') && fixedOnceSet('entity2_id')
+          && fixedOnceSet('entity_type') && fixedOnceSet('pair_key');
       }
 
       function isOwnerUpdate() {
@@ -297,7 +403,7 @@ service cloud.firestore {
 
       allow read: if isAuthed();
       allow create: if isOwnerCreate();
-      allow update: if isOwnerUpdate() && validPollPairKey();
+      allow update: if isOwnerUpdate() && identityUnchanged() && validPollPairKey();
       allow delete: if false;
     }
 
@@ -317,10 +423,13 @@ service cloud.firestore {
       allow update: if request.auth != null && (
         // Post owner can patch any field.
         isPostAuthor()
-        // Anyone can bump the remix counter (the remixer is not the post author).
+        // Anyone can bump the remix counter by exactly one (the remixer is not
+        // the post author) — FieldValue.increment(1).
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Remixcount'])
-        // Anyone can bump the share counter.
+          && request.resource.data.Remixcount == resource.data.get('Remixcount', 0) + 1
+        // Anyone can bump the share counter by exactly one.
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Sharecount'])
+          && request.resource.data.Sharecount == resource.data.get('Sharecount', 0) + 1
       );
 
       allow delete: if request.auth != null && isPostAuthor();

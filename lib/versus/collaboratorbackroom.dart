@@ -10,6 +10,7 @@ import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/versus/playable_album_cover.dart';
+import 'package:welcometothedisco/widgets/spotify_playback_feedback.dart';
 
 const _kPurple       = AppTheme.gradientStart;
 const _kPink         = AppTheme.gradientEnd;
@@ -819,7 +820,8 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       final played = await _api.play(uri);
       if (!mounted) return;
       if (!played) {
-        _showSpotifyPlaybackSnack(
+        await showSpotifyPlaybackFailure(
+          context,
           'Open Spotify on a phone, speaker, or desktop, then try again.',
         );
         return;

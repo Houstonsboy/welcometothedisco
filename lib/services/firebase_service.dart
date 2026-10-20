@@ -178,7 +178,6 @@ class FirebaseService {
     await NotificationService.notifyFriendNewFollow(
       recipientUid: recipientUid,
       followerUid: followerUid,
-      followerName: follower.username,
     );
   }
 
@@ -372,31 +371,6 @@ class FirebaseService {
       return entries.where((e) => e.isArtist).toList();
     }
     return entries;
-  }
-
-  /// One-time migration — adds type: "album" to all versus docs missing the field.
-  /// Call this once from a dev screen or admin button, then delete it.
-  /// Note: Firestore batch limit is 500; if you have more docs, run multiple times or chunk.
-  static Future<void> backfillVersusType() async {
-    final snapshot = await _firestore.collection('versus').get();
-
-    final batch = _firestore.batch();
-    int count = 0;
-
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      if (!data.containsKey('type')) {
-        batch.update(doc.reference, {'type': 'album'});
-        count++;
-      }
-    }
-
-    if (count > 0) {
-      await batch.commit();
-      debugPrint('[FirebaseService] backfillVersusType → updated $count docs');
-    } else {
-      debugPrint('[FirebaseService] backfillVersusType → nothing to update');
-    }
   }
 
   // ── Lazy image backfill — write Spotify images back to old versus docs ───────
@@ -863,8 +837,6 @@ class FirebaseService {
 
         await NotificationService.notifyFriendNewInvite(
           recipientUid: collaboratorUID.trim(),
-          senderUid: uid,
-          senderName: author?.username ?? '',
           versusId: versusID,
         );
       } catch (e) {
@@ -1561,7 +1533,6 @@ class FirebaseService {
   /// Throws [UsernameTakenException] if [username] belongs to someone else.
   static Future<void> createUserProfile({
     required String uid,
-    required String email,
     required String username,
     required String avatarPath,
     String bio = '',
@@ -1571,7 +1542,6 @@ class FirebaseService {
       uid: uid,
       username: username.trim().toLowerCase(),
       data: {
-        'email': email,
         'bio': bio.trim(),
         'avatar_path': avatarPath,
         'favorite_albums': _serializeFavoriteAlbums(favoriteAlbums),
@@ -1655,7 +1625,7 @@ class FirebaseService {
         ? profile!.username.trim()
         : (_auth.currentUser?.displayName?.trim().isNotEmpty ?? false
             ? _auth.currentUser!.displayName!.trim()
-            : (_auth.currentUser?.email?.split('@').first ?? 'User'));
+            : 'User');
     final authorAvatar = profile?.avatarPath.trim() ?? '';
 
     final recipients = mentionedUids
@@ -1731,8 +1701,6 @@ class FirebaseService {
 
     await NotificationService.notifyUsersMentionedInPost(
       recipientUids: recipientUids,
-      authorUid: authorUid,
-      authorName: authorName,
       postId: postId,
     );
   }

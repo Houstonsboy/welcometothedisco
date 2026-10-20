@@ -18,6 +18,7 @@ import 'package:welcometothedisco/utils/pair_utils.dart';
 import 'package:welcometothedisco/services/user_profile_cache_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
 import 'package:welcometothedisco/widgets/versus_share_card.dart';
+import 'package:welcometothedisco/widgets/spotify_playback_feedback.dart';
 
 const _kDefaultColor1 = AppTheme.gradientStart;
 const _kDefaultColor2 = AppTheme.gradientEnd;
@@ -773,9 +774,12 @@ class _VersusPlaygroundState extends State<VersusPlayground>
     try {
       final played = await _api.playRoundTracks(uri1, uri2);
       if (!played) {
-        _showPlaybackSnack(
-          'Open Spotify on a phone, speaker, or desktop, then try again.',
-        );
+        if (mounted) {
+          await showSpotifyPlaybackFailure(
+            context,
+            'Open Spotify on a phone, speaker, or desktop, then try again.',
+          );
+        }
         return false;
       }
       _hasVersusPlaybackStarted = true;

@@ -107,6 +107,67 @@ function computePairIncrements({ newVoterState, oldVoterData, versusId }) {
 }
 
 /**
+ * Trusted identity of a versus doc's two sides, used to validate polls — the
+ * voter writes the poll doc, so its entity IDs/names/type can't be trusted.
+ *
+ * Album versus (type "album", or legacy docs with no type) use album1ID/album2ID;
+ * artist, collaboration and post-remix ("collaborator") versus use artist1ID/artist2ID.
+ *
+ * maxPairedRounds is the number of head-to-head (non-bonus) rounds the versus
+ * can have — the shorter side's track count — or null when the doc doesn't
+ * record its tracks.
+ *
+ * Returns null when either side is missing (e.g. a collaboration nobody joined yet).
+ */
+function resolveVersusSides(versus) {
+  const v = versus || {};
+  const isAlbum = (v.type || "album") === "album";
+  const str = (x) => (typeof x === "string" ? x.trim() : "");
+  const len = (x) => (Array.isArray(x) ? x.length : 0);
+
+  const sides = isAlbum
+    ? {
+      entityType: "album",
+      entity1Id: str(v.album1ID), entity1Name: str(v.album1Name),
+      entity2Id: str(v.album2ID), entity2Name: str(v.album2Name),
+      tracks1: len(v.album1Tracklist), tracks2: len(v.album2Tracklist),
+    }
+    : {
+      entityType: "artist",
+      entity1Id: str(v.artist1ID), entity1Name: str(v.artist1Name),
+      entity2Id: str(v.artist2ID), entity2Name: str(v.artist2Name),
+      tracks1: len(v.artist1TrackIDs), tracks2: len(v.artist2TrackIDs),
+    };
+  if (!sides.entity1Id || !sides.entity2Id) return null;
+
+  const { tracks1, tracks2, ...rest } = sides;
+  return {
+    ...rest,
+    maxPairedRounds: tracks1 > 0 && tracks2 > 0 ? Math.min(tracks1, tracks2) : null,
+  };
+}
+
+/**
+ * Keeps one entry per round_number (first wins) and drops head-to-head rounds
+ * beyond what the versus actually has, so a hand-written poll can't stack
+ * extra or duplicate rounds. Bonus rounds are kept (countRounds ignores them).
+ */
+function sanitizeTrackDetails(trackDetails, maxPairedRounds) {
+  if (!Array.isArray(trackDetails)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const t of trackDetails) {
+    if (!t || typeof t !== "object") continue;
+    const n = t.round_number;
+    if (!Number.isInteger(n) || n < 0 || seen.has(n)) continue;
+    if (t.isBonus !== true && maxPairedRounds != null && n >= maxPairedRounds) continue;
+    seen.add(n);
+    out.push(t);
+  }
+  return out;
+}
+
+/**
  * Returns true when both entity IDs (trimmed) are identical — a self-matchup.
  * Self-matchups are recorded but excluded from pair docs and rankings.
  */
@@ -275,5 +336,6 @@ module.exports = {
   usernameSubstrings,
   makePairKey, countRounds, mapRoundsToAB,
   computeNewVoterState, computePairIncrements, isSelfMatchup,
+  resolveVersusSides, sanitizeTrackDetails,
   computeBradleyTerry, computeEntityStats, computeRanks,
 };

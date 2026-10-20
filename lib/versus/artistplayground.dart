@@ -13,6 +13,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
   import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/services/spotify_api.dart';
+import 'package:welcometothedisco/widgets/spotify_playback_feedback.dart';
   import 'package:welcometothedisco/utils/pair_utils.dart';
   import 'package:welcometothedisco/services/user_profile_cache_service.dart';
   import 'package:welcometothedisco/theme/app_theme.dart';
@@ -990,9 +991,12 @@ class _ArtistVersusPlaygroundState extends State<ArtistVersusPlayground>
     try {
       final played = await _api.playRoundTracks(firstUri, secondUri);
       if (!played) {
-        _showPlaybackSnack(
-          'Open Spotify on a phone, speaker, or desktop, then try again.',
-        );
+        if (mounted) {
+          await showSpotifyPlaybackFailure(
+            context,
+            'Open Spotify on a phone, speaker, or desktop, then try again.',
+          );
+        }
         return false;
       }
 

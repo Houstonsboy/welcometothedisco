@@ -33,6 +33,7 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   bool _loggingOut = false;
+  bool _deletingAccount = false;
   bool _reconnectingSpotify = false;
   bool _editing = false;
   bool _savingProfile = false;
@@ -190,6 +191,54 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  Future<void> _handleDeleteAccount() async {
+    if (_deletingAccount) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your profile, posts, versus battles and '
+          'votes, and removes you from your friends\' lists. This can\'t be '
+          'undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingAccount = true);
+    try {
+      await AuthService().deleteAccount();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    } catch (e) {
+      debugPrint('[UserProfilePage] delete account error: $e');
+      if (!mounted) return;
+      setState(() => _deletingAccount = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Couldn\'t delete your account. Please try again.'),
+          backgroundColor: _kPink.withValues(alpha: 0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   static String? _assetPath(String avatarPath) {
     final p = avatarPath.trim();
     if (p.isEmpty) return null;
@@ -342,6 +391,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       const SizedBox(height: 16),
                       ProfilePostsSection(authorUid: user!.id),
                     ],
+                    const SizedBox(height: 32),
+                    Center(
+                      child: TextButton(
+                        onPressed:
+                            _deletingAccount ? null : _handleDeleteAccount,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                        ),
+                        child: _deletingAccount
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.8,
+                                  color: Colors.redAccent,
+                                ),
+                              )
+                            : const Text('Delete account'),
+                      ),
+                    ),
                   ],
                 ),
               );

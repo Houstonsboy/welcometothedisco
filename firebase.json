@@ -4,16 +4,22 @@
     "indexes": "firestore.indexes.json"
   },
   "emulators": {
-    "firestore": { "port": 8080 },
-    "functions": { "port": 5001 },
-    "ui": { "enabled": true }
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true
+    }
   },
   "flutter": {
     "platforms": {
       "android": {
         "default": {
           "projectId": "jukebox-996de",
-          "appId": "1:941925661587:android:c28151ca996d3c8d7ac666",
+          "appId": "1:941925661587:android:85e9b8ad71a56c357ac666",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -21,11 +27,8 @@
         "lib/firebase_options.dart": {
           "projectId": "jukebox-996de",
           "configurations": {
-            "android": "1:941925661587:android:c28151ca996d3c8d7ac666",
-            "ios": "1:941925661587:ios:1bfb082ceee00f0c7ac666",
-            "macos": "1:941925661587:ios:1bfb082ceee00f0c7ac666",
-            "web": "1:941925661587:web:e8468dd133d0c5997ac666",
-            "windows": "1:941925661587:web:0e619334e2d4436c7ac666"
+            "android": "1:941925661587:android:85e9b8ad71a56c357ac666",
+            "ios": "1:941925661587:ios:f16152763c571a7a7ac666"
           }
         }
       }

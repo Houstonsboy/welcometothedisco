@@ -294,44 +294,65 @@ class SpotifyApi {
     };
   }
 
-  Future<http.Response> _get(String path, {Map<String, String>? query}) async {
+  static const _requestTimeout = Duration(seconds: 15);
+  static const _maxRetryAfter = Duration(seconds: 10);
+
+  /// Every Spotify call goes through here. With no token (Spotify not
+  /// connected) it returns a synthetic 401 without hitting the network; a call
+  /// that takes longer than [_requestTimeout] comes back as a synthetic 504,
+  /// so callers' existing "status != 200" handling covers stalled connections
+  /// instead of the UI waiting forever. A 429 is retried once after the
+  /// server's Retry-After, when that's short enough to wait for.
+  Future<http.Response> _send(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+  }) async {
     final uri = Uri.parse('$_base$path').replace(queryParameters: query);
     final h = await _headers();
     if (h == null) {
-      debugPrint('[SpotifyApi] GET $path → no token (Spotify not connected)');
+      debugPrint('[SpotifyApi] $method $path → no token (Spotify not connected)');
       return http.Response('', 401);
     }
-    final resp = await http.get(uri, headers: h);
-    debugPrint('[SpotifyApi] GET $path → ${resp.statusCode}');
-    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] GET $path error body: ${resp.body}');
+    final encoded = body != null ? jsonEncode(body) : null;
+
+    Future<http.Response> attempt() async {
+      try {
+        final request = switch (method) {
+          'PUT' => http.put(uri, headers: h, body: encoded),
+          'POST' => http.post(uri, headers: h, body: encoded),
+          _ => http.get(uri, headers: h),
+        };
+        return await request.timeout(_requestTimeout);
+      } on TimeoutException {
+        debugPrint('[SpotifyApi] $method $path → timed out');
+        return http.Response('', 504);
+      }
+    }
+
+    var resp = await attempt();
+    if (resp.statusCode == 429) {
+      final wait = Duration(seconds: int.tryParse(resp.headers['retry-after'] ?? '') ?? 1);
+      if (wait <= _maxRetryAfter) {
+        debugPrint('[SpotifyApi] $method $path → 429, retrying in ${wait.inSeconds}s');
+        await Future.delayed(wait);
+        resp = await attempt();
+      }
+    }
+    debugPrint('[SpotifyApi] $method $path → ${resp.statusCode}');
+    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] $method $path error body: ${resp.body}');
     return resp;
   }
 
-  Future<http.Response> _put(String path, {Object? body, Map<String, String>? query}) async {
-    final uri = Uri.parse('$_base$path').replace(queryParameters: query);
-    final h = await _headers();
-    if (h == null) {
-      debugPrint('[SpotifyApi] PUT $path → no token (Spotify not connected)');
-      return http.Response('', 401);
-    }
-    final resp = await http.put(uri, headers: h, body: body != null ? jsonEncode(body) : null);
-    debugPrint('[SpotifyApi] PUT $path → ${resp.statusCode}');
-    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] PUT $path error body: ${resp.body}');
-    return resp;
-  }
+  Future<http.Response> _get(String path, {Map<String, String>? query}) =>
+      _send('GET', path, query: query);
 
-  Future<http.Response> _post(String path, {Object? body, Map<String, String>? query}) async {
-    final uri = Uri.parse('$_base$path').replace(queryParameters: query);
-    final h = await _headers();
-    if (h == null) {
-      debugPrint('[SpotifyApi] POST $path → no token (Spotify not connected)');
-      return http.Response('', 401);
-    }
-    final resp = await http.post(uri, headers: h, body: body != null ? jsonEncode(body) : null);
-    debugPrint('[SpotifyApi] POST $path → ${resp.statusCode}');
-    if (resp.statusCode >= 400) debugPrint('[SpotifyApi] POST $path error body: ${resp.body}');
-    return resp;
-  }
+  Future<http.Response> _put(String path, {Object? body, Map<String, String>? query}) =>
+      _send('PUT', path, body: body, query: query);
+
+  Future<http.Response> _post(String path, {Object? body, Map<String, String>? query}) =>
+      _send('POST', path, body: body, query: query);
 
   // ── Devices ───────────────────────────────────────────────────────────────
 

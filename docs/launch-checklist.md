@@ -50,9 +50,9 @@ list with context; summarized + a few additions here:
 
 - [ ] Release signing: `android/app/build.gradle` still has `release { signingConfig =
       signingConfigs.debug }` — no real upload keystore / `key.properties` found in the repo.
-- [ ] `applicationId` is still the Flutter template default, `com.example.welcometothedisco`
-      (`android/app/build.gradle`) — rename before publishing, which also means regenerating
-      `google-services.json`.
+- [x] `applicationId` renamed to `com.jukebox.welcometothedisco`, with a regenerated
+      `google-services.json`. Add the release and Play App Signing SHA-1/256 to that Firebase app
+      once they exist.
 - [ ] Google Sign-In needs the **release** SHA-1/SHA-256 fingerprint registered in Firebase (debug
       fingerprint is presumably already there; production build will `DEVELOPER_ERROR` without it).
 - [ ] **No in-app account deletion flow** (grepped `lib/` — nothing). Google Play policy requires apps
@@ -68,10 +68,19 @@ list with context; summarized + a few additions here:
       not something you can skip by being ready early.
 - [ ] Confirm the **Blaze plan** is active on the `jukebox-996de` Firebase project — Spark cannot deploy
       Cloud Functions at all, which would silently break `sendFriendNotification` in production.
-- [ ] App Check isn't wired up (`firebase_core`/`cloud_firestore` in `pubspec.yaml` have no
-      `firebase_app_check` alongside them) — not a store requirement, but it's the only thing standing
-      between "valid Firebase auth token" and "actually our app," and it would also close part of the
-      notification abuse gap above.
+- [ ] **App Check: wired up, not yet enforced.** The app activates App Check (Play Integrity /
+      App Attest; debug provider in debug builds) and `sendFriendNotification` can require it.
+      To turn it on:
+      1. Firebase console → App Check → register the Android app with **Play Integrity** (needs the
+         app's SHA-256 signing fingerprints, incl. Play App Signing) and the iOS app with
+         **App Attest** (needs your Apple Team ID).
+      2. Run a debug build once per test device, copy the debug token it logs, and add it under
+         App Check → Manage debug tokens.
+      3. Watch App Check → APIs → Cloud Firestore / Cloud Functions metrics until nearly all
+         requests show as verified (i.e. the released app is sending tokens).
+      4. Enforce: set `ENFORCE_APP_CHECK=true` in `functions/.env` and redeploy functions; click
+         **Enforce** for Cloud Firestore in the console. Old app builds without App Check stop
+         working at that point.
 - [x] `compileSdkVersion`/`targetSdkVersion` already at 36 — satisfies Play's Android 16 target
       requirement, nothing to do unless a future Flutter upgrade regresses it.
 - [ ] Adaptive icon isn't explicitly configured in `flutter_launcher_icons` (no
@@ -82,7 +91,9 @@ list with context; summarized + a few additions here:
 
 - [ ] No `GoogleService-Info.plist` — Firebase won't initialize correctly on iOS without it.
 - [ ] No Push Notifications entitlement / `.entitlements` file (see §1).
-- [ ] Bundle ID is still `com.example.welcometothedisco` in `ios/Runner.xcodeproj/project.pbxproj`.
+- [x] Bundle ID renamed to `com.jukebox.welcometothedisco` (new `GoogleService-Info.plist` and Google
+      Sign-In client in `Info.plist`). Still needed: an App ID with Push Notifications in the Apple
+      developer portal for this bundle ID.
 - [ ] **Sign in with Apple is required** (App Store Guideline 4.8) because the app offers Google Sign-In
       as an account option — there's no Apple Sign-In code anywhere in `lib/authentication/` or
       `auth_service.dart` today. This is close to certain to be an App Review rejection reason without it.
@@ -97,11 +108,9 @@ See [spotify-api.md](./spotify-api.md) for full detail; key open items:
       beta sized to this cap, not around requesting more quota.
 - [ ] `spotify_api.dart` has no `429` / `Retry-After` handling — fine at current scale, worth adding
       before opening past the 25-user cap.
-- [ ] `functions/index.js`'s `exchangeSpotifyCode` callable appears to be dead code — the app's actual
-      auth flow (`spotify_auth.dart`) exchanges the PKCE code directly with Spotify, never calling this
-      function. Confirm that and either delete it or document why it's still deployed (it's also
-      unauthenticated and uninvolved-by-nobody-but-still-callable-by-anyone in its current form, which is
-      an unnecessary surface if it's genuinely unused).
+- [x] Dead `exchangeSpotifyCode` callable removed from `functions/index.js` (the app exchanges the PKCE
+      code directly with Spotify). Remove the deployed copy with
+      `firebase functions:delete exchangeSpotifyCode` and drop `SPOTIFY_CLIENT_SECRET` from `functions/.env`.
 - [ ] **Premium-required messaging was removed, not fixed, by the recent free-tier work.** Commits
       `f4cb90c` ("free spotify users can banjo") and `100b1c8` ("free spotify users can tango") deleted
       `lib/services/playback_gate.dart` (133 lines) and the `PlaybackResult.premiumRequired` /

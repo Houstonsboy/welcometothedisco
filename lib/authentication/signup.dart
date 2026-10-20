@@ -124,7 +124,6 @@ class _SignupScreenState extends State<SignupScreen> {
       try {
         await FirebaseService.createUserProfile(
           uid: user.uid,
-          email: user.email ?? '',
           username: username,
           avatarPath: _selectedAvatar!,
         );

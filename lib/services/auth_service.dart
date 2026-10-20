@@ -1,5 +1,6 @@
 // lib/services/auth_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:welcometothedisco/notification/notification_service.dart';
@@ -193,10 +194,33 @@ class AuthService {
   }
 
   // Sign out (Firebase only — Spotify tokens are intentionally kept so the
-  // user doesn't have to re-authenticate with Spotify on every login).
+  // user doesn't have to re-authenticate with Spotify on every login). They're
+  // scoped to this Firebase user (TokenStorageService), so another account
+  // signing in on this device doesn't get them.
   Future<void> signOut() async {
     final uid = _auth.currentUser?.uid ?? '';
     if (uid.isNotEmpty) await NotificationService.clearTokenForUser(uid);
+    await _googleSignIn.signOut();
+    await _auth.signOut();
+    await UserProfileCacheService.clear();
+  }
+
+  // Permanently deletes the account and all of the user's data server-side
+  // (see the deleteAccount Cloud Function), then clears everything held on
+  // this device — including Spotify tokens, unlike signOut().
+  Future<void> deleteAccount() async {
+    final uid = _auth.currentUser?.uid ?? '';
+    if (uid.isEmpty) return;
+    // Drop this device's token first so it can't receive anything meanwhile;
+    // the server deletes the token doc along with the rest of the profile.
+    await NotificationService.clearTokenForUser(uid);
+    await FirebaseFunctions.instance
+        .httpsCallable(
+          'deleteAccount',
+          options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+        )
+        .call<Map<String, dynamic>>();
+    await TokenStorageService.clearTokens();
     await _googleSignIn.signOut();
     await _auth.signOut();
     await UserProfileCacheService.clear();
