@@ -37,6 +37,12 @@ import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
 /// own — set as the MaterialApp's navigatorKey below.
 final navigatorKey = GlobalKey<NavigatorState>();
 
+/// Token exchange for a Spotify login redirect that cold-started the app (the
+/// process was killed while the user was in the browser). The app shell awaits
+/// it before checking for Spotify tokens, so it doesn't start a second login
+/// while this one is still completing.
+Future<void>? spotifyColdStartExchange;
+
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   // Keep native splash visible until SplashScreen.initState() calls remove().
@@ -46,31 +52,50 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   NotificationService.onNotificationTap = _handleNotificationTap;
-  await NotificationService.initialize();
+  spotifyColdStartExchange = _handleSpotifyColdStartLink();
 
-  // Cold-start: app opened by Spotify redirect URI.
-  final appLinks = AppLinks();
-  Uri? initialUri;
-  try {
-    initialUri = await appLinks.getInitialLink();
-  } catch (_) {}
-
-  if (initialUri != null &&
-      initialUri.toString().startsWith(AppConfig.spotifyRedirectUri)) {
-    debugPrint('[main] Cold-start deep link: $initialUri');
-    final auth = SpotifyAuth();
-    final handled = await auth.handleCallbackUri(initialUri.toString());
-    debugPrint('[main] handleCallbackUri result: $handled');
-  }
-
+  // Nothing network-bound or user-facing may gate the first frame: a Firestore
+  // write only completes on server ack (so offline it never would), and the
+  // notification permission prompt waits on the user. Both run after this.
   runApp(const MyApp());
+  unawaited(NotificationService.initialize());
+}
+
+Future<void> _handleSpotifyColdStartLink() async {
+  try {
+    final initialUri = await AppLinks().getInitialLink();
+    if (initialUri == null ||
+        !initialUri.toString().startsWith(AppConfig.spotifyRedirectUri)) {
+      return;
+    }
+    debugPrint('[main] Cold-start Spotify redirect');
+    final handled = await SpotifyAuth().handleCallbackUri(initialUri.toString());
+    debugPrint('[main] handleCallbackUri result: $handled');
+  } catch (e) {
+    debugPrint('[main] cold-start Spotify redirect failed: $e');
+  }
+}
+
+/// A tapped notification waits here until the signed-in app shell is on
+/// screen. Taps that arrive earlier (cold-start launch, splash, login) would
+/// otherwise be dropped, or pushed underneath the splash/login routes.
+Map<String, dynamic>? _pendingNotificationTap;
+bool _shellReady = false;
+
+void _flushPendingNotificationTap() {
+  final data = _pendingNotificationTap;
+  _pendingNotificationTap = null;
+  if (data != null) _handleNotificationTap(data);
 }
 
 /// Routes a tapped push notification (foreground banner, background tap, or
 /// cold-start launch) to the right screen based on its `data` payload.
 void _handleNotificationTap(Map<String, dynamic> data) {
   final navigator = navigatorKey.currentState;
-  if (navigator == null) return;
+  if (!_shellReady || navigator == null) {
+    _pendingNotificationTap = data;
+    return;
+  }
 
   final type = data['type'] as String?;
   final id = data['id'] as String?;
@@ -176,11 +201,9 @@ class _AuthGateState extends State<AuthGate> {
     if (current != null) {
       _user = current;
       _initializing = false;
-      unawaited(FirebaseService.ensureCurrentUserProfileCached());
-      unawaited(NotificationService.saveTokenForUser(current.uid));
-      NotificationService.startBadgeSync();
     }
-    // Stream handles future sign-in / sign-out events.
+    // Stream handles the current user (it emits immediately on listen) and
+    // future sign-in / sign-out events.
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (mounted) {
         setState(() {
@@ -240,16 +263,25 @@ class _AppShellState extends State<_AppShell> {
   @override
   void initState() {
     super.initState();
+    _shellReady = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _flushPendingNotificationTap();
+      // Signed in and on screen: the earliest point the OS permission prompt
+      // makes sense (and on iOS, the device token only exists after it).
+      unawaited(NotificationService.requestPermissionAndSaveToken());
+    });
     _initSpotify();
   }
 
   @override
   void dispose() {
+    _shellReady = false;
     _exitHintTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _initSpotify() async {
+    await spotifyColdStartExchange;
     final hasTokens = await TokenStorageService.hasSpotifyTokens();
     if (hasTokens) {
       await _loadSpotifyProfile();

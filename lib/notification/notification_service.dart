@@ -37,28 +37,15 @@ class NotificationService {
   static void Function(Map<String, dynamic> data)? onNotificationTap;
 
   // ── Initialise ────────────────────────────────────────────────────────────
-  /// Call once from main() after Firebase.initializeApp().
-  /// Requests permission, saves the device token, and wires message handlers.
+  /// Call once from main() right after runApp(); never await it there.
+  /// Wires message handlers only. The permission prompt and token save happen
+  /// in [requestPermissionAndSaveToken] once a signed-in user is on screen,
+  /// and AuthGate saves the token / starts badge sync on every sign-in.
   static Future<void> initialize() async {
     // Register the background handler before anything else.
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
 
     await _initLocalNotifications();
-
-    // Request permission (iOS prompts the user; Android 13+ also needs this).
-    final settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    debugPrint('[FCM] permission: ${settings.authorizationStatus}');
-
-    // Persist token for the current user if already signed in.
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      await saveTokenForUser(uid);
-      startBadgeSync();
-    }
 
     // Refresh token whenever FCM rotates it.
     _fcm.onTokenRefresh.listen((token) async {
@@ -150,10 +137,29 @@ class NotificationService {
   }
 
   // ── Token management ──────────────────────────────────────────────────────
+  /// Asks for notification permission (the OS only shows its prompt once;
+  /// later calls just return the current status), then saves the device
+  /// token — on iOS no usable token exists until the user allows
+  /// notifications. Call when a signed-in user is on screen, never at startup.
+  static Future<void> requestPermissionAndSaveToken() async {
+    try {
+      final settings = await _fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('[FCM] permission: ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('[FCM] permission request failed: $e');
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) await saveTokenForUser(uid);
+  }
+
   /// Fetch the current device token and save it to Firestore.
-  /// Call after sign-in and after sign-up.
-  /// Never throws — initialize() runs before runApp(), so a failure here
-  /// would otherwise stall startup on the splash screen.
+  /// Call after sign-in and after sign-up. Never throws, and callers should
+  /// not await it on a user-visible path: the Firestore write only completes
+  /// on server ack, so offline it stays pending.
   static Future<void> saveTokenForUser(String uid) async {
     try {
       final token = await _fcm.getToken();
@@ -185,12 +191,24 @@ class NotificationService {
 
   /// Clear the token on sign-out so the user stops receiving notifications
   /// on this device.
+  ///
+  /// Best effort and bounded: offline, the Firestore delete would never
+  /// complete and sign-out would hang. If it doesn't finish, this device may
+  /// keep getting the previous user's pushes until the next sign-in here
+  /// overwrites the token, or FCM reports it unregistered and
+  /// sendFriendNotification prunes it.
   static Future<void> clearTokenForUser(String uid) async {
     if (uid.isEmpty) return;
-    await _tokenDoc(uid).delete();
-    await _fcm.deleteToken();
     stopBadgeSync();
-    debugPrint('[FCM] token cleared for $uid');
+    try {
+      await Future.wait([
+        _tokenDoc(uid).delete(),
+        _fcm.deleteToken(),
+      ]).timeout(const Duration(seconds: 4));
+      debugPrint('[FCM] token cleared for $uid');
+    } catch (e) {
+      debugPrint('[FCM] token clear incomplete for $uid: $e');
+    }
   }
 
   // ── OS app-icon badge ─────────────────────────────────────────────────────

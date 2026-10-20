@@ -86,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen>
     _enterCtrl.forward();
 
     // Minimum display time — gives the user enough time to see the splash.
-    Future.delayed(const Duration(milliseconds: 3000), () {
+    Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
         _minTimeDone = true;
         _checkDone();
