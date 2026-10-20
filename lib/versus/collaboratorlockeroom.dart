@@ -11,6 +11,7 @@ import 'package:welcometothedisco/services/spotify_api.dart';
 import 'package:welcometothedisco/versus/collaboratorinvitebanner.dart';
 import 'package:welcometothedisco/versus/playable_album_cover.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
+import 'package:welcometothedisco/widgets/spotify_playback_feedback.dart';
 
 const _kPurple       = AppTheme.gradientStart;
 const _kPink         = AppTheme.gradientEnd;
@@ -2621,8 +2622,8 @@ class _PostRemixScreenState extends State<PostRemixScreen>
       final played = await _api.play(uri);
       if (!mounted) return;
       if (!played) {
-        _showPlaybackSnack(
-            'Open Spotify on a phone, speaker, or desktop, then try again.');
+        await showSpotifyPlaybackFailure(
+            context, 'Open Spotify on a phone, speaker, or desktop, then try again.');
         return;
       }
       setState(() => _previewPlayingTrackId = trackId);

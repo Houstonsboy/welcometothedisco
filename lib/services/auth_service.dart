@@ -194,7 +194,9 @@ class AuthService {
   }
 
   // Sign out (Firebase only — Spotify tokens are intentionally kept so the
-  // user doesn't have to re-authenticate with Spotify on every login).
+  // user doesn't have to re-authenticate with Spotify on every login). They're
+  // scoped to this Firebase user (TokenStorageService), so another account
+  // signing in on this device doesn't get them.
   Future<void> signOut() async {
     final uid = _auth.currentUser?.uid ?? '';
     if (uid.isNotEmpty) await NotificationService.clearTokenForUser(uid);

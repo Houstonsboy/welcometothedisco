@@ -16,6 +16,7 @@ import 'package:welcometothedisco/userprofile.dart';
 import 'package:welcometothedisco/models/artist_versus_model.dart';
 import 'package:welcometothedisco/versus/artistplayground.dart';
 import 'package:welcometothedisco/versus/collaboratorlockeroom.dart';
+import 'package:welcometothedisco/widgets/spotify_playback_feedback.dart';
 
 const _kGreen      = AppTheme.createGreen;
 const _kPink       = AppTheme.gradientEnd;
@@ -124,7 +125,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         if (ok) {
           setState(() => _playingTrackId = track.spotifyID);
         } else {
-          _snack('Open Spotify on a phone, speaker, or desktop, then try again.');
+          await showSpotifyPlaybackFailure(
+              context, 'Open Spotify on a phone, speaker, or desktop, then try again.');
         }
       }
     } catch (e) {
@@ -152,7 +154,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
         final ok = await _api.play(firstUri);
         if (!mounted) return;
         if (!ok) {
-          _snack('Open Spotify on a device first, then try again.');
+          await showSpotifyPlaybackFailure(
+              context, 'Open Spotify on a device first, then try again.');
           return;
         }
         setState(() => _playingTrackId = tracks.first.spotifyID);
