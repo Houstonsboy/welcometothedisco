@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>941925661587-7rd82bpchvhsncikcnro1pf0jvqfh3bt.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.941925661587-7rd82bpchvhsncikcnro1pf0jvqfh3bt</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>941925661587-1gndft15jmlnnuau01nmubkpa7apba45.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBpGgk5YiFAQ0VO38WjlcgWhQJ-km-5fnA</string>
+	<key>GCM_SENDER_ID</key>
+	<string>941925661587</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.jukebox.welcometothedisco</string>
+	<key>PROJECT_ID</key>
+	<string>jukebox-996de</string>
+	<key>STORAGE_BUCKET</key>
+	<string>jukebox-996de.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:941925661587:ios:f16152763c571a7a7ac666</string>
+	<key>DATABASE_URL</key>
+	<string>https://jukebox-996de-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
