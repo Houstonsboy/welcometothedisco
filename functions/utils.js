@@ -332,10 +332,139 @@ function usernameSubstrings(username) {
   return [...out].sort();
 }
 
+// ── Ranking history helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns the current day in Africa/Nairobi as "YYYY-MM-DD".
+ * ts — milliseconds since epoch (Date.now()).
+ */
+function nairobiDayKey(ts) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year:     "numeric",
+    month:    "2-digit",
+    day:      "2-digit",
+  }).format(new Date(ts));
+}
+
+/**
+ * Returns the ISO week in Africa/Nairobi as "YYYY-Www".
+ * ISO weeks run Mon–Sun; week 1 = the week that contains January 4th.
+ * ts — milliseconds since epoch (Date.now()).
+ */
+function nairobiWeekKey(ts) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi",
+    year:     "numeric",
+    month:    "2-digit",
+    day:      "2-digit",
+  }).formatToParts(new Date(ts));
+  const y = parseInt(parts.find(p => p.type === "year").value,  10);
+  const m = parseInt(parts.find(p => p.type === "month").value, 10) - 1;
+  const d = parseInt(parts.find(p => p.type === "day").value,   10);
+
+  // Work at UTC midnight of the Nairobi calendar date to avoid local-TZ drift.
+  const nd  = new Date(Date.UTC(y, m, d));
+  const dow = nd.getUTCDay() || 7; // 1 = Mon … 7 = Sun
+
+  // Thursday of this ISO week determines the ISO year.
+  const thu = new Date(nd);
+  thu.setUTCDate(nd.getUTCDate() + (4 - dow));
+
+  const isoYear = thu.getUTCFullYear();
+  const jan4    = new Date(Date.UTC(isoYear, 0, 4));
+  const jan4Dow = jan4.getUTCDay() || 7;
+  const week1Mon = new Date(jan4);
+  week1Mon.setUTCDate(jan4.getUTCDate() - (jan4Dow - 1));
+
+  const weekNum = Math.floor((thu.getTime() - week1Mon.getTime()) / (7 * 86_400_000)) + 1;
+  return `${isoYear}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+/**
+ * Computes baseline delta fields to merge into a rankings doc when the day or
+ * week has rolled over.  Returns null when no baseline update is needed.
+ *
+ * existingDoc    — current rankings doc data (or {} for a brand-new entity)
+ * currentPoints  — newly computed points (already rounded)
+ * currentRank    — newly computed rank (int | null)
+ * dayKey / weekKey — outputs of nairobiDayKey / nairobiWeekKey
+ */
+function rollBaseline(existingDoc, currentPoints, currentRank, dayKey, weekKey) {
+  const update = {};
+  if (!existingDoc.day_key || existingDoc.day_key !== dayKey) {
+    update.day_key          = dayKey;
+    update.day_start_points = currentPoints;
+    update.day_start_rank   = currentRank;
+  }
+  if (!existingDoc.week_key || existingDoc.week_key !== weekKey) {
+    update.week_key          = weekKey;
+    update.week_start_points = currentPoints;
+    update.week_start_rank   = currentRank;
+  }
+  return Object.keys(update).length > 0 ? update : null;
+}
+
+/**
+ * Merges a new BT snapshot into an existing history doc (OHLC style).
+ *
+ * existingHistory — current data of rankings/{id}/history/{dayKey}, or null/undefined for a new doc
+ * snap            — { points, rank, provisional, dayKey }
+ *
+ * Returns a full doc object ready to write (caller must replace updated_at with
+ * FieldValue.serverTimestamp() before writing).
+ */
+function mergeDailyHistory(existingHistory, { points, rank, provisional, dayKey }) {
+  const e     = existingHistory || {};
+  const isNew = !existingHistory;
+  return {
+    date:         dayKey,
+    open_points:  isNew ? points : (e.open_points  ?? points),
+    open_rank:    isNew ? rank   : ("open_rank" in e ? e.open_rank : rank),
+    close_points: points,
+    close_rank:   rank,
+    high_points:  isNew ? points : Math.max(e.high_points ?? -Infinity, points),
+    low_points:   isNew ? points : Math.min(e.low_points  ??  Infinity, points),
+    best_rank:    rank == null
+                    ? (e.best_rank  ?? null)
+                    : e.best_rank  == null ? rank : Math.min(e.best_rank,  rank),
+    worst_rank:   rank == null
+                    ? (e.worst_rank ?? null)
+                    : e.worst_rank == null ? rank : Math.max(e.worst_rank, rank),
+    provisional,
+    updates:      (e.updates || 0) + 1,
+    updated_at:   null, // caller replaces with FieldValue.serverTimestamp()
+  };
+}
+
+/**
+ * Computes points and rank delta for a given period from a rankings doc.
+ *
+ * doc    — rankings doc data object
+ * period — "day" | "week"
+ *
+ * Returns { pointsDelta: number|null, rankDelta: number|null }
+ * rankDelta is positive when the entity moved up (rank number decreased).
+ */
+function computeChange(doc, period) {
+  if (!doc) return { pointsDelta: null, rankDelta: null };
+  const startPoints = period === "day" ? doc.day_start_points  : doc.week_start_points;
+  const startRank   = period === "day" ? doc.day_start_rank    : doc.week_start_rank;
+  return {
+    pointsDelta: startPoints != null && doc.points != null
+      ? Math.round((doc.points - startPoints) * 100) / 100
+      : null,
+    rankDelta: startRank != null && doc.rank != null
+      ? startRank - doc.rank   // positive = improved
+      : null,
+  };
+}
+
 module.exports = {
   usernameSubstrings,
   makePairKey, countRounds, mapRoundsToAB,
   computeNewVoterState, computePairIncrements, isSelfMatchup,
   resolveVersusSides, sanitizeTrackDetails,
   computeBradleyTerry, computeEntityStats, computeRanks,
+  nairobiDayKey, nairobiWeekKey, rollBaseline, mergeDailyHistory, computeChange,
 };

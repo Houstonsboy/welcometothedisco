@@ -19,6 +19,10 @@ const {
   computeBradleyTerry,
   computeEntityStats,
   computeRanks,
+  nairobiDayKey,
+  nairobiWeekKey,
+  rollBaseline,
+  mergeDailyHistory,
 } = require("./utils");
 
 // ── Ranking job constants ─────────────────────────────────────────────────────
@@ -214,7 +218,10 @@ exports.recomputeRankings = onSchedule(
 );
 
 async function _runRankingForType(entityType) {
-  const typeStart = Date.now();
+  const now       = Date.now();
+  const typeStart = now;
+  const dayKey    = nairobiDayKey(now);
+  const weekKey   = nairobiWeekKey(now);
 
   // 1. Read all pairs for this entity type.
   const pairsSnap = await db.collection("pairs")
@@ -271,6 +278,17 @@ async function _runRankingForType(entityType) {
     return;
   }
 
+  // 2b. Batch-read today's history docs for all existing ranking entities.
+  const historyByEntityId = {};
+  if (rankingsSnap.docs.length > 0) {
+    const historyRefs  = rankingsSnap.docs.map(snap => snap.ref.collection("history").doc(dayKey));
+    const historySnaps = await db.getAll(...historyRefs);
+    for (let i = 0; i < rankingsSnap.docs.length; i++) {
+      historyByEntityId[rankingsSnap.docs[i].id] =
+        historySnaps[i].exists ? historySnaps[i].data() : null;
+    }
+  }
+
   // 3. Compute BT ratings, entity stats, and ranks.
   const { points, iterations } = computeBradleyTerry(rows, allEntityIds, { prior: RANKING_PRIOR });
   const stats = computeEntityStats(rows);
@@ -304,26 +322,43 @@ async function _runRankingForType(entityType) {
     const oldPoints      = typeof old.points === "number"
       ? Math.round(old.points * 100) / 100 : null;
 
+    const baselineUpdate = rollBaseline(old, newPoints, newRank, dayKey, weekKey);
+
     const changed =
       oldPoints                     !== newPoints      ||
       (old.rank ?? null)            !== newRank        ||
       (old.provisional ?? true)     !== newProvisional ||
       (old.distinct_opponents || 0) !== newDistinct    ||
       (old.total_voters || 0)       !== newTotalVoters ||
-      (old.entity_name_lower || "") !== newNameLower;
+      (old.entity_name_lower || "") !== newNameLower   ||
+      baselineUpdate !== null;
 
     if (!changed) continue;
 
     docsWritten++;
     bulkWriter.update(snap.ref, {
       points:             newPoints,
-      rank:               newRank,            // null is valid; undefined is not
+      rank:               newRank,
       provisional:        newProvisional,
       distinct_opponents: newDistinct,
       total_voters:       newTotalVoters,
       entity_name_lower:  newNameLower,
       points_updated_at:  FieldValue.serverTimestamp(),
+      ...(baselineUpdate || {}),
     });
+
+    // Write today's history (OHLC).
+    const existingHistory = historyByEntityId[id];
+    const histDoc = mergeDailyHistory(existingHistory, {
+      points: newPoints, rank: newRank, provisional: newProvisional, dayKey,
+    });
+    histDoc.updated_at = FieldValue.serverTimestamp();
+    const histRef = snap.ref.collection("history").doc(dayKey);
+    if (existingHistory) {
+      bulkWriter.update(histRef, histDoc);
+    } else {
+      bulkWriter.create(histRef, histDoc);
+    }
   }
 
   // 4b. Create rankings docs for entities found in pairs but with no existing doc.
@@ -357,7 +392,24 @@ async function _runRankingForType(entityType) {
       distinct_opponents: newDistinct,
       total_voters:       newTotalVoters,
       points_updated_at:  FieldValue.serverTimestamp(),
+      // Day-zero baselines.
+      day_key:            dayKey,
+      day_start_points:   newPoints,
+      day_start_rank:     newRank,
+      week_key:           weekKey,
+      week_start_points:  newPoints,
+      week_start_rank:    newRank,
     });
+
+    // Write creation-day history for the new entity.
+    const newHistDoc = mergeDailyHistory(null, {
+      points: newPoints, rank: newRank, provisional: newProvisional, dayKey,
+    });
+    newHistDoc.updated_at = FieldValue.serverTimestamp();
+    bulkWriter.create(
+      db.collection("rankings").doc(id).collection("history").doc(dayKey),
+      newHistDoc,
+    );
   }
 
   await bulkWriter.close();

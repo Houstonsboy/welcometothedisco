@@ -51,6 +51,12 @@ abstract final class AppTheme {
   /// Positive / success feedback (snackbars, completed states).
   static const Color successGreen         = Color(0xFF22C55E);
 
+  /// Ranking drop / loss indicator.
+  static const Color lossRed              = Color(0xFFEF4444);
+
+  /// Ranking no-change indicator (muted grey).
+  static const Color changeFlat           = Color(0xFF6B7280);
+
   /// "Honk" title accent used in app-bar / auth screen headings.
   static const Color titleAccent          = Color.fromARGB(255, 159, 181, 63);
 

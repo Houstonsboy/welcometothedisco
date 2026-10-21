@@ -1082,6 +1082,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         editedArtistID:      _myArtist!.id,
         editedArtistName:    _myArtist!.name,
         editedTrackIDs: _mySelectedTracks.map((t) => t.id).toList(),
+        editedTracklist: _mySelectedTracks.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': t.artistName,
+          'trackcover':  t.albumArtUrl ?? '',
+        }).toList(),
         editedComment: _commentCtrl.text.trim().isEmpty
             ? null
             : _commentCtrl.text.trim(),
@@ -1091,6 +1097,14 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         editedArtist2Name: _authorEditsBothSides ? _soloSide2Artist!.name : null,
         editedArtist2TrackIDs: _authorEditsBothSides
             ? _soloSide2SelectedTracks.map((t) => t.id).toList()
+            : null,
+        editedTracklist2: _authorEditsBothSides
+            ? _soloSide2SelectedTracks.map((t) => {
+                'spotifyID':   t.id,
+                'trackname':   t.name,
+                'trackartist': t.artistName,
+                'trackcover':  t.albumArtUrl ?? '',
+              }).toList()
             : null,
       );
       if (mounted) {

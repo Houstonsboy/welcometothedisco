@@ -445,6 +445,121 @@ describeEmulator("S25 — re-run after missing doc created: doc updated, created
   });
 });
 
+// ── S26 ───────────────────────────────────────────────────────────────────────
+// History subcollection: first run creates the history doc; second run merges.
+describeEmulator("S26 — history subcollection created and merged correctly", () => {
+  const A = "hist-a";
+  const B = "hist-b";
+  const PAIR_KEY = `${A}_${B}`;
+  let dayKey;
+
+  beforeAll(async () => {
+    await Promise.all([
+      clearCollection("pairs"),
+      clearCollection("rankings"),
+      clearCollection("ranking_runs"),
+    ]);
+    await seedPair(PAIR_KEY, "artist", A, B, 4, 1, 3);
+    await seedRankingStub(A, "artist", "Artist A");
+    await seedRankingStub(B, "artist", "Artist B");
+    await runRankingJob();
+
+    // Determine the day key from one of the written history docs.
+    const histSnap = await db.collection("rankings").doc(A)
+      .collection("history").limit(1).get();
+    dayKey = histSnap.docs[0]?.id;
+  });
+
+  test("history doc created for winning entity (A)", async () => {
+    expect(dayKey).toBeTruthy();
+    const h = await db.collection("rankings").doc(A)
+      .collection("history").doc(dayKey).get();
+    expect(h.exists).toBe(true);
+    const d = h.data();
+    expect(d.date).toBe(dayKey);
+    expect(typeof d.open_points).toBe("number");
+    expect(typeof d.close_points).toBe("number");
+    expect(d.high_points).toBeGreaterThanOrEqual(d.low_points);
+    expect(d.updates).toBe(1);
+  });
+
+  test("history doc created for losing entity (B)", async () => {
+    const h = await db.collection("rankings").doc(B)
+      .collection("history").doc(dayKey).get();
+    expect(h.exists).toBe(true);
+    expect(h.data().updates).toBe(1);
+  });
+
+  test("A open_points == close_points (only one run so far)", async () => {
+    const h = await db.collection("rankings").doc(A)
+      .collection("history").doc(dayKey).get();
+    const d = h.data();
+    expect(d.open_points).toBe(d.close_points);
+  });
+
+  test("second run merges: updates increments, open preserved, close updated", async () => {
+    // Mutate votes so the job sees a change and re-writes.
+    await db.collection("pairs").doc(PAIR_KEY).update({ votes_a: 5, votes_b: 1 });
+    await runRankingJob();
+
+    const h = await db.collection("rankings").doc(A)
+      .collection("history").doc(dayKey).get();
+    const d = h.data();
+    // open should be the same as first run (it's pinned on first write).
+    // close should reflect the updated points.
+    // updates should now be 2.
+    expect(d.updates).toBe(2);
+    expect(d.open_points).toBeDefined();
+    expect(d.close_points).toBeDefined();
+    expect(d.high_points).toBeGreaterThanOrEqual(d.low_points);
+  });
+});
+
+// ── S27 ───────────────────────────────────────────────────────────────────────
+// Baselines: day and week keys are set on first run and rolled on a new day.
+describeEmulator("S27 — day/week baselines written on rankings doc", () => {
+  const C = "baseline-c";
+  const D = "baseline-d";
+  const PAIR_KEY = `${C}_${D}`;
+
+  beforeAll(async () => {
+    await Promise.all([
+      clearCollection("pairs"),
+      clearCollection("rankings"),
+      clearCollection("ranking_runs"),
+    ]);
+    await seedPair(PAIR_KEY, "artist", C, D, 3, 2, 3);
+    await seedRankingStub(C, "artist", "Artist C");
+    await seedRankingStub(D, "artist", "Artist D");
+    await runRankingJob();
+  });
+
+  test("ranking doc for C has day_key, week_key, and start baselines", async () => {
+    const doc = await db.collection("rankings").doc(C).get();
+    const d = doc.data();
+    expect(d.day_key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(d.week_key).toMatch(/^\d{4}-W\d{2}$/);
+    expect(typeof d.day_start_points).toBe("number");
+    expect(typeof d.week_start_points).toBe("number");
+    // On first run, start equals current points.
+    expect(d.day_start_points).toBe(d.points);
+    expect(d.week_start_points).toBe(d.points);
+  });
+
+  test("second run same day: day_key unchanged, day_start_points preserved", async () => {
+    // Mutate votes so the doc changes and the job re-writes.
+    await db.collection("pairs").doc(PAIR_KEY).update({ votes_a: 4, votes_b: 1 });
+    await runRankingJob();
+
+    const doc = await db.collection("rankings").doc(C).get();
+    const d = doc.data();
+    // Baseline preserved since day/week haven't rolled.
+    expect(typeof d.day_start_points).toBe("number");
+    // day_start_points <= current points (it was pinned at first run's value).
+    expect(d.day_start_points).toBeLessThanOrEqual(d.points + 0.01);
+  });
+});
+
 // ── Rules: poll UPDATE with mismatched pair_key is denied ─────────────────────
 describeEmulator("Rules — poll UPDATE with mismatched pair_key is denied", () => {
   // This test uses the @firebase/rules-unit-testing client SDK

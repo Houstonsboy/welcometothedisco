@@ -16,6 +16,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///   distinct_opponents   int      (unique pair partners; updated by onPollWritten)
 ///   total_voters         int      (unique voters across all pairs; updated by onPollWritten)
 ///   points_updated_at    Timestamp? (null until nightly job first runs)
+///   day_key              string?  ("YYYY-MM-DD" in Africa/Nairobi)
+///   day_start_points     double?  (points at start of current day)
+///   day_start_rank       int?     (rank at start of current day; null if provisional then)
+///   week_key             string?  ("YYYY-Www" ISO week in Africa/Nairobi)
+///   week_start_points    double?  (points at start of current ISO week)
+///   week_start_rank      int?     (rank at start of current ISO week)
 class RankingModel {
   final String entityId;
   final String entityType;
@@ -29,6 +35,13 @@ class RankingModel {
   final int distinctOpponents;
   final int totalVoters;
   final DateTime? pointsUpdatedAt;
+  // Day/week baselines — set by the ranking job; used to compute change deltas.
+  final String? dayKey;
+  final double? dayStartPoints;
+  final int? dayStartRank;
+  final String? weekKey;
+  final double? weekStartPoints;
+  final int? weekStartRank;
 
   const RankingModel({
     required this.entityId,
@@ -43,6 +56,12 @@ class RankingModel {
     this.distinctOpponents = 0,
     this.totalVoters = 0,
     this.pointsUpdatedAt,
+    this.dayKey,
+    this.dayStartPoints,
+    this.dayStartRank,
+    this.weekKey,
+    this.weekStartPoints,
+    this.weekStartRank,
   });
 
   bool get isArtist => entityType == 'artist';
@@ -62,6 +81,12 @@ class RankingModel {
       distinctOpponents: (data['distinct_opponents'] as num?)?.toInt() ?? 0,
       totalVoters:       (data['total_voters'] as num?)?.toInt() ?? 0,
       pointsUpdatedAt:   _toDateTime(data['points_updated_at']),
+      dayKey:            data['day_key']            as String?,
+      dayStartPoints:    (data['day_start_points']  as num?)?.toDouble(),
+      dayStartRank:      (data['day_start_rank']    as num?)?.toInt(),
+      weekKey:           data['week_key']           as String?,
+      weekStartPoints:   (data['week_start_points'] as num?)?.toDouble(),
+      weekStartRank:     (data['week_start_rank']   as num?)?.toInt(),
     );
   }
 

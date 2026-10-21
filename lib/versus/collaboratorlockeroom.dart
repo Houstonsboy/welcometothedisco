@@ -2810,10 +2810,22 @@ class _PostRemixScreenState extends State<PostRemixScreen>
             .map((t) => t.spotifyID)
             .where((id) => id.isNotEmpty)
             .toList(),
+        artist1Tracklist: post.tracklist.map((t) => {
+          'spotifyID':   t.spotifyID,
+          'trackname':   t.trackName,
+          'trackartist': t.trackArtist,
+          'trackcover':  t.trackCover,
+        }).toList(),
         artist2ID:       _rightArtist!.id,
         artist2Name:     _rightArtist!.name,
         artist2ImageUrl: _rightArtist!.imageUrl ?? '',
         artist2TrackIDs: _rightSelected.map((t) => t.id).toList(),
+        artist2Tracklist: _rightSelected.map((t) => {
+          'spotifyID':   t.id,
+          'trackname':   t.name,
+          'trackartist': t.artistName,
+          'trackcover':  t.albumArtUrl ?? '',
+        }).toList(),
         remixPolicy:     post.remixEnabled.firestoreValue.toString(),
       );
       if (!mounted) return;

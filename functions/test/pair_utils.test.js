@@ -6,6 +6,7 @@
 const {
   makePairKey, countRounds, mapRoundsToAB, computeNewVoterState, computePairIncrements,
   computeBradleyTerry, computeEntityStats, computeRanks, isSelfMatchup,
+  nairobiDayKey, nairobiWeekKey, rollBaseline, mergeDailyHistory, computeChange,
 } = require("../utils");
 
 // ── makePairKey ───────────────────────────────────────────────────────────────
@@ -741,3 +742,209 @@ describe("isSelfMatchup", () => {
   });
 });
 
+
+// ── nairobiDayKey ─────────────────────────────────────────────────────────────
+
+describe("nairobiDayKey", () => {
+  // Africa/Nairobi = UTC+3 (no DST).
+  // UTC 2026-10-21T00:00:00Z → Nairobi 2026-10-21T03:00:00 → day "2026-10-21"
+  const oct21_utc = Date.UTC(2026, 9, 21, 0, 0, 0);
+  test("UTC midnight → same Nairobi calendar date", () => {
+    expect(nairobiDayKey(oct21_utc)).toBe("2026-10-21");
+  });
+
+  // UTC 2026-10-20T22:00:00Z → Nairobi 2026-10-21T01:00:00 → day "2026-10-21"
+  test("late UTC of previous day is next Nairobi day", () => {
+    const late_oct20_utc = Date.UTC(2026, 9, 20, 22, 0, 0);
+    expect(nairobiDayKey(late_oct20_utc)).toBe("2026-10-21");
+  });
+
+  // UTC 2026-10-20T20:59:00Z → Nairobi 2026-10-20T23:59:00 → day "2026-10-20"
+  test("one minute before Nairobi midnight → previous day", () => {
+    const just_before = Date.UTC(2026, 9, 20, 20, 59, 0);
+    expect(nairobiDayKey(just_before)).toBe("2026-10-20");
+  });
+
+  test("YYYY-MM-DD format", () => {
+    expect(nairobiDayKey(oct21_utc)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+// ── nairobiWeekKey ────────────────────────────────────────────────────────────
+
+describe("nairobiWeekKey", () => {
+  // 2026-W43: Mon 2026-10-19 – Sun 2026-10-25.
+  // Jan 1 2026 = Thursday → week 1 starts Dec 29 2025.
+  test("2026-10-21 (Wed) → 2026-W43", () => {
+    expect(nairobiWeekKey(Date.UTC(2026, 9, 21))).toBe("2026-W43");
+  });
+
+  // Jan 1 2026 is Thursday, the first Thursday of 2026 → week 1.
+  test("2026-01-01 (Thu) → 2026-W01", () => {
+    expect(nairobiWeekKey(Date.UTC(2026, 0, 1, 0, 0, 0))).toBe("2026-W01");
+  });
+
+  // Dec 29 2025 (Mon) is the first day of ISO week 1 of 2026 (its Thursday is Jan 1 2026).
+  test("2025-12-29 (Mon) → 2026-W01 (ISO year rolls forward)", () => {
+    expect(nairobiWeekKey(Date.UTC(2025, 11, 29, 3, 0, 0))).toBe("2026-W01");
+  });
+
+  // Dec 28 2025 (Sun) → the Thursday of that week is Dec 25 2025 → 2025-W52.
+  test("2025-12-28 (Sun) → 2025-W52", () => {
+    expect(nairobiWeekKey(Date.UTC(2025, 11, 28, 3, 0, 0))).toBe("2025-W52");
+  });
+
+  test("YYYY-Www format", () => {
+    expect(nairobiWeekKey(Date.UTC(2026, 9, 21))).toMatch(/^\d{4}-W\d{2}$/);
+  });
+});
+
+// ── rollBaseline ──────────────────────────────────────────────────────────────
+
+describe("rollBaseline", () => {
+  test("no existing keys → sets both day and week baselines", () => {
+    const result = rollBaseline({}, 120.5, 3, "2026-10-21", "2026-W43");
+    expect(result).toEqual({
+      day_key: "2026-10-21", day_start_points: 120.5, day_start_rank: 3,
+      week_key: "2026-W43", week_start_points: 120.5, week_start_rank: 3,
+    });
+  });
+
+  test("same day AND same week → returns null (no update needed)", () => {
+    const doc = {
+      day_key: "2026-10-21", day_start_points: 100, day_start_rank: 5,
+      week_key: "2026-W43",  week_start_points: 100, week_start_rank: 5,
+    };
+    expect(rollBaseline(doc, 115, 4, "2026-10-21", "2026-W43")).toBeNull();
+  });
+
+  test("new day, same week → rolls only day baseline", () => {
+    const doc = {
+      day_key: "2026-10-20", day_start_points: 100, day_start_rank: 5,
+      week_key: "2026-W43",  week_start_points: 100, week_start_rank: 5,
+    };
+    const result = rollBaseline(doc, 110, 4, "2026-10-21", "2026-W43");
+    expect(result).toEqual({
+      day_key: "2026-10-21", day_start_points: 110, day_start_rank: 4,
+    });
+    expect(result.week_key).toBeUndefined();
+  });
+
+  test("new week → rolls both day and week baselines", () => {
+    const doc = {
+      day_key: "2026-10-19", day_start_points: 100, day_start_rank: 5,
+      week_key: "2026-W42",  week_start_points: 90,  week_start_rank: 6,
+    };
+    const result = rollBaseline(doc, 130, 2, "2026-10-26", "2026-W44");
+    expect(result.week_key).toBe("2026-W44");
+    expect(result.week_start_points).toBe(130);
+    expect(result.day_key).toBe("2026-10-26");
+  });
+
+  test("null rank is stored correctly in the baseline", () => {
+    const result = rollBaseline({}, 100, null, "2026-10-21", "2026-W43");
+    expect(result.day_start_rank).toBeNull();
+    expect(result.week_start_rank).toBeNull();
+  });
+});
+
+// ── mergeDailyHistory ─────────────────────────────────────────────────────────
+
+describe("mergeDailyHistory", () => {
+  const base = { points: 100, rank: 5, provisional: false, dayKey: "2026-10-21" };
+
+  test("first call (no existing history) — open equals close, updates = 1", () => {
+    const h = mergeDailyHistory(null, base);
+    expect(h.date).toBe("2026-10-21");
+    expect(h.open_points).toBe(100);
+    expect(h.open_rank).toBe(5);
+    expect(h.close_points).toBe(100);
+    expect(h.close_rank).toBe(5);
+    expect(h.high_points).toBe(100);
+    expect(h.low_points).toBe(100);
+    expect(h.best_rank).toBe(5);
+    expect(h.worst_rank).toBe(5);
+    expect(h.provisional).toBe(false);
+    expect(h.updates).toBe(1);
+  });
+
+  test("second call — open preserved, high updated, updates incremented", () => {
+    const existing = mergeDailyHistory(null, base);
+    const h = mergeDailyHistory(existing, { points: 115, rank: 3, provisional: false, dayKey: "2026-10-21" });
+    expect(h.open_points).toBe(100);   // open never changes
+    expect(h.open_rank).toBe(5);
+    expect(h.close_points).toBe(115);  // close = latest
+    expect(h.high_points).toBe(115);   // high updated
+    expect(h.low_points).toBe(100);    // low unchanged
+    expect(h.best_rank).toBe(3);       // best_rank = min rank number
+    expect(h.worst_rank).toBe(5);
+    expect(h.updates).toBe(2);
+  });
+
+  test("lower points update low, higher low unchanged", () => {
+    const existing = mergeDailyHistory(null, base);
+    const h = mergeDailyHistory(existing, { points: 80, rank: 8, provisional: false, dayKey: "2026-10-21" });
+    expect(h.low_points).toBe(80);
+    expect(h.high_points).toBe(100);
+    expect(h.worst_rank).toBe(8);      // worst_rank = max rank number
+    expect(h.best_rank).toBe(5);
+  });
+
+  test("null rank — best/worst_rank stay null when no ranked snapshot ever seen", () => {
+    const h = mergeDailyHistory(null, { points: 100, rank: null, provisional: true, dayKey: "2026-10-21" });
+    expect(h.best_rank).toBeNull();
+    expect(h.worst_rank).toBeNull();
+  });
+
+  test("null rank after a non-null rank — existing best/worst preserved", () => {
+    const existing = mergeDailyHistory(null, { points: 100, rank: 5, provisional: false, dayKey: "2026-10-21" });
+    const h = mergeDailyHistory(existing, { points: 105, rank: null, provisional: true, dayKey: "2026-10-21" });
+    expect(h.best_rank).toBe(5);
+    expect(h.worst_rank).toBe(5);
+  });
+});
+
+// ── computeChange ─────────────────────────────────────────────────────────────
+
+describe("computeChange", () => {
+  test("null doc → both deltas null", () => {
+    expect(computeChange(null, "day")).toEqual({ pointsDelta: null, rankDelta: null });
+  });
+
+  test("day period, points went up", () => {
+    const doc = { points: 115, rank: 3, day_start_points: 100, day_start_rank: 5 };
+    const { pointsDelta, rankDelta } = computeChange(doc, "day");
+    expect(pointsDelta).toBe(15);   // 115 - 100
+    expect(rankDelta).toBe(2);      // 5 - 3 = +2 (moved up)
+  });
+
+  test("day period, points went down", () => {
+    const doc = { points: 90, rank: 7, day_start_points: 100, day_start_rank: 5 };
+    const { pointsDelta, rankDelta } = computeChange(doc, "day");
+    expect(pointsDelta).toBe(-10);
+    expect(rankDelta).toBe(-2);     // 5 - 7 = -2 (moved down)
+  });
+
+  test("week period reads week baselines", () => {
+    const doc = {
+      points: 120, rank: 2,
+      week_start_points: 100, week_start_rank: 4,
+      day_start_points: 110,  day_start_rank: 3,
+    };
+    const { pointsDelta, rankDelta } = computeChange(doc, "week");
+    expect(pointsDelta).toBe(20);  // uses week baseline, not day
+    expect(rankDelta).toBe(2);
+  });
+
+  test("no baseline set → both deltas null", () => {
+    const doc = { points: 110, rank: 3 };
+    expect(computeChange(doc, "day")).toEqual({ pointsDelta: null, rankDelta: null });
+  });
+
+  test("current rank null → rankDelta null", () => {
+    const doc = { points: 105, rank: null, day_start_points: 100, day_start_rank: 3 };
+    const { pointsDelta, rankDelta } = computeChange(doc, "day");
+    expect(pointsDelta).toBe(5);
+    expect(rankDelta).toBeNull();
+  });
+});

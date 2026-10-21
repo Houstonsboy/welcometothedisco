@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:welcometothedisco/Ranking/entity_history.dart';
 import 'package:welcometothedisco/models/pair_model.dart';
 import 'package:welcometothedisco/models/ranking_model.dart';
+import 'package:welcometothedisco/Ranking/widgets/points_chart.dart';
 import 'package:welcometothedisco/posts/profile_posts_section.dart';
 import 'package:welcometothedisco/services/firebase_service.dart';
 import 'package:welcometothedisco/theme/app_theme.dart';
@@ -197,6 +198,10 @@ class _EntityProfileScreenState extends State<EntityProfileScreen> {
           provisional: ranking?.provisional ?? true,
           rank: ranking?.rank,
         ),
+        if (ranking != null) ...[
+          const SizedBox(height: 14),
+          _PointsChartCard(entityId: widget.entityId),
+        ],
         const SizedBox(height: 14),
         _CollapsiblePairsWidget(
           pairs: _pairs,
@@ -725,6 +730,48 @@ class _PairListRow extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.09),
           ),
       ],
+    );
+  }
+}
+
+// ── Points chart card ─────────────────────────────────────────────────────────
+
+class _PointsChartCard extends StatelessWidget {
+  final String entityId;
+  const _PointsChartCard({required this.entityId});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withValues(alpha: 0.06),
+            border: Border.all(
+                color: Colors.white.withValues(alpha: 0.10), width: 0.7),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'POINTS HISTORY',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              PointsChart(entityId: entityId),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

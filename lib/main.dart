@@ -34,6 +34,7 @@ import 'package:welcometothedisco/posts/post_view.dart';
 import 'package:welcometothedisco/versus/playground.dart';
 import 'package:welcometothedisco/versus/artistplayground.dart';
 import 'package:welcometothedisco/versus/collaboratorbackroom.dart';
+import 'package:welcometothedisco/leaderboard/leaderboard_screen.dart';
 
 /// Lets notification tap handling push screens without a BuildContext of its
 /// own — set as the MaterialApp's navigatorKey below.
@@ -421,12 +422,15 @@ class _AppShellState extends State<_AppShell> {
               body: IndexedStack(
                 index: _selectedIndex,
                 children: [
-                  const ViewPostsScreen(),
+                  const ViewPostsScreen(),                       // 0 Posts
                   _mountedTabs.contains(1)
-                      ? const HomeScreenContent()
+                      ? const HomeScreenContent()                // 1 Versus/Search
                       : const SizedBox.shrink(),
                   _mountedTabs.contains(2)
-                      ? const FriendRequest()
+                      ? const LeaderboardScreen()                // 2 Leaderboard
+                      : const SizedBox.shrink(),
+                  _mountedTabs.contains(3)
+                      ? const FriendRequest()                    // 3 Friends
                       : const SizedBox.shrink(),
                 ],
               ),

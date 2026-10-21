@@ -685,17 +685,21 @@ class FirebaseService {
     final me         = results[0];
     final postAuthor = results[1];
 
+    final a1 = artist1ID.trim();
+    final a2 = artist2ID.trim();
+    final selfMatchup = isSelfMatchup(a1, a2);
+
     await _firestore.collection('versus').add({
       'type':           'collaborator',
       'status':         'open',
       'sourcePostID':   sourcePostID,
       'remixPolicy':    remixPolicy,
       // artist 1 — original post side (locked)
-      'artist1ID':       artist1ID.trim(),
+      'artist1ID':       a1,
       'artist1Name':     artist1Name.trim(),
       'artist1TrackIDs': artist1TrackIDs,
       // artist 2 — remixer's pick
-      'artist2ID':       artist2ID.trim(),
+      'artist2ID':       a2,
       'artist2Name':     artist2Name.trim(),
       'artist2TrackIDs': artist2TrackIDs,
       // ownership: post author is the "author", current user is collaborator
@@ -706,6 +710,10 @@ class FirebaseService {
       'collaborator_username': me?.username ?? '',
       'collaborator_avatar':   me?.avatarPath ?? '',
       'timestamp':             FieldValue.serverTimestamp(),
+      // Ranking metadata — same as artist lockeroom so polls/rankings work.
+      'entity_type':    'artist',
+      'is_self_matchup': selfMatchup,
+      if (!selfMatchup) 'pair_key': makePairKey(a1, a2),
       // Denormalized cover images — inbox renders immediately, no Spotify call.
       if (artist1ImageUrl.trim().isNotEmpty) 'artist1ImageUrl': artist1ImageUrl.trim(),
       if (artist2ImageUrl.trim().isNotEmpty) 'artist2ImageUrl': artist2ImageUrl.trim(),
@@ -1018,10 +1026,14 @@ class FirebaseService {
     String? editedComment,
     String? editorUsername,
     String? editorAvatarPath,
+    /// Full track objects (name/artist/cover) — written alongside the IDs so the
+    /// playground can render without Spotify API calls.
+    List<Map<String, dynamic>>? editedTracklist,
     /// When [collaboratorID] is empty, the author may set both sides in one update.
     String? editedArtist2ID,
     String? editedArtist2Name,
     List<String>? editedArtist2TrackIDs,
+    List<Map<String, dynamic>>? editedTracklist2,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('User not logged in');
@@ -1056,6 +1068,9 @@ class FirebaseService {
         update['artist1ID'] = editedArtistID.trim();
         update['artist1Name'] = editedArtistName.trim();
         update['artist1TrackIDs'] = editedTrackIDs.map((e) => e.trim()).toList();
+        if (editedTracklist != null && editedTracklist.isNotEmpty) {
+          update['artist1Tracklist'] = editedTracklist;
+        }
         final ac = editedComment?.trim();
         if (ac != null && ac.isNotEmpty) {
           update['authorComment'] = ac;
@@ -1077,17 +1092,44 @@ class FirebaseService {
           update['artist2Name'] = (editedArtist2Name ?? '').trim();
           update['artist2TrackIDs'] =
               editedArtist2TrackIDs.map((e) => e.trim()).toList();
+          if (editedTracklist2 != null && editedTracklist2.isNotEmpty) {
+            update['artist2Tracklist'] = editedTracklist2;
+          }
         }
       } else {
         update['artist2ID'] = editedArtistID.trim();
         update['artist2Name'] = editedArtistName.trim();
         update['artist2TrackIDs'] = editedTrackIDs.map((e) => e.trim()).toList();
+        if (editedTracklist != null && editedTracklist.isNotEmpty) {
+          update['artist2Tracklist'] = editedTracklist;
+        }
         final cc = editedComment?.trim();
         if (cc != null && cc.isNotEmpty) {
           update['collaboratorComment'] = cc;
         }
         update['collaborator_username'] = (editorUsername ?? '').trim();
         update['collaborator_avatar'] = (editorAvatarPath ?? '').trim();
+      }
+
+      // Write ranking metadata if not already present.
+      if ((data['entity_type'] as String? ?? '').isEmpty) {
+        update['entity_type'] = 'artist';
+      }
+      final a1Final = isAuthor
+          ? editedArtistID.trim()
+          : (data['artist1ID'] as String? ?? '').trim();
+      final a2Final = isAuthor
+          ? ((editedArtist2ID ?? '').trim().isNotEmpty
+              ? (editedArtist2ID ?? '').trim()
+              : (data['artist2ID'] as String? ?? '').trim())
+          : editedArtistID.trim();
+      final selfMatchup = isSelfMatchup(a1Final, a2Final);
+      update['is_self_matchup'] = selfMatchup;
+      if (!selfMatchup &&
+          a1Final.isNotEmpty &&
+          a2Final.isNotEmpty &&
+          (data['pair_key'] as String? ?? '').isEmpty) {
+        update['pair_key'] = makePairKey(a1Final, a2Final);
       }
 
       // Any non-completed collaboration edit should remain visible/active for battle.
