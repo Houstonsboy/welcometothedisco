@@ -5,11 +5,12 @@ import 'package:welcometothedisco/theme/app_theme.dart';
 
 // ── Chart range ───────────────────────────────────────────────────────────────
 
-enum _ChartRange { d7, d30, d90, y1 }
+enum _ChartRange { h24, d7, d30, d90, y1 }
 
 extension _ChartRangeLabel on _ChartRange {
   String get label {
     switch (this) {
+      case _ChartRange.h24: return '24H';
       case _ChartRange.d7:  return '7D';
       case _ChartRange.d30: return '30D';
       case _ChartRange.d90: return '90D';
@@ -19,6 +20,7 @@ extension _ChartRangeLabel on _ChartRange {
 
   int get days {
     switch (this) {
+      case _ChartRange.h24: return 1;
       case _ChartRange.d7:  return 7;
       case _ChartRange.d30: return 30;
       case _ChartRange.d90: return 90;
