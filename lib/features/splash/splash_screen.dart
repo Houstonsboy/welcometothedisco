@@ -54,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _rotateCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 1800),
     );
     _exitCtrl = AnimationController(
       vsync: this,
@@ -74,16 +74,8 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInCubic),
     );
 
-    _enterCtrl.addStatusListener((status) {
-      if (status == AnimationStatus.completed &&
-          _enableRotation &&
-          !_disableAnimations &&
-          mounted) {
-        _rotateCtrl.repeat();
-      }
-    });
-
     _enterCtrl.forward();
+    if (_enableRotation) _rotateCtrl.repeat();
 
     // Minimum display time — gives the user enough time to see the splash.
     Future.delayed(const Duration(milliseconds: 1000), () {

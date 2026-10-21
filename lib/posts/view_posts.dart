@@ -263,7 +263,12 @@ class _ViewPostsScreenState extends State<ViewPostsScreen> {
                       childCount: _posts.length + (_hasMore ? 1 : 0),
                     ),
                   ),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    // FAB (52 px) sits at bottom:24; nav bar ~56 px; system inset.
+                    height: MediaQuery.of(context).padding.bottom + 132,
+                  ),
+                ),
               ],
             ),
           ),
@@ -431,158 +436,161 @@ class _PostCard extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
+        // Two-column layout: left expands, right is fixed width.
+        // Row height = max(left, right) so neither column ever overflows.
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Section 1: author header ───────────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _authorAvatar(),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          post.authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _kTextPrimary,
-                            fontFamily: AppTheme.fontBody,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '· ${_relativeTime()}',
-                        style: const TextStyle(
-                          color: _kTextMuted,
-                          fontFamily: AppTheme.fontBody,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.more_horiz_rounded,
-                    color: Colors.white.withValues(alpha: 0.40), size: 18),
-              ],
-            ),
+            // ── Left: everything except the artist profile ─────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
-            const SizedBox(height: 8),
-
-            // ── Section 2: description anchors height; artist is
-            //    positioned top-right and does NOT affect Stack height,
-            //    so the tracklist margin tracks the description, not the
-            //    artist circle.
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Forces the Stack to stretch to full card width so that
-                // Positioned(right: 0) always anchors to the card edge,
-                // not the description text's natural width.
-                const SizedBox(width: double.infinity, height: 0),
-                // Description drives the Stack's intrinsic height
-                Padding(
-                  padding: const EdgeInsets.only(right: 68),
-                  child: _PostDescriptionBody(text: post.description),
-                ),
-                // Artist floats top-right, outside the layout flow
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  width: 56,
-                  child: Column(
+                  // Author header
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.22),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: post.artistImageUrl,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(
-                              color: _kBlue.withValues(alpha: 0.35),
-                              child: Icon(Icons.music_note_rounded,
-                                  color: _kPink.withValues(alpha: 0.9), size: 20),
+                      _authorAvatar(),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                post.authorName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: _kTextPrimary,
+                                  fontFamily: AppTheme.fontBody,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                            errorWidget: (_, __, ___) => Container(
-                              color: _kBlue.withValues(alpha: 0.35),
-                              child: Icon(Icons.music_note_rounded,
-                                  color: _kPink.withValues(alpha: 0.9), size: 20),
+                            const SizedBox(width: 5),
+                            Text(
+                              '· ${_relativeTime()}',
+                              style: const TextStyle(
+                                color: _kTextMuted,
+                                fontFamily: AppTheme.fontBody,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        post.artistName,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _kTextMuted,
-                          fontFamily: AppTheme.fontBody,
-                          fontSize: 9,
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 8),
+
+                  // Post description — wraps freely; never runs under the right column
+                  _PostDescriptionBody(text: post.description),
+
+                  const SizedBox(height: 10),
+
+                  // Overlapping track-cover circles (fixed-size Stack — safe)
+                  _OverlappingTrackCovers(tracklist: post.tracklist),
+
+                  const SizedBox(height: 9),
+
+                  // Action counts
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.loop_rounded,
+                          color: _kGreen.withValues(alpha: 0.75), size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _fmt(post.remixCount),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.50),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Icon(Icons.reply_rounded,
+                          color: Colors.white.withValues(alpha: 0.40), size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _fmt(post.shareCount),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.50),
+                          fontFamily: AppTheme.fontBody,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(width: 12),
 
-            // ── Section 3: tracklist covers ────────────────────────────
-            _OverlappingTrackCovers(tracklist: post.tracklist),
-
-            const SizedBox(height: 9),
-
-            // ── Section 4: action stats (left-aligned) ─────────────────
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.loop_rounded,
-                    color: _kGreen.withValues(alpha: 0.75), size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  _fmt(post.remixCount),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.50),
-                    fontFamily: AppTheme.fontBody,
-                    fontSize: 11,
+            // ── Right: artist profile + versus opponents ────────────────
+            SizedBox(
+              width: 65,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: post.artistImageUrl,
+                        width: 53,
+                        height: 53,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: _kBlue.withValues(alpha: 0.35),
+                          child: Icon(Icons.music_note_rounded,
+                              color: _kPink.withValues(alpha: 0.9), size: 20),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: _kBlue.withValues(alpha: 0.35),
+                          child: Icon(Icons.music_note_rounded,
+                              color: _kPink.withValues(alpha: 0.9), size: 20),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 18),
-                Icon(Icons.reply_rounded,
-                    color: Colors.white.withValues(alpha: 0.40), size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  _fmt(post.shareCount),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.50),
-                    fontFamily: AppTheme.fontBody,
-                    fontSize: 11,
+                  const SizedBox(height: 4),
+                  Text(
+                    post.artistName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _kTextMuted,
+                      fontFamily: AppTheme.fontBody,
+                      fontSize: 9,
+                    ),
                   ),
-                ),
-              ],
+                  if (post.remixCount > 0 && post.id.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    _RemixOpponentStrip(
+                      postId: post.id,
+                      circleSize: 19,
+                      overlap: 5,
+                      maxCount: 4,
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -825,6 +833,96 @@ class _CreatePostFABState extends State<_CreatePostFAB>
             size: 28,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Remix opponent circles (feed card) ──────────────────────────────────────
+class _RemixOpponentStrip extends StatelessWidget {
+  const _RemixOpponentStrip({
+    required this.postId,
+    this.circleSize = 20.0,
+    this.overlap    = 6.0,
+    this.maxCount   = 5,
+  });
+  final String postId;
+  final double circleSize;
+  final double overlap;
+  final int    maxCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: FirebaseService.getPostRemixesStream(postId).first,
+      builder: (context, snap) {
+        final remixes = snap.data ?? [];
+        if (remixes.isEmpty) return const SizedBox.shrink();
+
+        final items      = remixes.take(maxCount).toList();
+        final stackWidth = circleSize + (circleSize - overlap) * (items.length - 1);
+
+        return SizedBox(
+          height: circleSize,
+          width: stackWidth,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: List.generate(items.length, (i) {
+              final url =
+                  (items[i]['artist2ImageUrl'] as String?)?.trim() ?? '';
+              return Positioned(
+                left: i * (circleSize - overlap),
+                child: _OpponentCircle(url: url, size: circleSize),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OpponentCircle extends StatelessWidget {
+  const _OpponentCircle({required this.url, required this.size});
+  final String url;
+  final double size;
+
+  Widget _fallback() => Container(
+        color: _kBlue.withValues(alpha: 0.35),
+        child: Icon(Icons.music_note_rounded,
+            color: _kPink.withValues(alpha: 0.8), size: size * 0.5),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.22),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: url.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => _fallback(),
+                errorWidget: (_, __, ___) => _fallback(),
+              )
+            : _fallback(),
       ),
     );
   }

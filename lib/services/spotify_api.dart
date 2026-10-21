@@ -377,10 +377,39 @@ class SpotifyApi {
 
   // ── Playback control ──────────────────────────────────────────────────────
 
+  /// Returns a device ID ready to accept playback commands.
+  /// If no device is currently active, transfers playback to the first
+  /// available device (wakes it up) before returning. Returns null if no
+  /// devices are connected.
+  Future<String?> _readyDeviceId() async {
+    final resp = await _get('/me/player/devices');
+    if (resp.statusCode != 200) return null;
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final devices = (json['devices'] as List?) ?? [];
+    if (devices.isEmpty) return null;
+
+    final active = devices.firstWhere(
+      (d) => d['is_active'] == true,
+      orElse: () => devices.first,
+    );
+    final deviceId = active['id'] as String?;
+    if (deviceId == null) return null;
+
+    if (active['is_active'] != true) {
+      // Device exists but isn't active (e.g. mobile Spotify in background).
+      // Transfer playback to it first so the subsequent play command succeeds.
+      debugPrint('[SpotifyApi] _readyDeviceId — transferring to $deviceId');
+      await _put('/me/player', body: {'device_ids': [deviceId], 'play': false});
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+
+    return deviceId;
+  }
+
   Future<bool> play(String spotifyUri) async {
-    final deviceId = await getActiveDeviceId();
+    final deviceId = await _readyDeviceId();
     if (deviceId == null) {
-      debugPrint('[SpotifyApi] play() — no active device');
+      debugPrint('[SpotifyApi] play() — no device available');
       return false;
     }
     final resp = await _put(
@@ -392,9 +421,9 @@ class SpotifyApi {
   }
 
   Future<bool> playRoundTracks(String track1Uri, String track2Uri) async {
-    final deviceId = await getActiveDeviceId();
+    final deviceId = await _readyDeviceId();
     if (deviceId == null) {
-      debugPrint('[SpotifyApi] playRoundTracks() — no active device');
+      debugPrint('[SpotifyApi] playRoundTracks() — no device available');
       return false;
     }
     final playResp = await _put(
