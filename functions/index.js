@@ -156,6 +156,20 @@ exports.sendFriendNotification = onCall(async (request) => {
       data.versusType = vd.type || "album";
       break;
     }
+    case "tracks_needed": {
+      // Sender = collaborator who just added more tracks than the author.
+      // Recipient = the author who needs to match.
+      const v = await db.collection("versus").doc(id).get();
+      if (!v.exists) throw notInvolved();
+      const authorId = versusAuthor(v.data());
+      if (v.get("collaboratorID") !== senderUid || authorId !== recipientUid) {
+        throw notInvolved();
+      }
+      recipients = [recipientUid];
+      title = `${senderName} added tracks`;
+      body = "Open the versus to match their selection";
+      break;
+    }
     default:
       throw new HttpsError("invalid-argument", `Unknown type: ${type}`);
   }

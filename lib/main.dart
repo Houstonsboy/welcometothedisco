@@ -133,6 +133,7 @@ void _handleNotificationTap(Map<String, dynamic> data) {
       );
       break;
     case 'invite':
+    case 'tracks_needed':
       navigator.push(
         MaterialPageRoute(builder: (_) => CollaboratorBackroom(versusID: id)),
       );

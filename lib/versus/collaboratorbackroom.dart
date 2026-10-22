@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'dart:math' as math;
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -309,13 +312,18 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
 
     _trackSearchCtrl.addListener(_onTrackFilterChanged);
     _trackSearchCtrlSide2.addListener(_onTrackFilterChangedSide2);
-    _commentCtrl.addListener(() { if (mounted) setState(() {}); });
+    _commentCtrl.addListener(() {
+      if (mounted) {
+        setState(() {});
+        _saveDraft();
+      }
+    });
 
     if (_authorEditsBothSides) {
       unawaited(_loadSoloAuthorBothSides());
     } else {
       _loadUser1Tracks();
-      _checkPrefilledArtist2();
+      unawaited(_restoreDraftOrPrefill());
     }
   }
 
@@ -400,6 +408,72 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       });
       _fetchMyTopTracks(id);
     } catch (_) {}
+  }
+
+  // ── Draft persistence ──────────────────────────────────────────────────────
+
+  String get _draftKey =>
+      'collab_draft_${widget.versus.id}_${widget.currentUser.id}';
+
+  void _saveDraft() {
+    // Only persist the collaborator's own side; author-both-sides is a
+    // different (more complex) flow not covered here.
+    if (_authorEditsBothSides || _isAuthorEditor) return;
+    final artist = _myArtist;
+    final payload = jsonEncode({
+      'artistId':       artist?.id ?? '',
+      'artistName':     artist?.name ?? '',
+      'artistImageUrl': artist?.imageUrl,
+      'trackIds':       _mySelectedTracks.map((t) => t.id).toList(),
+      'comment':        _commentCtrl.text.trim(),
+    });
+    SharedPreferences.getInstance()
+        .then((p) => p.setString(_draftKey, payload));
+  }
+
+  void _clearDraft() {
+    SharedPreferences.getInstance().then((p) => p.remove(_draftKey));
+  }
+
+  /// Tries to restore a local draft first; falls back to Firestore-prefilled
+  /// data (artist2 already saved on the versus doc).
+  Future<void> _restoreDraftOrPrefill() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_draftKey);
+      if (raw != null) {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        final artistId = json['artistId'] as String? ?? '';
+        if (artistId.isNotEmpty) {
+          final artistName     = json['artistName'] as String? ?? '';
+          final artistImageUrl = json['artistImageUrl'] as String?;
+          final trackIds       = (json['trackIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .where((e) => e.isNotEmpty)
+              .toList() ?? [];
+          final comment = json['comment'] as String? ?? '';
+
+          final tracks = trackIds.isNotEmpty
+              ? await _api.getTracksByIds(trackIds)
+              : <SpotifyTrack>[];
+          if (!mounted) return;
+          setState(() {
+            _myArtist         = SpotifyArtistDetails(
+              id: artistId, name: artistName, imageUrl: artistImageUrl,
+            );
+            _myArtistImageUrl = artistImageUrl;
+            _mySelectedTracks = tracks;
+          });
+          if (comment.isNotEmpty) _commentCtrl.text = comment;
+          unawaited(_fetchMyTopTracks(artistId));
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[CollaboratorBackroom] draft restore failed: $e');
+    }
+    // No draft (or empty/corrupt) — fall back to Firestore-prefilled data.
+    await _checkPrefilledArtist2();
   }
 
   Future<void> _loadSoloAuthorBothSides() async {
@@ -618,6 +692,22 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       _lastArtistQuery  = '';
     });
     _fetchMyTopTracks(artist.id);
+    _saveDraft();
+  }
+
+  void _clearMyArtist() {
+    if (_artistsLocked) return;
+    setState(() {
+      _myArtist          = null;
+      _myArtistImageUrl  = null;
+      _myTopTracks       = [];
+      _myDiscographyTracks = [];
+      _mySelectedTracks  = [];
+      _trackSearchResults = null;
+      _trackFilterQuery  = '';
+      _trackSearchCtrl.clear();
+    });
+    _saveDraft();
   }
 
   void _selectArtistFromSearch(SpotifyArtistDetails artist) {
@@ -712,10 +802,12 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
         _mySelectedTracks.add(track);
       }
     });
+    _saveDraft();
   }
 
   void _removeMyTrack(String trackId) {
     setState(() => _mySelectedTracks.removeWhere((t) => t.id == trackId));
+    _saveDraft();
   }
 
   void _reorderMySelectedTracks(int oldIndex, int newIndex) {
@@ -730,6 +822,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
       final item = _mySelectedTracks.removeAt(oldIndex);
       _mySelectedTracks.insert(newIndex, item);
     });
+    _saveDraft();
   }
 
   List<SpotifyTrack> get _myVisibleTracks {
@@ -1107,11 +1200,21 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               }).toList()
             : null,
       );
+      if (hasLongerTracks) {
+        unawaited(FirebaseService.sendTracksNeededNotification(
+          authorUID:    widget.versus.authorID,
+          versusID:     widget.versus.id,
+          artist1ID:    widget.versus.artist1ID,
+          artist1Name:  widget.versus.artist1Name,
+          artist2ID:    _myArtist!.id,
+          artist2Name:  _myArtist!.name,
+        ));
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(hasLongerTracks
-              ? 'Saved. Other side will be notified to add tracks.'
-              : 'Versus is now live! 🔥'),
+              ? 'Saved. Your partner has been notified to add tracks.'
+              : 'Versus is now live!'),
           backgroundColor: _kSuccessGreen.withValues(alpha: 0.92),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1120,6 +1223,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           await _showLongerTracksNoticeDialog();
           if (!mounted) return;
         }
+        _clearDraft();
         // Return versusId so the caller can refetch/refresh.
         Navigator.of(context).pop(widget.versus.id);
       }
@@ -1412,16 +1516,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
               onTap: () => _goToPage(leftPageIndex),
               onRemove: (_myArtist == null || _artistsLocked)
                   ? null
-                  : () => setState(() {
-                        _myArtist              = null;
-                        _myArtistImageUrl      = null;
-                        _myTopTracks           = [];
-                        _myDiscographyTracks   = [];
-                        _mySelectedTracks      = [];
-                        _trackSearchResults = null;
-                        _trackFilterQuery = '';
-                        _trackSearchCtrl.clear();
-                      }),
+                  : _clearMyArtist,
             ),
           ),
           Padding(
@@ -1853,18 +1948,7 @@ class _CollaboratorAcceptScreenState extends State<CollaboratorAcceptScreen>
           trailing: _artistsLocked
               ? null
               : GestureDetector(
-            onTap: () {
-              setState(() {
-                _myArtist              = null;
-                _myArtistImageUrl      = null;
-                _myTopTracks           = [];
-                _myDiscographyTracks   = [];
-                _mySelectedTracks      = [];
-                _trackSearchResults    = null;
-                _trackFilterQuery      = '';
-                _trackSearchCtrl.clear();
-              });
-            },
+            onTap: _clearMyArtist,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(

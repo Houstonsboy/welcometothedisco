@@ -57,12 +57,22 @@ service cloud.firestore {
         // Mention: a post the sender authored that lists the recipient in mentionedUids.
         function notifData() { return request.resource.data; }
 
+        /// The recipient has blocked the sender (users/{uid}/private/moderation).
+        function senderBlocked() {
+          let path = /databases/$(database)/documents/users/$(userId)/private/moderation;
+          return exists(path)
+            && request.auth.uid in get(path).data.get('blocked', []);
+        }
+
         function isFollowNotif() {
           return notifData().type == 'follow'
             && notifId == request.auth.uid
             && notifData().followerID == request.auth.uid
             && notifData().keys().hasOnly(['type', 'read', 'timestamp', 'followerID',
-                 'follower_username', 'follower_avatar', 'follower_bio']);
+                 'follower_username', 'follower_avatar', 'follower_bio', 'follow_back'])
+            // Display hint only ("followed you back"): rules can't check it
+            // against the recipient's friends list of maps.
+            && notifData().get('follow_back', false) is bool;
         }
 
         function isInviteNotif() {
@@ -92,15 +102,44 @@ service cloud.firestore {
                  'authorName', 'author_avatar', 'postID']);
         }
 
+        // Collaborator notifies the author that they added more tracks and the
+        // author needs to open the versus to match them.
+        function isTracksNeededNotif() {
+          let vid = notifData().get('versusID', '');
+          let v = get(/databases/$(database)/documents/versus/$(vid)).data;
+          let vAuthor = v.get('authorID', v.get('Author', ''));
+          return notifData().type == 'tracks_needed'
+            && notifData().authorID == request.auth.uid
+            && vid is string && vid != ''
+            && exists(/databases/$(database)/documents/versus/$(vid))
+            && v.get('collaboratorID', '') == request.auth.uid
+            && vAuthor == userId
+            && notifData().keys().hasOnly(['type', 'read', 'timestamp', 'authorID',
+                 'authorName', 'author_avatar', 'versusID', 'artist1ID', 'artist1Name',
+                 'artist2ID', 'artist2Name']);
+        }
+
         allow create: if request.auth != null
           && userId != request.auth.uid
+          && !senderBlocked()
           && notifData().get('read', false) == false
-          && (isFollowNotif() || isInviteNotif() || isMentionNotif());
+          && (isFollowNotif() || isInviteNotif() || isMentionNotif() || isTracksNeededNotif());
 
-        // Only the recipient can update — restricted to marking as read only
-        allow update: if request.auth != null
-          && request.auth.uid == userId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow update: if request.auth != null && (
+          // The recipient marks it read.
+          request.auth.uid == userId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          // A re-follow (after an unfollow) rewrites the follower's own follow
+          // notification as new and unread, under the same checks as a create.
+          // At most once an hour, so follow/unfollow loops can't keep
+          // re-alerting the recipient.
+          || resource.data.get('type', '') == 'follow'
+            && userId != request.auth.uid
+            && !senderBlocked()
+            && notifData().get('read', false) == false
+            && isFollowNotif()
+            && request.time > resource.data.timestamp + duration.value(1, 'h')
+        );
       }
     }
 
@@ -136,12 +175,29 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == versusAuthorUid();
       }
 
-      /// Collaboration invitee: may only patch their side + status + comment; cannot reassign author/invite.
+      /// Collaboration invitee: may only patch their side + ranking metadata + status +
+      /// comment; cannot reassign author/invite fields.
+      ///
+      /// The four ranking-metadata fields (artist2Tracklist, entity_type, is_self_matchup,
+      /// pair_key) are written by FirebaseService.acceptCollaborationInvite alongside the
+      /// track data. entity_type and pair_key are immutable once set; is_self_matchup can
+      /// only move false → true (enforced globally by selfMatchupImmutable()).
       function collaborationCollaboratorUpdate() {
         let beforeAuthor = resource.data.get('authorID', resource.data.get('Author', ''));
         let afterAuthor = request.resource.data.get('authorID', request.resource.data.get('Author', ''));
         let beforeCollab = resource.data.get('collaboratorID', '');
         let afterCollab = request.resource.data.get('collaboratorID', '');
+        let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+        // pair_key is immutable once set.
+        let pairKeyAlreadySet = resource.data.get('pair_key', null) != null;
+        let pairKeyImmutable = !pairKeyAlreadySet
+          || request.resource.data.get('pair_key', null) == resource.data.get('pair_key', null);
+        // When pair_key is written for the first time it must be valid sorted form.
+        let pkValid = !affectedKeys.hasAny(['pair_key']) || validArtistPairKey();
+        // entity_type is immutable once set; when written now it must be 'artist'.
+        let entityTypeAlreadySet = resource.data.get('entity_type', '') != '';
+        let entityTypeValid = !affectedKeys.hasAny(['entity_type'])
+          || (!entityTypeAlreadySet && request.resource.data.get('entity_type', '') == 'artist');
         return request.auth != null
           && resource.data.get('type', '') == 'collaboration'
           && beforeCollab != ''
@@ -149,11 +205,16 @@ service cloud.firestore {
           && afterAuthor == beforeAuthor
           && afterCollab == beforeCollab
           && request.resource.data.get('type', '') == resource.data.get('type', '')
-          && request.resource.data.diff(resource.data).affectedKeys()
+          && pairKeyImmutable
+          && pkValid
+          && entityTypeValid
+          && affectedKeys
               .hasOnly([
                 'artist2ID', 'artist2Name', 'artist2TrackIDs',
+                'artist2Tracklist',
                 'status', 'collaboratorComment',
-                'collaborator_username', 'collaborator_avatar'
+                'collaborator_username', 'collaborator_avatar',
+                'entity_type', 'is_self_matchup', 'pair_key'
               ]);
       }
 
@@ -322,12 +383,6 @@ service cloud.firestore {
     match /rankings/{entityId} {
       allow read: if request.auth != null;
       allow create, update, delete: if false;
-
-      // Daily OHLC history: read-only from clients; written by Cloud Functions only.
-      match /history/{dayKey} {
-        allow read: if request.auth != null;
-        allow create, update, delete: if false;
-      }
     }
 
     // Pairs: read-only from clients; all writes are by Cloud Functions.
@@ -439,6 +494,33 @@ service cloud.firestore {
       );
 
       allow delete: if request.auth != null && isPostAuthor();
+    }
+
+    // Content reports (App Store 1.2 / Play UGC policy). Create-only: the
+    // reporter can't read, edit or delete reports, and nor can anyone else from
+    // a client; onReportCreated emails each one to support.
+    match /reports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['reporterID', 'targetType', 'targetID', 'targetOwnerID', 'reason', 'details', 'createdAt'])
+        && request.resource.data.reporterID == request.auth.uid
+        && request.resource.data.targetType in ['post', 'versus', 'user']
+        && request.resource.data.targetID is string
+        && request.resource.data.targetID.size() > 0
+        && request.resource.data.targetID.size() <= 128
+        && request.resource.data.get('targetOwnerID', '') is string
+        && request.resource.data.reason in
+             ['spam', 'harassment', 'hate', 'sexual', 'violence', 'impersonation', 'other']
+        && request.resource.data.get('details', '') is string
+        && request.resource.data.get('details', '').size() <= 1000
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
+    // Outgoing email queue for the Trigger Email extension. Server-only: a
+    // client that could write here could send mail through our SMTP account.
+    match /mail/{mailId} {
+      allow read, write: if false;
     }
 
     // Ranking run audit log: written only by Cloud Functions, never by clients.

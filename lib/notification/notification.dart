@@ -174,7 +174,7 @@ class InboxNotificationItem {
   factory InboxNotificationItem.fromDoc(
       QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final t = doc.data()['type'] as String?;
-    if (t == 'invite') {
+    if (t == 'invite' || t == 'tracks_needed') {
       return InboxNotificationItem._invite(InviteNotification.fromDoc(doc));
     }
     if (t == 'mention') {

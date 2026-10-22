@@ -67,6 +67,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "941925661587-npr10tq3rtpiog8uas2brggp2m9mi21c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jukebox.welcometothedisco",
+            "certificate_hash": "6c8b424ac30c90e43c819a20912088ff58aa18e7"
+          }
+        },
+        {
           "client_id": "941925661587-tg3k81mnnh7a913m27cok0ggpiuvsqm7.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

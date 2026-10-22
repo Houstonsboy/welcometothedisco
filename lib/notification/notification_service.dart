@@ -302,6 +302,18 @@ class NotificationService {
   static Future<void> notifyFriendsNewVersus({required String versusId}) =>
       _callSendFunction({'type': 'versus', 'id': versusId});
 
+  /// Call after the collaborator submits more tracks than the author side has,
+  /// so the author knows they need to open the versus and add matching tracks.
+  static Future<void> notifyAuthorTracksNeeded({
+    required String recipientUid,
+    required String versusId,
+  }) =>
+      _callSendFunction({
+        'type': 'tracks_needed',
+        'id': versusId,
+        'recipientUid': recipientUid,
+      });
+
   // ── Internal helpers ──────────────────────────────────────────────────────
 
   static Future<void> _callSendFunction(Map<String, dynamic> payload) async {

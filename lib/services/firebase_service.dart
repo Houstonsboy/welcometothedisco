@@ -856,6 +856,45 @@ class FirebaseService {
     return versusID;
   }
 
+  // ── Notify author that collaborator added more tracks (needs to match) ────
+  static Future<void> sendTracksNeededNotification({
+    required String authorUID,
+    required String versusID,
+    required String artist1ID,
+    required String artist1Name,
+    required String artist2ID,
+    required String artist2Name,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid == authorUID) return;
+    final sender = await getCurrentUser();
+    try {
+      await _firestore
+          .collection('users')
+          .doc(authorUID)
+          .collection('notifications')
+          .add({
+        'type': 'tracks_needed',
+        'read': false,
+        'timestamp': FieldValue.serverTimestamp(),
+        'authorID': uid,
+        'authorName': sender?.username ?? '',
+        'author_avatar': sender?.avatarPath ?? '',
+        'versusID': versusID,
+        'artist1ID': artist1ID,
+        'artist1Name': artist1Name,
+        'artist2ID': artist2ID,
+        'artist2Name': artist2Name,
+      });
+      await NotificationService.notifyAuthorTracksNeeded(
+        recipientUid: authorUID,
+        versusId: versusID,
+      );
+    } catch (e) {
+      debugPrint('[FirebaseService] sendTracksNeededNotification failed: $e');
+    }
+  }
+
   // ── Fetch single artist versus by doc ID ──────────────────────────────────
   static Future<ArtistVersusModel?> getArtistVersusById(
       String documentId) async {
